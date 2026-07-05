@@ -364,6 +364,13 @@ char const * GameFileClass::Set_Name( char const *filename )
 		}
 	}
 
+#ifdef __EMSCRIPTEN__
+	if( m_fileExists == FALSE )
+	{
+		fprintf(stderr, "[W3DFS_MISS] '%s' (last path tried: '%s')\n", filename, m_filePath);
+	}
+#endif
+
 	return m_filename;
 
 }

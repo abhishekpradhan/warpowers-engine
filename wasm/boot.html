@@ -51,12 +51,16 @@
       onAbort: function(w) { log('ABORT: ' + w); },
       preRun: [function() {
         ENV.CNC_GENERALS_ZH_PATH = '/game';
+        ENV.CNC_GENERALS_PATH = '/game-base';  // base-game archives (ZH mounts first, wins conflicts)
         ENV.HOME = '/home/web_user';
         FS.mkdir('/game');
+        FS.mkdir('/game-base');
         FS.mkdir('/fonts');
         addRunDependency('gamedata');
         // name → path in the wasm FS; the fontconfig stub resolves every font
         // query to /fonts/default.ttf, so a real TTF must be staged there.
+        // ZH is an expansion: much of its art (terrain, effects, models) lives
+        // in the BASE game's archives, mounted from CNC_GENERALS_PATH.
         var files = [
           ['INIZH.big', '/game/INIZH.big'],
           ['EnglishZH.big', '/game/EnglishZH.big'],
@@ -64,6 +68,12 @@
           ['gensecZH.big', '/game/gensecZH.big'],
           ['TexturesZH.big', '/game/TexturesZH.big'],
           ['W3DZH.big', '/game/W3DZH.big'],
+          ['TerrainZH.big', '/game/TerrainZH.big'],
+          ['MapsZH.big', '/game/MapsZH.big'],
+          ['base-Textures.big', '/game-base/Textures.big'],
+          ['base-W3D.big', '/game-base/W3D.big'],
+          ['base-Terrain.big', '/game-base/Terrain.big'],
+          ['base-Window.big', '/game-base/Window.big'],
           ['default.ttf', '/fonts/default.ttf'],
         ];
         var done = 0;
