@@ -240,7 +240,7 @@ target_sources(corei_ww3d2 INTERFACE ${WW3D2_SRC})
 
 # GeneralsX @build fbraz 11/02/2026 BenderAI - Enable FreeType text rendering on Linux/macOS
 target_compile_definitions(corei_ww3d2 INTERFACE
-    $<$<PLATFORM_ID:Linux,Darwin>:SAGE_USE_FREETYPE>
+    $<$<PLATFORM_ID:Linux,Darwin,Emscripten>:SAGE_USE_FREETYPE>
 )
 
 if (MSVC AND NOT IS_VS6_BUILD)
@@ -250,7 +250,8 @@ if (MSVC AND NOT IS_VS6_BUILD)
 endif()
 
 # GeneralsX @build fbraz 11/02/2026 BenderAI - FreeType2 for Unix text rendering (Linux + macOS Phase 5)
-if(UNIX)
+# Igroteka @build 05/07/2026 Emscripten: freetype via port flag, fontconfig stubbed
+if(UNIX AND NOT EMSCRIPTEN)
     find_package(Freetype REQUIRED)
     # GeneralsX @build felipebraz 20/06/2025 fontconfig needed on macOS too (render2dsentence.cpp uses Locate_Font_FontConfig)
     find_package(Fontconfig REQUIRED)
@@ -267,4 +268,5 @@ target_link_libraries(corei_ww3d2 INTERFACE
     $<$<PLATFORM_ID:Linux>:Fontconfig::Fontconfig>
     $<$<PLATFORM_ID:Darwin>:Fontconfig::Fontconfig>
     $<$<PLATFORM_ID:Darwin>:Iconv::Iconv>
+    $<$<PLATFORM_ID:Emscripten>:fontconfig_stub>
 )

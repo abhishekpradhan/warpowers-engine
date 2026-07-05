@@ -1,0 +1,67 @@
+# Igroteka @build 05/07/2026 - Emscripten dependency strategy (no vcpkg).
+# glm/gli: header-only, fetched directly (their own CMake is skipped — Populate only).
+# freetype: Emscripten built-in port (-sUSE_FREETYPE=1 at compile and link).
+# fontconfig: local stub resolving every font query to the bundled /fonts/default.ttf.
+# openal/curl: not used on wasm (miniaudio audio, update check off).
+
+if(NOT EMSCRIPTEN)
+    return()
+endif()
+
+include(FetchContent)
+
+# ---- glm (header-only) ----
+FetchContent_Declare(
+    glm_src
+    URL https://github.com/g-truc/glm/archive/refs/tags/1.0.1.tar.gz
+    URL_HASH SHA256=9f3174561fd26904b23f0db5e560971cbf9b3cbda0b280f04d5c379d03bf234c
+)
+FetchContent_GetProperties(glm_src)
+if(NOT glm_src_POPULATED)
+    FetchContent_Populate(glm_src)
+endif()
+if(NOT TARGET glm::glm)
+    add_library(glm_headers INTERFACE)
+    target_include_directories(glm_headers INTERFACE ${glm_src_SOURCE_DIR})
+    add_library(glm::glm ALIAS glm_headers)
+endif()
+
+# ---- gli (header-only) ----
+FetchContent_Declare(
+    gli_src
+    URL https://github.com/g-truc/gli/archive/refs/tags/0.8.2.0.tar.gz
+    URL_HASH SHA256=9e7024c2df77c011eff4f66667c1834620c70b7902cd50f32ab48edd49fe0139
+)
+FetchContent_GetProperties(gli_src)
+if(NOT gli_src_POPULATED)
+    FetchContent_Populate(gli_src)
+endif()
+if(NOT TARGET gli)
+    add_library(gli INTERFACE)
+    target_include_directories(gli INTERFACE ${gli_src_SOURCE_DIR})
+endif()
+
+# ---- freetype via Emscripten port ----
+# The port supplies headers at compile time and the library at link time.
+add_compile_options("-sUSE_FREETYPE=1")
+add_link_options("-sUSE_FREETYPE=1")
+
+# ---- fontconfig stub ----
+add_library(fontconfig_stub STATIC ${CMAKE_SOURCE_DIR}/wasm/fontconfig_stub/fontconfig_stub.c)
+target_include_directories(fontconfig_stub PUBLIC ${CMAKE_SOURCE_DIR}/wasm/fontconfig_stub)
+# Header visible everywhere; the stub library is linked explicitly by WW3D2
+# (a global link_libraries() here would leak into SDL3's exported targets).
+include_directories(${CMAKE_SOURCE_DIR}/wasm/fontconfig_stub)
+
+message(STATUS "wasm-deps: glm/gli fetched, freetype via emscripten port, fontconfig stubbed")
+
+# ---- GameSpy SDK platform identity ----
+# The vendored GameSpy SDK detects platforms via __linux__ and defines _LINUX
+# internally; Emscripten defines neither. Its Linux/POSIX paths compile fine
+# against Emscripten's musl headers (sockets exist at compile time; the service
+# is dead anyway and the transport gets replaced with WebRTC later).
+# GameSpy platform defines live in cmake/gamespy.cmake (PUBLIC on the gamespy target).
+
+# ---- libc gap shim ----
+# Force-included into every TU: wcslcpy/wcslcat (BSD functions macOS has, musl lacks).
+add_compile_options("SHELL:-include ${CMAKE_SOURCE_DIR}/wasm/wasm_compat.h")

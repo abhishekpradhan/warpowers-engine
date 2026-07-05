@@ -55,3 +55,12 @@ target_include_directories(corei_wwaudio INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(corei_wwaudio INTERFACE
     core_wwcommon
 )
+
+# Igroteka @build 05/07/2026 - WWAudio sources key MilesStub.h on these defines;
+# on wasm nothing else in z_wwaudio's link chain provides them.
+if(SAGE_USE_MINIAUDIO)
+    target_compile_definitions(corei_wwaudio INTERFACE SAGE_USE_MINIAUDIO)
+endif()
+if(SAGE_USE_OPENAL)
+    target_compile_definitions(corei_wwaudio INTERFACE SAGE_USE_OPENAL)
+endif()
