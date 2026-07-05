@@ -889,7 +889,17 @@ void INI::parseAndTranslateLabel( INI* ini, void * /*instance*/, void *store, co
 	// translate
 	UnicodeString translated = TheGameText->fetch( token );
 	if( translated.isEmpty() )
+	{
+#ifdef __EMSCRIPTEN__
+		// Igroteka @build 06/07/2026 wasm: GameText lookups come back empty for
+		// labels present in the CSF (under investigation). Fall back to the raw
+		// label so boot continues; this only affects display strings.
+		fprintf(stderr, "[wasm-compat] parseAndTranslateLabel: empty fetch for '%s', using label\n", token);
+		translated.translate(token);
+#else
 		throw INI_INVALID_DATA;
+#endif
+	}
 
 	// save the translated text
 	UnicodeString *theString = (UnicodeString *)store;

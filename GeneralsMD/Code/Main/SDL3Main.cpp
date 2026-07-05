@@ -294,15 +294,23 @@ int main(int argc, char* argv[])
 		FilterPipeWireOpenAL();
 
 		// Load Vulkan library for DXVK DirectX8→Vulkan translation
+		// Igroteka @build 06/07/2026 wasm: no Vulkan in browsers; d8web renders
+		// through WebGL2 on the canvas, so the window is a plain SDL window.
+#ifndef __EMSCRIPTEN__
 		fprintf(stderr, "INFO: Loading Vulkan library...\n");
 		if (!SDL_Vulkan_LoadLibrary(nullptr)) {
 			fprintf(stderr, "WARNING: Failed to load Vulkan: %s\n", SDL_GetError());
 			fprintf(stderr, "WARNING: Continuing without Vulkan (may use software rendering)\n");
 		}
+#endif
 
 		// Create SDL3 window with Vulkan support
 		fprintf(stderr, "INFO: Creating SDL3 Vulkan window...\n");
+#ifdef __EMSCRIPTEN__
+		Uint32 windowFlags = SDL_WINDOW_RESIZABLE;  // wasm: plain window over #canvas, no Vulkan
+#else
 		Uint32 windowFlags = SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIDDEN;  // Start hidden, show after D3D init
+#endif
 		TheSDL3Window = SDL_CreateWindow(
 			"Command & Conquer Generals: Zero Hour",
 			1024, 768,  // Default resolution

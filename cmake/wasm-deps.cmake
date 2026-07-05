@@ -65,3 +65,33 @@ message(STATUS "wasm-deps: glm/gli fetched, freetype via emscripten port, fontco
 # ---- libc gap shim ----
 # Force-included into every TU: wcslcpy/wcslcat (BSD functions macOS has, musl lacks).
 add_compile_options("SHELL:-include ${CMAKE_SOURCE_DIR}/wasm/wasm_compat.h")
+
+# ---- C++ exceptions ----
+# SAGE throws C++ exceptions as control flow (INI parse errors, MetaMap label
+# translation). Without wasm exception support every throw aborts the runtime.
+add_compile_options("-fwasm-exceptions")
+add_link_options("-fwasm-exceptions")
+
+# ---- Emscripten link configuration ----
+# GROWABLE_ARRAYBUFFERS=0: Chrome rejects resizable ArrayBuffer views in WebGL
+# upload calls (learned the hard way in d8web).
+# INITIAL_MEMORY 512MB + growth: SAGE's memory pools want a large heap up front.
+# STACK_SIZE 8MB: the engine assumes Windows-sized thread stacks.
+# Link-time: binaryen's -O3 post-link passes SIGABRT on this binary when wasm
+# exceptions are enabled; -O1 + stripped DWARF avoids the crashing pass (compile
+# optimization stays -O3).
+add_link_options("-O1" "-g0")
+add_link_options(
+    "-sALLOW_MEMORY_GROWTH=1"
+    "-sGROWABLE_ARRAYBUFFERS=0"
+    "-sINITIAL_MEMORY=536870912"
+    "-sMAXIMUM_MEMORY=2147483648"
+    "-sSTACK_SIZE=8388608"
+    "-sEXIT_RUNTIME=0"
+)
+
+# ---- d8web: D3D8→WebGL2 translation layer + engine bridge ----
+# d8web lives in the igroteka monorepo one level up from this fork.
+add_subdirectory(${CMAKE_SOURCE_DIR}/../d8web d8web EXCLUDE_FROM_ALL)
+# (the d8web_bridge target is created next to z_generals, where the engine's
+# d3d8lib interface target with the DXVK/CompatLib include set already exists)
