@@ -1704,11 +1704,17 @@ FontCharsClass::Locate_Font_FontConfig (const char *font_name)
 bool
 FontCharsClass::Create_Freetype_Font (const char *font_name)
 {
+#ifdef __EMSCRIPTEN__
+	fprintf(stderr, "[FONT] Create_Freetype_Font '%s' size=%d\n", font_name, PointSize);
+#endif
 	//
 	//	Initialize FreeType library
 	//
 	FT_Error error = FT_Init_FreeType( &FTLibrary );
 	if ( error != 0 ) {
+#ifdef __EMSCRIPTEN__
+		fprintf(stderr, "[FONT] FT_Init_FreeType failed err=%d\n", (int)error);
+#endif
 		return false;
 	}
 
@@ -1732,6 +1738,9 @@ FontCharsClass::Create_Freetype_Font (const char *font_name)
 	//
 	const char *font_path = Locate_Font_FontConfig( font_name );
 	if ( font_path == nullptr ) {
+#ifdef __EMSCRIPTEN__
+		fprintf(stderr, "[FONT] fontconfig found no match for '%s'\n", font_name);
+#endif
 		FT_Done_FreeType( FTLibrary );
 		FTLibrary = nullptr;
 		return false;
@@ -1742,6 +1751,9 @@ FontCharsClass::Create_Freetype_Font (const char *font_name)
 	//
 	error = FT_New_Face( FTLibrary, font_path, 0, &FTFace );
 	if ( error != 0 ) {
+#ifdef __EMSCRIPTEN__
+		fprintf(stderr, "[FONT] FT_New_Face('%s') failed err=%d\n", font_path, (int)error);
+#endif
 		FT_Done_FreeType( FTLibrary );
 		FTLibrary = nullptr;
 		return false;
@@ -1752,12 +1764,18 @@ FontCharsClass::Create_Freetype_Font (const char *font_name)
 	//
 	error = FT_Set_Pixel_Sizes( FTFace, 0, font_height );
 	if ( error != 0 ) {
+#ifdef __EMSCRIPTEN__
+		fprintf(stderr, "[FONT] FT_Set_Pixel_Sizes(%d) failed err=%d\n", font_height, (int)error);
+#endif
 		FT_Done_Face( FTFace );
 		FT_Done_FreeType( FTLibrary );
 		FTFace = nullptr;
 		FTLibrary = nullptr;
 		return false;
 	}
+#ifdef __EMSCRIPTEN__
+	fprintf(stderr, "[FONT] loaded '%s' -> %s px=%d\n", font_name, font_path, font_height);
+#endif
 
 	//
 	//	Calculate font metrics (Wine-compatible, same as fighter19)
