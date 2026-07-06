@@ -92,6 +92,6 @@ add_link_options(
 
 # ---- d8web: D3D8→WebGL2 translation layer + engine bridge ----
 # d8web lives in the igroteka monorepo one level up from this fork.
-add_subdirectory(${CMAKE_SOURCE_DIR}/../d8web d8web EXCLUDE_FROM_ALL)
+add_subdirectory(${CMAKE_SOURCE_DIR}/../dvijoke/d8web d8web EXCLUDE_FROM_ALL)
 # (the d8web_bridge target is created next to z_generals, where the engine's
 # d3d8lib interface target with the DXVK/CompatLib include set already exists)
