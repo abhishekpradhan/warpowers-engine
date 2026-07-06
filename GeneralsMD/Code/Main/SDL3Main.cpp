@@ -307,7 +307,13 @@ int main(int argc, char* argv[])
 		// Create SDL3 window with Vulkan support
 		fprintf(stderr, "INFO: Creating SDL3 Vulkan window...\n");
 #ifdef __EMSCRIPTEN__
-		Uint32 windowFlags = SDL_WINDOW_RESIZABLE;  // wasm: plain window over #canvas, no Vulkan
+		// wasm: plain window over #canvas, no Vulkan. NOT resizable: with
+		// SDL_WINDOW_RESIZABLE, SDL3's emscripten backend syncs the canvas
+		// backing store to its CSS size on any page resize (rotation,
+		// fullscreen), while the engine keeps rendering its fixed-resolution
+		// viewport — the picture comes out cropped/offset. The page scales
+		// the fixed-size canvas with CSS instead.
+		Uint32 windowFlags = 0;
 #else
 		Uint32 windowFlags = SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIDDEN;  // Start hidden, show after D3D init
 #endif
