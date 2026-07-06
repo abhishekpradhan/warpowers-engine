@@ -15,6 +15,7 @@
 
 #include <cstdio>
 #include <cstring>
+#include <vector>
 
 namespace {
 
@@ -187,7 +188,11 @@ private:
 class BridgeTexture final : public BridgeUnknown<IDirect3DTexture8> {
 public:
     BridgeTexture(dw::IDirect3DTexture8* inner, BridgeDevice* dev) : m_inner(inner), m_dev(dev) {}
-    ~BridgeTexture() override { m_inner->Release(); }
+    ~BridgeTexture() override {
+        for (auto* s : m_levelSurfaces)
+            if (s) s->Release();  // drop the owner ref on cached level wrappers
+        m_inner->Release();
+    }
 
     BRIDGE_RESOURCE_BOILERPLATE
     D3DRESOURCETYPE STDMETHODCALLTYPE GetType() override { return D3DRTYPE_TEXTURE; }
@@ -210,6 +215,7 @@ public:
 private:
     dw::IDirect3DTexture8* m_inner;
     BridgeDevice* m_dev;
+    std::vector<BridgeSurface*> m_levelSurfaces;  // texture-owned level wrappers
 };
 
 // ---------------------------------------------------------------------------
@@ -593,10 +599,24 @@ HRESULT STDMETHODCALLTYPE BridgeTexture::GetDevice(IDirect3DDevice8** dev) {
 }
 HRESULT STDMETHODCALLTYPE BridgeTexture::GetSurfaceLevel(UINT level, IDirect3DSurface8** out) {
     if (!out) return D3DERR_INVALIDCALL;
-    dw::IDirect3DSurface8* inner = nullptr;
-    HRESULT hr = m_inner->GetSurfaceLevel(level, &inner);
-    *out = SUCCEEDED(hr) ? new BridgeSurface(inner, m_dev) : nullptr;
-    return hr;
+    // D3D8 contract: level surfaces are texture-owned; a caller's Release()
+    // must not invalidate them while the texture lives. The engine's
+    // D3DXFilterTexture releases each level wrapper and keeps using it as the
+    // next mip's source — a fresh wrapper per call is a use-after-free (the
+    // freed wrapper's address gets reused by the next level's wrapper, so the
+    // filter degenerated to same-surface copies and mips stayed black).
+    if (level >= m_inner->GetLevelCount()) { *out = nullptr; return D3DERR_INVALIDCALL; }
+    if (m_levelSurfaces.size() <= level) m_levelSurfaces.resize(m_inner->GetLevelCount(), nullptr);
+    BridgeSurface*& slot = m_levelSurfaces[level];
+    if (!slot) {
+        dw::IDirect3DSurface8* inner = nullptr;
+        HRESULT hr = m_inner->GetSurfaceLevel(level, &inner);
+        if (FAILED(hr)) { *out = nullptr; return hr; }
+        slot = new BridgeSurface(inner, m_dev);  // owner ref
+    }
+    slot->AddRef();
+    *out = slot;
+    return D3D_OK;
 }
 
 // ---------------------------------------------------------------------------

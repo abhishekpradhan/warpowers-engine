@@ -84,6 +84,13 @@ D3DXLoadSurfaceFromSurface(
 	pSrcSurface->GetDesc(&descSrc);
 	pDestSurface->GetDesc(&descDest);
 
+#ifdef __EMSCRIPTEN__
+	if (descSrc.Width >= 512 || descDest.Width >= 256)
+		fprintf(stderr, "[LSFS] src=%ux%u fmt=%u dst=%ux%u fmt=%u\n",
+		        descSrc.Width, descSrc.Height, (unsigned)descSrc.Format,
+		        descDest.Width, descDest.Height, (unsigned)descDest.Format);
+#endif
+
 	if (descSrc.Format != descDest.Format)
 	{
 		// Currently we only support scaling between formats of the same type
@@ -371,6 +378,11 @@ D3DXLoadSurfaceFromSurface(
 	}
 
 	// Non-power-of-two scaling not supported
+#ifdef __EMSCRIPTEN__
+	fprintf(stderr, "[LSFS] UNSUPPORTED scale %ux%u -> %ux%u fmt=%u\n",
+	        descSrc.Width, descSrc.Height, descDest.Width, descDest.Height,
+	        (unsigned)descSrc.Format);
+#endif
 	pDestSurface->UnlockRect();
 	pSrcSurface->UnlockRect();
 	return D3DERR_INVALIDCALL;
@@ -429,6 +441,10 @@ D3DXFilterTexture(
 
 			while (tex->GetSurfaceLevel(Level, &mipsurf) == D3D_OK)
 			{
+#ifdef __EMSCRIPTEN__
+				if (desc.Width >= 512)
+					fprintf(stderr, "[FILTER_PASS] level=%d top=%p mip=%p\n", Level, (void*)topsurf, (void*)mipsurf);
+#endif
 				// Copy the data
 				D3DXLoadSurfaceFromSurface(mipsurf, NULL, NULL, topsurf, NULL, NULL, Filter, 0);
 

@@ -2996,12 +2996,5 @@ void BaseHeightMapRenderObjClass::loadPostProcess()
 //=============================================================================
 Bool BaseHeightMapRenderObjClass::useCloud()
 {
-#ifdef __EMSCRIPTEN__
-	// Igroteka wasm probe: the scrolling cloud-shadow stage darkens terrain
-	// wholesale (suspected texture-transform drift in d8web). Disabled while
-	// that path is verified against the native renderer.
-	return FALSE;
-#else
 	return TheGlobalData->m_useCloudMap && TheGlobalData->m_timeOfDay != TIME_OF_DAY_NIGHT;
-#endif
 }
