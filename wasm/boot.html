@@ -45,7 +45,16 @@
 
     var Module = {
       canvas: document.getElementById('canvas'),
-      arguments: ['-win'],
+      // Cache-bust the .wasm fetch — a stale cached build after a rebuild is
+      // indistinguishable from "the fix didn't work". Local serving, so the
+      // re-download cost is irrelevant.
+      locateFile: function(path) { return path + '?v=' + Date.now(); },
+      // Engine args from the URL for fast test scenarios, e.g.:
+      //   boot.html?args=-noshellmap          (menu without the 3D shell map)
+      //   boot.html?args=-noshellmap,-noaudio
+      arguments: ['-win'].concat(
+        (new URLSearchParams(location.search).get('args') || '')
+          .split(',').filter(function(a) { return a.length > 0; })),
       print: log,
       printErr: log,
       onAbort: function(w) { log('ABORT: ' + w); },
@@ -56,6 +65,16 @@
         FS.mkdir('/game');
         FS.mkdir('/game-base');
         FS.mkdir('/fonts');
+        // User prefs. Shadows default OFF (d8web has no stencil yet — shadow
+        // volumes draw as solid black prisms). Re-enable with boot.html?shadows=on
+        var userDir = '/home/web_user/.local/share/GeneralsX/GeneralsZH';
+        FS.mkdirTree(userDir);
+        var shadows = (new URLSearchParams(location.search).get('shadows') === 'on') ? 'yes' : 'no';
+        FS.writeFile(userDir + '/Options.ini',
+          'UseShadowVolumes = ' + shadows + '\n' +
+          'UseShadowDecals = ' + shadows + '\n' +
+          'Resolution = 1024 768\n');
+        log('[prefs] shadows=' + shadows);
         addRunDependency('gamedata');
         // name → path in the wasm FS; the fontconfig stub resolves every font
         // query to /fonts/default.ttf, so a real TTF must be staged there.
