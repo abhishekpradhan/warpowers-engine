@@ -1888,10 +1888,22 @@ FontCharsClass::Store_Freetype_Char (WCHAR ch)
 	//	Copy FreeType bitmap to our buffer (convert 8-bit gray → 16-bit format)
 	//
 	for ( unsigned int row = 0; row < glyph->bitmap.rows; row++ ) {
+		//
+		//	GeneralsXWeb @bugfix: clamp to the cell — FreeType rounding can make
+		//	descender glyphs one row taller than CharHeight, and the overflow
+		//	row lands in the NEXT cached glyph's buffer (visible as a stray bar
+		//	above whatever character happens to be stored after this one).
+		//
+		if ( (int)(y_offset + row) >= (int)CharHeight ) {
+			break;
+		}
 		int src_index = row * glyph->bitmap.pitch;
 		int dst_index = (y_offset + row) * char_width;
 
 		for ( unsigned int col = 0; col < glyph->bitmap.width; col++ ) {
+			if ( x_offset + (int)col >= (int)char_width ) {
+				break;
+			}
 			//
 			//	Get 8-bit grayscale pixel
 			//
