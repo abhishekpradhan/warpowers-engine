@@ -963,7 +963,9 @@ namespace
 {
 	// helpers for inline counters
 	constexpr const Int kHudAnchorX = 3;
-	constexpr const Int kHudAnchorY = -1;
+	// GeneralsXWeb: was -1, which clips the glyph tops on every platform —
+	// in the browser canvas there is no window chrome above to hide it.
+	constexpr const Int kHudAnchorY = 3;
 	constexpr const Int kHudGapPx = 6;
 	inline Bool isAtHudAnchorPos(const Coord2D &p) { return p.x == kHudAnchorX && p.y == kHudAnchorY; }
 }

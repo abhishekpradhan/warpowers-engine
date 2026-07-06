@@ -428,7 +428,7 @@ static void initLabelVersion()
 	NameKeyType versionID = TheNameKeyGenerator->nameToKey( "MainMenu.wnd:LabelVersion" );
 	GameWindow *labelVersion = TheWindowManager->winGetWindowFromId( nullptr, versionID );
 	UnicodeString creditText;
-	creditText.translate("GeneralsX - Multiplatform C&C Generals");
+	creditText.translate("GeneralsXWeb - C&C Generals in the browser");
 
 	if (labelVersion)
 	{
