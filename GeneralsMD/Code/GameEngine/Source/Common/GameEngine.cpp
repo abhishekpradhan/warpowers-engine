@@ -1051,6 +1051,9 @@ static void igrotekaFrameTick(void* arg)
 	{
 		fprintf(stderr, "INFO: igrotekaFrameTick - quitting, cancelling main loop\n");
 		emscripten_cancel_main_loop();
+		// EXIT GAME never unwinds to a process exit here (EXIT_RUNTIME=0, RAF
+		// loop just stops) — notify the page so it can return to the desktop.
+		EM_ASM({ if (Module.onGameExit) Module.onGameExit(); });
 		return;
 	}
 	try
