@@ -1,5 +1,9 @@
 # GeneralsXWeb — Command & Conquer: Generals Zero Hour in the browser
 
+> **⚠️ Experimental.** This port is under active development: expect rendering
+> glitches, missing subsystems (audio, multiplayer), broken saves, and
+> breaking changes between commits. Not affiliated with or endorsed by EA.
+
 GeneralsXWeb is a **WebAssembly port** of [GeneralsX](https://github.com/fbraz3/GeneralsX),
 the cross-platform build of **Command & Conquer: Generals — Zero Hour**. The
 engine compiles to wasm with Emscripten and renders through
