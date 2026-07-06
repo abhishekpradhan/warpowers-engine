@@ -80,7 +80,14 @@
         // query to /fonts/default.ttf, so a real TTF must be staged there.
         // ZH is an expansion: much of its art (terrain, effects, models) lives
         // in the BASE game's archives, mounted from CNC_GENERALS_PATH.
+        FS.mkdirTree('/game/Data/Scripts');
         var files = [
+          // Loose script files — retail ships these OUTSIDE the .big archives;
+          // SkirmishScripts.scb is the entire skirmish AI (without it the AI
+          // sits idle).
+          ['Scripts/SkirmishScripts.scb', '/game/Data/Scripts/SkirmishScripts.scb'],
+          ['Scripts/MultiplayerScripts.scb', '/game/Data/Scripts/MultiplayerScripts.scb'],
+          ['Scripts/Scripts.ini', '/game/Data/Scripts/Scripts.ini'],
           ['INIZH.big', '/game/INIZH.big'],
           ['EnglishZH.big', '/game/EnglishZH.big'],
           ['WindowZH.big', '/game/WindowZH.big'],
