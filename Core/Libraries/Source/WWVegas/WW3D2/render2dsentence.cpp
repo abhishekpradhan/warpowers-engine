@@ -35,6 +35,25 @@
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #include "render2dsentence.h"
+
+// Igroteka wasm: boot trace logs are off by default — thousands per boot,
+// each crossing wasm->JS. Enable with window.IG_TRACE = 1 before the engine
+// script loads (native: IG_TRACE env var).
+#ifdef __EMSCRIPTEN__
+#include <emscripten/emscripten.h>
+static bool igTraceEnabled() {
+    static const bool on = EM_ASM_INT({
+        return (typeof window !== 'undefined' && window.IG_TRACE) ? 1 : 0;
+    }) != 0;
+    return on;
+}
+#else
+#include <cstdlib>
+static bool igTraceEnabled() {
+    static const bool on = getenv("IG_TRACE") && *getenv("IG_TRACE") != '0';
+    return on;
+}
+#endif
 #include "surfaceclass.h"
 #include "texture.h"
 #include "wwprofile.h"
@@ -1705,7 +1724,7 @@ bool
 FontCharsClass::Create_Freetype_Font (const char *font_name)
 {
 #ifdef __EMSCRIPTEN__
-	fprintf(stderr, "[FONT] Create_Freetype_Font '%s' size=%d\n", font_name, PointSize);
+	if (igTraceEnabled()) fprintf(stderr, "[FONT] Create_Freetype_Font '%s' size=%d\n", font_name, PointSize);
 #endif
 	//
 	//	Initialize FreeType library
@@ -1713,7 +1732,7 @@ FontCharsClass::Create_Freetype_Font (const char *font_name)
 	FT_Error error = FT_Init_FreeType( &FTLibrary );
 	if ( error != 0 ) {
 #ifdef __EMSCRIPTEN__
-		fprintf(stderr, "[FONT] FT_Init_FreeType failed err=%d\n", (int)error);
+		if (igTraceEnabled()) fprintf(stderr, "[FONT] FT_Init_FreeType failed err=%d\n", (int)error);
 #endif
 		return false;
 	}
@@ -1739,7 +1758,7 @@ FontCharsClass::Create_Freetype_Font (const char *font_name)
 	const char *font_path = Locate_Font_FontConfig( font_name );
 	if ( font_path == nullptr ) {
 #ifdef __EMSCRIPTEN__
-		fprintf(stderr, "[FONT] fontconfig found no match for '%s'\n", font_name);
+		if (igTraceEnabled()) fprintf(stderr, "[FONT] fontconfig found no match for '%s'\n", font_name);
 #endif
 		FT_Done_FreeType( FTLibrary );
 		FTLibrary = nullptr;
@@ -1752,7 +1771,7 @@ FontCharsClass::Create_Freetype_Font (const char *font_name)
 	error = FT_New_Face( FTLibrary, font_path, 0, &FTFace );
 	if ( error != 0 ) {
 #ifdef __EMSCRIPTEN__
-		fprintf(stderr, "[FONT] FT_New_Face('%s') failed err=%d\n", font_path, (int)error);
+		if (igTraceEnabled()) fprintf(stderr, "[FONT] FT_New_Face('%s') failed err=%d\n", font_path, (int)error);
 #endif
 		FT_Done_FreeType( FTLibrary );
 		FTLibrary = nullptr;
@@ -1765,7 +1784,7 @@ FontCharsClass::Create_Freetype_Font (const char *font_name)
 	error = FT_Set_Pixel_Sizes( FTFace, 0, font_height );
 	if ( error != 0 ) {
 #ifdef __EMSCRIPTEN__
-		fprintf(stderr, "[FONT] FT_Set_Pixel_Sizes(%d) failed err=%d\n", font_height, (int)error);
+		if (igTraceEnabled()) fprintf(stderr, "[FONT] FT_Set_Pixel_Sizes(%d) failed err=%d\n", font_height, (int)error);
 #endif
 		FT_Done_Face( FTFace );
 		FT_Done_FreeType( FTLibrary );
@@ -1774,7 +1793,7 @@ FontCharsClass::Create_Freetype_Font (const char *font_name)
 		return false;
 	}
 #ifdef __EMSCRIPTEN__
-	fprintf(stderr, "[FONT] loaded '%s' -> %s px=%d\n", font_name, font_path, font_height);
+	if (igTraceEnabled()) fprintf(stderr, "[FONT] loaded '%s' -> %s px=%d\n", font_name, font_path, font_height);
 #endif
 
 	//

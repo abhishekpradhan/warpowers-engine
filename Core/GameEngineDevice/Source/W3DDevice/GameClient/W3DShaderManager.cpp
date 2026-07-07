@@ -54,6 +54,25 @@
 //-----------------------------------------------------------------------------
 
 #include "dx8wrapper.h"
+
+// Igroteka wasm: boot trace logs are off by default — thousands per boot,
+// each crossing wasm->JS. Enable with window.IG_TRACE = 1 before the engine
+// script loads (native: IG_TRACE env var).
+#ifdef __EMSCRIPTEN__
+#include <emscripten/emscripten.h>
+static bool igTraceEnabled() {
+    static const bool on = EM_ASM_INT({
+        return (typeof window !== 'undefined' && window.IG_TRACE) ? 1 : 0;
+    }) != 0;
+    return on;
+}
+#else
+#include <cstdlib>
+static bool igTraceEnabled() {
+    static const bool on = getenv("IG_TRACE") && *getenv("IG_TRACE") != '0';
+    return on;
+}
+#endif
 #include "assetmgr.h"
 #include "Lib/BaseType.h"
 #include "Common/file.h"
@@ -3066,7 +3085,7 @@ HRESULT W3DShaderManager::LoadAndCreateD3DShader(const char* strFilePath, const 
 
 		// GeneralsX @bugfix BenderAI 18/02/2026 Add comprehensive asset loading diagnostics
 		const char* shaderTypeStr = ShaderType ? "VERTEX" : "PIXEL";
-		fprintf(stderr, "[ASSET_LOAD] Attempting to load shader (%s): file='%s'\n", 
+		if (igTraceEnabled()) fprintf(stderr, "[ASSET_LOAD] Attempting to load shader (%s): file='%s'\n", 
 			shaderTypeStr, strFilePath ? strFilePath : "(null)");
 
 		// GeneralsX @bugfix BenderAI 18/02/2026 Normalize path for cross-platform compatibility (fighter19 pattern)
@@ -3075,7 +3094,7 @@ HRESULT W3DShaderManager::LoadAndCreateD3DShader(const char* strFilePath, const 
 		if (normalizedPath.isEmpty())
 		{
 			// Normalization failed - path might be invalid
-			fprintf(stderr, "[ASSET_FAIL] Could not normalize path: original='%s'\n", 
+			if (igTraceEnabled()) fprintf(stderr, "[ASSET_FAIL] Could not normalize path: original='%s'\n", 
 				strFilePath ? strFilePath : "(null)");
 			char debugMsg[512];
 			snprintf(debugMsg, sizeof(debugMsg), "ERROR: Could not normalize shader file path: '%s'\n", 
@@ -3084,14 +3103,14 @@ HRESULT W3DShaderManager::LoadAndCreateD3DShader(const char* strFilePath, const 
 			return E_FAIL;
 		}
 
-		fprintf(stderr, "[ASSET_PATH] Original: '%s' -> Normalized: '%s'\n", 
+		if (igTraceEnabled()) fprintf(stderr, "[ASSET_PATH] Original: '%s' -> Normalized: '%s'\n", 
 			strFilePath ? strFilePath : "(null)", normalizedPath.str());
 
 		file = TheFileSystem->openFile(normalizedPath.str(), File::READ | File::BINARY);
 		if (file == nullptr)
 		{
 			// GeneralsX @bugfix BenderAI 13/02/2026 Log actual filename that's missing
-			fprintf(stderr, "[ASSET_FAIL] File not found in VFS: normalized_path='%s'\n", 
+			if (igTraceEnabled()) fprintf(stderr, "[ASSET_FAIL] File not found in VFS: normalized_path='%s'\n", 
 				normalizedPath.str());
 			char debugMsg[512];
 			snprintf(debugMsg, sizeof(debugMsg), "ERROR: Could not find shader file: '%s' (normalized: '%s')\n", 
@@ -3104,14 +3123,14 @@ HRESULT W3DShaderManager::LoadAndCreateD3DShader(const char* strFilePath, const 
 		TheFileSystem->getFileInfo(normalizedPath, &fileInfo);
 		DWORD dwFileSize = fileInfo.sizeLow;
 
-		fprintf(stderr, "[ASSET_LOAD] File found: path='%s' size=%u bytes\n", 
+		if (igTraceEnabled()) fprintf(stderr, "[ASSET_LOAD] File found: path='%s' size=%u bytes\n", 
 			normalizedPath.str(), dwFileSize);
 
 		// GeneralsX @bugfix BenderAI 13/02/2026 Use new[] instead of HeapAlloc (fighter19 pattern)
 		const DWORD* pShader = new DWORD[dwFileSize / sizeof(DWORD)]();
 		if (!pShader)
 		{
-			fprintf(stderr, "[ASSET_FAIL] Out of memory allocating %u bytes for shader data\n", dwFileSize);
+			if (igTraceEnabled()) fprintf(stderr, "[ASSET_FAIL] Out of memory allocating %u bytes for shader data\n", dwFileSize);
 			OutputDebugString( "Failed to allocate memory to load shader\n " );
 			file->close();
 			return E_FAIL;
@@ -3135,7 +3154,7 @@ HRESULT W3DShaderManager::LoadAndCreateD3DShader(const char* strFilePath, const 
 
 		if (FAILED(hr))
 		{
-			fprintf(stderr, "[ASSET_FAIL] Failed to create %s shader: original='%s' hr=0x%08x\n", 
+			if (igTraceEnabled()) fprintf(stderr, "[ASSET_FAIL] Failed to create %s shader: original='%s' hr=0x%08x\n", 
 				shaderTypeStr, strFilePath ? strFilePath : "(null)", hr);
 			OutputDebugString( "Failed to create shader\n ");
 			return E_FAIL;
@@ -3146,7 +3165,7 @@ HRESULT W3DShaderManager::LoadAndCreateD3DShader(const char* strFilePath, const 
 	}
 	catch(...)
 	{
-		fprintf(stderr, "[ASSET_FAIL] Exception loading shader: file='%s'\n", 
+		if (igTraceEnabled()) fprintf(stderr, "[ASSET_FAIL] Exception loading shader: file='%s'\n", 
 			strFilePath ? strFilePath : "(null)");
 		OutputDebugString( "Error opening file \n" );
 		return E_FAIL;

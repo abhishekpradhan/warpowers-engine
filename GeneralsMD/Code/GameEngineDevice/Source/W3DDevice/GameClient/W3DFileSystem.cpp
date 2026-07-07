@@ -41,6 +41,25 @@
 // #define MAINTAIN_LEGACY_FILES
 
 #include "Common/ArchiveFile.h"
+
+// Igroteka wasm: boot trace logs are off by default — thousands per boot,
+// each crossing wasm->JS. Enable with window.IG_TRACE = 1 before the engine
+// script loads (native: IG_TRACE env var).
+#ifdef __EMSCRIPTEN__
+#include <emscripten/emscripten.h>
+static bool igTraceEnabled() {
+    static const bool on = EM_ASM_INT({
+        return (typeof window !== 'undefined' && window.IG_TRACE) ? 1 : 0;
+    }) != 0;
+    return on;
+}
+#else
+#include <cstdlib>
+static bool igTraceEnabled() {
+    static const bool on = getenv("IG_TRACE") && *getenv("IG_TRACE") != '0';
+    return on;
+}
+#endif
 #include "Common/Debug.h"
 #include "Common/file.h"
 #include "Common/FileSystem.h"
@@ -167,6 +186,33 @@ char const * GameFileClass::Set_Name( char const *filename )
 
 	if( Is_Open() )
 		Close();
+
+#ifdef __EMSCRIPTEN__
+	// Windows ignores trailing dots in filenames and Zero Hour's data relies
+	// on it: model names like "UISABOTR_SKN." get ".w3d" appended and open
+	// fine natively as "UISABOTR_SKN..w3d", while retry paths keep appending
+	// (".w3d.w3d.w3d..."). The wasm FS is POSIX-literal, so collapse both
+	// here — the one place every file name passes through.
+	char igFixed[_MAX_PATH];
+	{
+		strlcpy(igFixed, filename, ARRAY_SIZE(igFixed));
+		size_t len = strlen(igFixed);
+		const size_t extLen = 4;  // ".w3d"
+		while (len >= 2 * extLen
+			&& strcasecmp(igFixed + len - extLen, ".w3d") == 0
+			&& strncasecmp(igFixed + len - 2 * extLen, ".w3d", extLen) == 0) {
+			len -= extLen;
+			igFixed[len] = 0;
+		}
+		while (len > extLen + 1
+			&& strcasecmp(igFixed + len - extLen, ".w3d") == 0
+			&& igFixed[len - extLen - 1] == '.') {
+			memmove(igFixed + len - extLen - 1, igFixed + len - extLen, extLen + 1);
+			len -= 1;
+		}
+		filename = igFixed;
+	}
+#endif
 
 	// save the filename
 	strlcpy( m_filename, filename, _MAX_PATH );
@@ -367,7 +413,7 @@ char const * GameFileClass::Set_Name( char const *filename )
 #ifdef __EMSCRIPTEN__
 	if( m_fileExists == FALSE )
 	{
-		fprintf(stderr, "[W3DFS_MISS] '%s' (last path tried: '%s')\n", filename, m_filePath);
+		if (igTraceEnabled()) fprintf(stderr, "[W3DFS_MISS] '%s' (last path tried: '%s')\n", filename, m_filePath);
 	}
 #endif
 

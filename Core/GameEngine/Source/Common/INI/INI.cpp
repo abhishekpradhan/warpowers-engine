@@ -29,6 +29,25 @@
 
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
+
+// Igroteka wasm: boot trace logs are off by default — thousands per boot,
+// each crossing wasm->JS. Enable with window.IG_TRACE = 1 before the engine
+// script loads (native: IG_TRACE env var).
+#ifdef __EMSCRIPTEN__
+#include <emscripten/emscripten.h>
+static bool igTraceEnabled() {
+    static const bool on = EM_ASM_INT({
+        return (typeof window !== 'undefined' && window.IG_TRACE) ? 1 : 0;
+    }) != 0;
+    return on;
+}
+#else
+#include <cstdlib>
+static bool igTraceEnabled() {
+    static const bool on = getenv("IG_TRACE") && *getenv("IG_TRACE") != '0';
+    return on;
+}
+#endif
 #define DEFINE_DEATH_NAMES
 
 #include "WWMath/wwmath.h"
@@ -194,7 +213,7 @@ INI::INI()
 UnsignedInt INI::loadFileDirectory( AsciiString fileDirName, INILoadType loadType, Xfer *pXfer, Bool subdirs )
 {
 	// GeneralsX @feature BenderAI 20/02/2026 Debug hang investigation
-	fprintf(stderr, "[INI] loadFileDirectory('%s') START\n", fileDirName.str());
+	if (igTraceEnabled()) fprintf(stderr, "[INI] loadFileDirectory('%s') START\n", fileDirName.str());
 	fflush(stderr);
 	
 	UnsignedInt filesRead = 0;
@@ -214,34 +233,34 @@ UnsignedInt INI::loadFileDirectory( AsciiString fileDirName, INILoadType loadTyp
 		iniFile.concat(ext);
 	}
 
-	fprintf(stderr, "[INI] loadFileDirectory - checking iniFile: '%s'\n", iniFile.str());
+	if (igTraceEnabled()) fprintf(stderr, "[INI] loadFileDirectory - checking iniFile: '%s'\n", iniFile.str());
 	fflush(stderr);
 	
 	if (TheFileSystem->doesFileExist(iniFile.str()))
 	{
-		fprintf(stderr, "[INI] loadFileDirectory - loading iniFile: '%s' START\n", iniFile.str());
+		if (igTraceEnabled()) fprintf(stderr, "[INI] loadFileDirectory - loading iniFile: '%s' START\n", iniFile.str());
 		fflush(stderr);
 		filesRead += load(iniFile, loadType, pXfer);
-		fprintf(stderr, "[INI] loadFileDirectory - loading iniFile: '%s' END\n", iniFile.str());
+		if (igTraceEnabled()) fprintf(stderr, "[INI] loadFileDirectory - loading iniFile: '%s' END\n", iniFile.str());
 		fflush(stderr);
 	}
 
 	// Load any additional ini files from a "filename" directory and its subdirectories.
-	fprintf(stderr, "[INI] loadFileDirectory - calling loadDirectory('%s') START\n", iniDir.str());
+	if (igTraceEnabled()) fprintf(stderr, "[INI] loadFileDirectory - calling loadDirectory('%s') START\n", iniDir.str());
 	fflush(stderr);
 	filesRead += loadDirectory(iniDir, loadType, pXfer, subdirs);
-	fprintf(stderr, "[INI] loadFileDirectory - calling loadDirectory('%s') END\n", iniDir.str());
+	if (igTraceEnabled()) fprintf(stderr, "[INI] loadFileDirectory - calling loadDirectory('%s') END\n", iniDir.str());
 	fflush(stderr);
 
 	// Expect to open and load at least one file.
 	if (filesRead == 0)
 	{
-		fprintf(stderr, "[INI] ERROR: No files read from directory '%s'\n", fileDirName.str());
+		if (igTraceEnabled()) fprintf(stderr, "[INI] ERROR: No files read from directory '%s'\n", fileDirName.str());
 		fflush(stderr);
 		throw INI_CANT_OPEN_FILE;
 	}
 
-	fprintf(stderr, "[INI] loadFileDirectory('%s') END - filesRead=%d\n", fileDirName.str(), filesRead);
+	if (igTraceEnabled()) fprintf(stderr, "[INI] loadFileDirectory('%s') END - filesRead=%d\n", fileDirName.str(), filesRead);
 	fflush(stderr);
 	return filesRead;
 }
@@ -254,7 +273,7 @@ UnsignedInt INI::loadFileDirectory( AsciiString fileDirName, INILoadType loadTyp
 UnsignedInt INI::loadDirectory( AsciiString dirName, INILoadType loadType, Xfer *pXfer, Bool subdirs )
 {
 	// GeneralsX @feature BenderAI 20/02/2026 Debug hang investigation
-	fprintf(stderr, "[INI] loadDirectory('%s') START\n", dirName.str());
+	if (igTraceEnabled()) fprintf(stderr, "[INI] loadDirectory('%s') START\n", dirName.str());
 	fflush(stderr);
 	
 	UnsignedInt filesRead = 0;
@@ -262,7 +281,7 @@ UnsignedInt INI::loadDirectory( AsciiString dirName, INILoadType loadType, Xfer 
 	// sanity
 	if( dirName.isEmpty() )
 	{
-		fprintf(stderr, "[INI] ERROR: Empty directory name in loadDirectory\n");
+		if (igTraceEnabled()) fprintf(stderr, "[INI] ERROR: Empty directory name in loadDirectory\n");
 		fflush(stderr);
 		throw INI_INVALID_DIRECTORY;
 	}
@@ -397,16 +416,16 @@ static INIFieldParseProc findFieldParse(const FieldParse* parseTable, const char
 UnsignedInt INI::load( AsciiString filename, INILoadType loadType, Xfer *pXfer )
 {
 	// GeneralsX @feature BenderAI 20/02/2026 Debug hang investigation
-	fprintf(stderr, "[INI] load('%s') START\n", filename.str());
+	if (igTraceEnabled()) fprintf(stderr, "[INI] load('%s') START\n", filename.str());
 	fflush(stderr);
 	
 	setFPMode(); // so we have consistent Real values for GameLogic -MDC
 
 	s_xfer = pXfer;
-	fprintf(stderr, "[INI] load - calling prepFile('%s') START\n", filename.str());
+	if (igTraceEnabled()) fprintf(stderr, "[INI] load - calling prepFile('%s') START\n", filename.str());
 	fflush(stderr);
 	prepFile(filename, loadType);
-	fprintf(stderr, "[INI] load - prepFile completed\n");
+	if (igTraceEnabled()) fprintf(stderr, "[INI] load - prepFile completed\n");
 	fflush(stderr);
 
 	try
@@ -419,7 +438,7 @@ UnsignedInt INI::load( AsciiString filename, INILoadType loadType, Xfer *pXfer )
 		{
 			lineCount++;
 			if ((lineCount % 100) == 0) {
-				fprintf(stderr, "[INI] load - processed %d lines\n", lineCount);
+				if (igTraceEnabled()) fprintf(stderr, "[INI] load - processed %d lines\n", lineCount);
 				fflush(stderr);
 			}
 			
@@ -464,12 +483,12 @@ UnsignedInt INI::load( AsciiString filename, INILoadType loadType, Xfer *pXfer )
 			}
 
 		}
-		fprintf(stderr, "[INI] load - processed total %d lines\n", lineCount);
+		if (igTraceEnabled()) fprintf(stderr, "[INI] load - processed total %d lines\n", lineCount);
 		fflush(stderr);
 	}
 	catch (...)
 	{
-		fprintf(stderr, "[INI] ERROR in load('%s') - exception caught\n", filename.str());
+		if (igTraceEnabled()) fprintf(stderr, "[INI] ERROR in load('%s') - exception caught\n", filename.str());
 		fflush(stderr);
 		unPrepFile();
 
@@ -479,7 +498,7 @@ UnsignedInt INI::load( AsciiString filename, INILoadType loadType, Xfer *pXfer )
 
 	unPrepFile();
 
-	fprintf(stderr, "[INI] load('%s') END\n", filename.str());
+	if (igTraceEnabled()) fprintf(stderr, "[INI] load('%s') END\n", filename.str());
 	fflush(stderr);
 	return 1;
 }

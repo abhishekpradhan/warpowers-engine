@@ -3,6 +3,25 @@
 
 #include "d3dx8core.h"
 
+// Igroteka wasm: boot trace logs are off by default — thousands per boot,
+// each crossing wasm->JS. Enable with window.IG_TRACE = 1 before the engine
+// script loads (native: IG_TRACE env var).
+#ifdef __EMSCRIPTEN__
+#include <emscripten/emscripten.h>
+static bool igTraceEnabled() {
+    static const bool on = EM_ASM_INT({
+        return (typeof window !== 'undefined' && window.IG_TRACE) ? 1 : 0;
+    }) != 0;
+    return on;
+}
+#else
+#include <cstdlib>
+static bool igTraceEnabled() {
+    static const bool on = getenv("IG_TRACE") && *getenv("IG_TRACE") != '0';
+    return on;
+}
+#endif
+
 // GeneralsX @build felipebraz 20/06/2025 GLI causes make_vec4 ambiguity with Apple Clang (GLM version mismatch).
 // On macOS, exclude GLI and use stub implementations for the surface scaling path.
 #if !defined(__APPLE__) && !defined(__EMSCRIPTEN__)
@@ -443,7 +462,7 @@ D3DXFilterTexture(
 			{
 #ifdef __EMSCRIPTEN__
 				if (desc.Width >= 512)
-					fprintf(stderr, "[FILTER_PASS] level=%d top=%p mip=%p\n", Level, (void*)topsurf, (void*)mipsurf);
+					if (igTraceEnabled()) fprintf(stderr, "[FILTER_PASS] level=%d top=%p mip=%p\n", Level, (void*)topsurf, (void*)mipsurf);
 #endif
 				// Copy the data
 				D3DXLoadSurfaceFromSurface(mipsurf, NULL, NULL, topsurf, NULL, NULL, Filter, 0);
