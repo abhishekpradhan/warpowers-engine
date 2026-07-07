@@ -56,18 +56,32 @@
 #ifdef __EMSCRIPTEN__
 #include <emscripten/emscripten.h>
 #include "Common/ArchiveFileSystem.h"
+#include "Common/AudioEventRTS.h"
 #include "Common/FileSystem.h"
 #include "Common/GameAudio.h"
 
 // Debug probe: bit 0 = an AudioZH.big sample is visible, bit 1 = an
-// INIZH.big control file is visible. Call: Module._igroteka_audio_probe()
+// INIZH.big control file is visible, bit 2 = the audio sample actually
+// OPENS (exists and open can disagree for late-mounted archives).
+// Call: Module._igroteka_audio_probe()
 extern "C" EMSCRIPTEN_KEEPALIVE int igroteka_audio_probe(void)
 {
 	if (TheFileSystem == NULL) return -1;
 	int r = 0;
 	if (TheFileSystem->doesFileExist("Data\\Audio\\Sounds\\addnwi1a.wav")) r |= 1;
 	if (TheFileSystem->doesFileExist("Data\\INI\\GameData.ini")) r |= 2;
+	File *f = TheFileSystem->openFile("Data\\Audio\\Sounds\\addnwi1a.wav");
+	if (f != NULL) { r |= 4; f->close(); }
 	return r;
+}
+
+// Debug: fire a known UI sound through the full audio pipeline.
+extern "C" EMSCRIPTEN_KEEPALIVE int igroteka_play_test(void)
+{
+	if (TheAudio == NULL) return -1;
+	AudioEventRTS ev("GUIClick");
+	TheAudio->addAudioEvent(&ev);
+	return 1;
 }
 
 // Igroteka lazy audio: the page stages the ~900MB of audio archives in the
