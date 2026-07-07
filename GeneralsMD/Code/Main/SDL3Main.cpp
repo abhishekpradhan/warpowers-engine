@@ -75,13 +75,18 @@ extern "C" EMSCRIPTEN_KEEPALIVE int igroteka_audio_probe(void)
 	return r;
 }
 
-// Debug: fire a known UI sound through the full audio pipeline.
-extern "C" EMSCRIPTEN_KEEPALIVE int igroteka_play_test(void)
+// Debug: fire a known UI sound through the full audio pipeline. Returns the
+// audio handle: 0..5 = dropped (Error/NoSound/Muted/NotForLocal/...),
+// >= AHSV_FirstHandle (6) = actually queued to play.
+extern "C" EMSCRIPTEN_KEEPALIVE int igroteka_play_test(const char *unused)
 {
+	(void)unused;
 	if (TheAudio == NULL) return -1;
 	AudioEventRTS ev("GUIClick");
-	TheAudio->addAudioEvent(&ev);
-	return 1;
+	AudioHandle h = TheAudio->addAudioEvent(&ev);
+	fprintf(stderr, "AUDIO: play_test GUIClick handle=%u music_playing=%d\n",
+		(unsigned)h, (int)TheAudio->isMusicPlaying());
+	return (int)h;
 }
 
 // Igroteka lazy audio: the page stages the ~900MB of audio archives in the
