@@ -1218,7 +1218,16 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 			/// @todo: Here is where we would look at the game mode & play an intro movie or something.
 			// Failing that, we just set the flag so the actual game can start from a uniform
 			// entry point (startNewGame() called from update()).
+#ifdef __EMSCRIPTEN__
+			// wasm: skirmish gets the same one-frame defer single player has.
+			// The browser only composites the canvas BETWEEN frame tasks —
+			// with the blocking map load running inside the click frame, the
+			// game's own load screen was drawn but never presented, so the
+			// player stared at a frozen menu for the whole load.
+			if( m_gameMode == GAME_SINGLE_PLAYER || m_gameMode == GAME_SKIRMISH )
+#else
 			if( m_gameMode == GAME_SINGLE_PLAYER )
+#endif
 			{
 
 				if(m_background)
@@ -1231,7 +1240,13 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 				if(m_loadScreen)
 				{
 					TheWritableGlobalData->m_loadScreenRender = TRUE;	///< mark it so only a few select things are rendered during load
+#ifdef __EMSCRIPTEN__
+					// The skirmish load screen reads player slots from the
+					// game info; single player expects null.
+					m_loadScreen->init(m_gameMode == GAME_SKIRMISH ? TheGameInfo : nullptr);
+#else
 					m_loadScreen->init(nullptr);
+#endif
 				}
 
 			}
@@ -1242,6 +1257,15 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 		}
 
 	}
+
+#ifdef __EMSCRIPTEN__
+	// wasm: the blocking map load below starves the main-thread audio
+	// callback — playing sounds turn into choppy repeats for the whole
+	// load. Stop them for clean silence; map scripts start the in-game
+	// music and sounds fresh once the match begins.
+	if (TheAudio)
+		TheAudio->stopAudio(AudioAffect_All);
+#endif
 
 	m_rankLevelLimit = 1000;	// this is reset every game.
 
