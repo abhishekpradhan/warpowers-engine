@@ -1224,7 +1224,11 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 			// with the blocking map load running inside the click frame, the
 			// game's own load screen was drawn but never presented, so the
 			// player stared at a frozen menu for the whole load.
-			if( m_gameMode == GAME_SINGLE_PLAYER || m_gameMode == GAME_SKIRMISH )
+			// TheGameInfo gate: MultiPlayerLoadScreen::init dereferences the
+			// game info; when it isn't set yet at this early point, fall back
+			// to the old path (frozen menu, but it loads).
+			if( m_gameMode == GAME_SINGLE_PLAYER
+				|| (m_gameMode == GAME_SKIRMISH && TheGameInfo != NULL) )
 #else
 			if( m_gameMode == GAME_SINGLE_PLAYER )
 #endif

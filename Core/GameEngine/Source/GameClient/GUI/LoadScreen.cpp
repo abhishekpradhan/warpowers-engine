@@ -1276,6 +1276,12 @@ MultiPlayerLoadScreen::~MultiPlayerLoadScreen()
 
 void MultiPlayerLoadScreen::init( GameInfo *game )
 {
+	// A null game info is dereferenced below — bail instead of crashing
+	// (the wasm early-init path could arrive here before the info exists).
+	DEBUG_ASSERTCRASH(game, ("MultiPlayerLoadScreen::init with null game info"));
+	if (game == NULL)
+		return;
+
 	// create the layout of the load screen
 	m_loadScreen = TheWindowManager->winCreateFromScript( "Menus/MultiplayerLoadScreen.wnd" );
 	DEBUG_ASSERTCRASH(m_loadScreen, ("Can't initialize the Multiplayer loadscreen"));
