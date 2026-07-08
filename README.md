@@ -21,7 +21,10 @@ is uploaded or hosted.
 
 [![Zero Hour skirmish running in a Safari tab - click to play the capture](docs/media/skirmish.webp)](docs/media/gameplay.mp4)
 
-**[▶ 42-second capture](docs/media/gameplay.mp4)** (4.4 MB, H.264): cold boot, `.big`
+
+https://github.com/user-attachments/assets/e41ecd1b-f78e-4bfc-a3fc-d2532dfe1789
+
+cold boot, `.big`
 asset load, main menu, skirmish setup, and a base going up under AI pressure -
 one Safari tab, no streaming, no server.
 
