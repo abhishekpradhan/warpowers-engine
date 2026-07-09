@@ -67,6 +67,7 @@
         this.id = m.youAre; this.host = m.host; this.iceServers = m.iceServers || [];
         this.connected = true;
         this.log("joined as " + this.id + (this.host ? " (host)" : ""));
+        this._startPing();
         if (this._welcome) this._welcome(m);
         break;
       case "roster":
@@ -154,8 +155,33 @@
   CafeUdp.prototype.close = function (port) { this.inboxes.delete(port); };
   CafeUdp.prototype.localIP = function () { return this.myIP >>> 0; };
 
-  // Live connection status — the "is the host alive / connectable" helper. Read
-  // from the HUD overlay (boot.html) or from JS: window.CafeUdp.status().
+  // ---- ping (round-trip time per peer) ----
+  // WebRTC exposes the real network RTT via getStats() on the succeeded ICE
+  // candidate pair — no need to inject ping frames into the game's DataChannel.
+  // Polled every 2s; each PeerLink caches its rtt in ms.
+  CafeUdp.prototype._startPing = function () {
+    var self = this;
+    if (this._pingTimer) return;
+    this._pingTimer = setInterval(function () { self._pollPing(); }, 2000);
+    self._pollPing();
+  };
+  CafeUdp.prototype._pollPing = function () {
+    this.peers.forEach(function (link) {
+      if (!link.pc || link.pc.getStats == null) return;
+      link.pc.getStats(null).then(function (stats) {
+        var rtt = null;
+        stats.forEach(function (r) {
+          if (r.type === "candidate-pair" && r.currentRoundTripTime != null &&
+              (r.nominated || r.state === "succeeded"))
+            rtt = r.currentRoundTripTime;
+        });
+        if (rtt != null) link.rtt = Math.round(rtt * 1000);
+      }).catch(function () {});
+    });
+  };
+
+  // Live connection status + per-player ping. Read from the HUD overlay or from
+  // JS: window.CafeUdp.status().
   CafeUdp.prototype.status = function () {
     var self = this;
     var host = this.roster.find(function (p) { return p.host; });
@@ -167,14 +193,38 @@
         hostAlive = !!(link && link.channel && link.channel.readyState === "open");
       }
     }
+    // Per-player rows: my own ping is 0; others come from their PeerLink rtt.
+    var players = this.roster.map(function (p) {
+      var mine = p.id === self.id;
+      var link = self.peers.get(p.id);
+      return {
+        name: p.name || "player",
+        host: !!p.host,
+        isMe: mine,
+        ping: mine ? 0 : (link && link.rtt != null ? link.rtt : null),
+      };
+    });
+    // My headline ping: to the host if I'm a guest, else the average to peers.
+    var myPing = null;
+    if (host && host.id !== self.id) {
+      var hl = self.peers.get(host.id);
+      myPing = hl && hl.rtt != null ? hl.rtt : null;
+    } else {
+      var rs = [];
+      this.peers.forEach(function (l) { if (l.rtt != null) rs.push(l.rtt); });
+      if (rs.length) myPing = Math.round(rs.reduce(function (a, b) { return a + b; }, 0) / rs.length);
+    }
     return {
       room: this.room || "?",
       connected: !!this.connected,
       myIP: ipStr(this.myIP),
+      myName: this.name || "you",
       peers: this.roster.length,
       isHost: !!(host && host.id === this.id),
       hostAlive: hostAlive,
       hostIP: ipStr(this.hostIP()),
+      ping: myPing,
+      players: players,
     };
   };
 
@@ -248,7 +298,13 @@
     };
     pc.ondatachannel = function (e) { self._bind(e.channel); };
     if (initiator)
-      this._bind(pc.createDataChannel("game", { ordered: false, maxRetransmits: 0 }));
+      // ordered:false keeps UDP-like delivery (no head-of-line blocking), but
+      // maxRetransmits:5 lets SCTP retry lost packets at RTT speed. The engine's
+      // own resend is dial-up-tuned (2s retry vs a 5s disconnect window —
+      // Connection.cpp), so raw packet loss stalled the lockstep barrier into
+      // the Disconnection Menu. Bounded retransmits = near-lossless without
+      // unbounded latency.
+      this._bind(pc.createDataChannel("game", { ordered: false, maxRetransmits: 5 }));
   }
   PeerLink.prototype._bind = function (ch) {
     var self = this;
