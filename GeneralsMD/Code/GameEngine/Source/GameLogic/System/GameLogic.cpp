@@ -1258,6 +1258,15 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 
 			}
 
+#ifdef __EMSCRIPTEN__
+			// Igroteka: exactly one browser paint happens between this tick
+			// (flag set, return) and the next tick's fully-synchronous map load
+			// (update() -> startNewGame). Tell the page NOW so it can raise a
+			// loading overlay in that paint; only compositor-driven CSS
+			// (transform/opacity) keeps animating once the load blocks the
+			// main thread. Fires for every mode incl. LAN/multiplayer.
+			EM_ASM({ if (typeof Module !== 'undefined' && Module.onMatchLoadBegin) Module.onMatchLoadBegin(); });
+#endif
 			m_startNewGame = TRUE;
 			return;
 
@@ -2360,6 +2369,13 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 			deleteLoadScreen();
 
 	}
+
+#ifdef __EMSCRIPTEN__
+	// Igroteka: the synchronous load (and the MP wait-for-peers barrier above)
+	// is over — the page can fade its loading overlay. Unconditional: fires for
+	// every game mode, with or without an engine load screen.
+	EM_ASM({ if (typeof Module !== 'undefined' && Module.onMatchLoadEnd) Module.onMatchLoadEnd(); });
+#endif
 
 	#ifdef DUMP_PERF_STATS
 	GetPrecisionTimer(&endTime64);
