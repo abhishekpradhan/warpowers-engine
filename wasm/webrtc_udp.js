@@ -47,6 +47,9 @@
     this.name = name;
     var wsUrl = base.replace(/^http/, "ws") +
       "/room/" + encodeURIComponent(room) + "/ws?name=" + encodeURIComponent(name || "engine");
+    // Private (password-gated) rooms require a signed token minted by the party
+    // page; it rides the WS URL. Open dev rooms have no token and connect freely.
+    if (window.CAFE_TOKEN) wsUrl += "&token=" + encodeURIComponent(window.CAFE_TOKEN);
     var ws = new WebSocket(wsUrl);
     this.ws = ws;
     ws.onmessage = function (e) { self._onMsg(JSON.parse(e.data)); };
@@ -283,12 +286,17 @@
   };
 
   // ---- boot ----
-  // Config comes from boot.html: window.CAFE_URL, window.CAFE_ROOM, window.CAFE_NAME.
+  // Config comes from the host page: window.CAFE_URL, CAFE_ROOM, CAFE_NAME,
+  // CAFE_TOKEN. Auto-connect only when CAFE_ENABLE is set — the deployed game
+  // sets it only for a multiplayer launch (?room=...), so single-player never
+  // opens a lobby socket. CafeUdp still exists so the engine's UDP shim resolves.
   var udp = new CafeUdp();
   window.CafeUdp = udp;
-  window.CAFE_UDP_READY = udp.connect(
-    window.CAFE_URL || "https://cafe-nw.mrz.sh",
-    window.CAFE_ROOM || "lan",
-    window.CAFE_NAME || ("engine-" + Math.floor(Math.random() * 1e4))
-  ).then(function () { udp.log("ready"); });
+  if (window.CAFE_ENABLE) {
+    window.CAFE_UDP_READY = udp.connect(
+      window.CAFE_URL || "https://cafe-nw.mrz.sh",
+      window.CAFE_ROOM || "lan",
+      window.CAFE_NAME || ("engine-" + Math.floor(Math.random() * 1e4))
+    ).then(function () { udp.log("ready"); });
+  }
 })();

@@ -50,9 +50,11 @@
     window.__udplog = function(m) { log(m); };
     (function() {
       var p = new URLSearchParams(location.search);
+      window.CAFE_ENABLE = true; // dev harness always joins a lobby room
       window.CAFE_URL  = p.get('cafe')   || 'https://cafe-nw.mrz.sh';
       window.CAFE_ROOM = p.get('room')   || 'lan';
       window.CAFE_NAME = p.get('player') || ('gx-' + Math.floor(Math.random() * 1e4));
+      window.CAFE_TOKEN = p.get('token') || null; // set when testing a private room
       // Autopilot: ?host=1 auto-creates the game, ?autojoin=1 auto-joins the host.
       // Lets Igroteka gather a party then open each tab straight into the match.
       window.CAFE_AUTO = p.get('host') ? 'host' : (p.get('autojoin') ? 'join' : '');
