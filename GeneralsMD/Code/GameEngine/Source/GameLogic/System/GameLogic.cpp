@@ -1265,7 +1265,68 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 			// loading overlay in that paint; only compositor-driven CSS
 			// (transform/opacity) keeps animating once the load blocks the
 			// main thread. Fires for every mode incl. LAN/multiplayer.
-			EM_ASM({ if (typeof Module !== 'undefined' && Module.onMatchLoadBegin) Module.onMatchLoadBegin(); });
+			// The payload mirrors the game's own load screen: map + per-slot
+			// name/faction/color (JSON; strings escaped, non-ASCII folded).
+			{
+				AsciiString payload;
+				payload.concat("{");
+				if (TheGameInfo)
+				{
+					payload.concat("\"map\":\"");
+					for (const char *c = TheGameInfo->getMap().str(); *c; ++c)
+					{
+						if (*c == '"' || *c == '\\') payload.concat('\\');
+						payload.concat((*c >= 0x20 && *c < 0x7f) ? *c : '?');
+					}
+					payload.concat("\",\"players\":[");
+					Bool firstSlot = TRUE;
+					for (Int s = 0; s < MAX_SLOTS; ++s)
+					{
+						GameSlot *slot = TheGameInfo->getSlot(s);
+						if (!slot || !slot->isOccupied())
+							continue;
+						if (!firstSlot) payload.concat(",");
+						firstSlot = FALSE;
+						payload.concat("{\"name\":\"");
+						UnicodeString uname = slot->getName();
+						for (const WideChar *w = uname.str(); *w; ++w)
+						{
+							char c = (*w >= 0x20 && *w < 0x7f) ? (char)*w : '?';
+							if (c == '"' || c == '\\') payload.concat('\\');
+							payload.concat(c);
+						}
+						payload.concat("\",\"faction\":\"");
+						Int pt = slot->getPlayerTemplate();
+						if (pt == PLAYERTEMPLATE_OBSERVER)
+							payload.concat("Observer");
+						else if (pt < 0 || pt >= ThePlayerTemplateStore->getPlayerTemplateCount())
+							payload.concat("Random");
+						else
+						{
+							UnicodeString disp = ThePlayerTemplateStore->getNthPlayerTemplate(pt)->getDisplayName();
+							for (const WideChar *w = disp.str(); *w; ++w)
+							{
+								char c = (*w >= 0x20 && *w < 0x7f) ? (char)*w : '?';
+								if (c == '"' || c == '\\') payload.concat('\\');
+								payload.concat(c);
+							}
+						}
+						payload.concat("\",\"human\":");
+						payload.concat(slot->isHuman() ? "true" : "false");
+						payload.concat(",\"color\":");
+						AsciiString colorStr;
+						colorStr.format("%d", slot->getColor());
+						payload.concat(colorStr);
+						payload.concat("}");
+					}
+					payload.concat("]");
+				}
+				payload.concat("}");
+				EM_ASM({
+					if (typeof Module !== 'undefined' && Module.onMatchLoadBegin)
+						Module.onMatchLoadBegin(UTF8ToString($0));
+				}, payload.str());
+			}
 #endif
 			m_startNewGame = TRUE;
 			return;
