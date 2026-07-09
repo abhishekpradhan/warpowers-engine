@@ -706,6 +706,7 @@ void LanLobbyMenuUpdate( WindowLayout * layout, void *userData)
 	{
 		int mode = cafe_autopilot_mode();
 		static Bool s_hostFired = FALSE;
+		static Bool s_joinFired = FALSE;
 		static Int s_joinTick = 0;
 		if (mode == 1)
 		{
@@ -713,11 +714,17 @@ void LanLobbyMenuUpdate( WindowLayout * layout, void *userData)
 		}
 		else if (mode == 2)
 		{
-			if ((s_joinTick++ % 45) == 0)
+			// Keep polling (host's game arrives async over the shim) until we find
+			// it, then RequestGameJoin exactly ONCE. Re-joining an already-joined
+			// game makes the engine reject us with "Duplicate name already in game".
+			if (!s_joinFired && (s_joinTick++ % 45) == 0)
 			{
 				LANGameInfo *theGame = TheLAN->LookupGameByListOffset(0);
 				if (theGame)
+				{
 					TheLAN->RequestGameJoin(theGame);
+					s_joinFired = TRUE;
+				}
 				else
 					DEBUG_LOG(("autopilot: waiting for host's game in LAN lobby..."));
 			}
