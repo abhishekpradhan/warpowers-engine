@@ -162,7 +162,19 @@ void W3DShroud::init(WorldHeightMap *pMap, Real worldCellSizeX, Real worldCellSi
 #endif
 		m_pSrcTexture = DX8Wrapper::_Create_DX8_Surface(srcWidth,srcHeight, WW3D_FORMAT_R5G6B5);
 
+	// WarPowers @bugfix Some Vulkan/Metal drivers refuse 16-bit offscreen plain
+	// surfaces; fall back to 32-bit, and if surface creation fails entirely,
+	// leave the shroud disabled (get/setShroudLevel already tolerate null).
+	if (m_pSrcTexture == nullptr)
+		m_pSrcTexture = DX8Wrapper::_Create_DX8_Surface(srcWidth,srcHeight, WW3D_FORMAT_X8R8G8B8);
+
 	DEBUG_ASSERTCRASH( m_pSrcTexture != nullptr, ("Failed to Allocate Shroud Src Surface"));
+
+	if (m_pSrcTexture == nullptr)
+	{
+		fprintf(stderr, "[WP_SHROUD] surface creation failed (%dx%d); shroud disabled\n", srcWidth, srcHeight);
+		return;
+	}
 
 	D3DLOCKED_RECT rect;
 

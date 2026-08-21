@@ -1590,6 +1590,7 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 		d.setBool(TheKey_teamIsSingleton, true);
 		TheSidesList->addTeam(&d);
 	//}
+	fprintf(stderr, "[WP_TSNG validateSides]\n"); fflush(stderr); // WarPowers @debug
 	TheSidesList->validateSides();
 
 	// update the loadscreen
@@ -1943,6 +1944,8 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 		Int timer = timeGetTime();
 		for (MapObject *pMapObj = MapObject::getFirstMapObject(); pMapObj; pMapObj = pMapObj->getNext())
 		{
+			// WarPowers @debug temporary bring-up trace
+			fprintf(stderr, "[WP_TSNG obj '%s']\n", pMapObj->getName().str()); fflush(stderr);
 
 			if (pMapObj->getFlag(FLAG_BRIDGE_FLAGS) || pMapObj->getFlag(FLAG_ROAD_FLAGS)) {
 				continue;	// roads & bridges are special cased in the terrain side.
@@ -2163,6 +2166,7 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 	// Note - WorldBuilderDoc.cpp also uses initial camera position, so if changed, update both.  jba
 	// Note - We construct the multiplayer start spot name manually here, so change this if you
 	//        change TheKey_Player_1_Start etc.  mdc
+	fprintf(stderr, "[WP_TSNG camera stage]\n"); fflush(stderr); // WarPowers @debug
 	AsciiString startingCamName = TheNameKeyGenerator->keyToName(TheKey_InitialCameraPosition);
 	if (TheGameInfo)
 	{
