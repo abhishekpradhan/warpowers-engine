@@ -208,13 +208,19 @@ void ThingFactory::init()
 void ThingFactory::reset()
 {
 	ThingTemplate *t;
+	// WarPowers @debug temporary trace for reset-time crash investigation
+	fprintf(stderr, "[THING_RESET] begin, m_firstTemplate=%p\n", (void*)m_firstTemplate);
 	// go through all templates and delete any overrides
 	for( t = m_firstTemplate; t; /* empty */ )
 	{
+		fprintf(stderr, "[THING_RESET] visiting t=%p\n", (void*)t);
+		fflush(stderr);
 		Bool possibleAdjustment = FALSE;
 		// t itself can be deleted if it is something created for this map only. Therefore,
 		// we need to store what the next item is so that we don't orphan a bunch of templates.
 		ThingTemplate *nextT = t->friend_getNextTemplate();
+		fprintf(stderr, "[THING_RESET]   name='%s' id=%d next=%p\n", t->getName().str(), (int)t->getTemplateID(), (void*)nextT);
+		fflush(stderr);
 		DEBUG_ASSERTCRASH(!nextT || t->getTemplateID() == nextT->getTemplateID() + 1, ("Next template ID is unexpected"));
 
 		if (t == m_firstTemplate) {

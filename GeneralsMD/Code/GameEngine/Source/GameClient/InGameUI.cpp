@@ -2042,6 +2042,20 @@ void InGameUI::update()
 
 	GameWindow *moneyWin = TheWindowManager->winGetWindowFromId( nullptr, moneyWindowKey );
 	GameWindow *powerWin = TheWindowManager->winGetWindowFromId( nullptr, powerWindowKey );
+	// WarPowers @debug temporary breadcrumb
+	{
+		static Bool logged = FALSE;
+		if (!logged)
+		{
+			fprintf(stderr, "[WP_UI] update: moneyWin=%p powerWin=%p\n", (void*)moneyWin, (void*)powerWin);
+			for (GameWindow *w = TheWindowManager->winGetWindowList(); w; w = w->winGetNext())
+				fprintf(stderr, "[WP_UI]   toplevel win id=%d hidden=%d\n", (int)w->winGetWindowId(), (int)w->winIsHidden());
+			fflush(stderr);
+			logged = TRUE;
+		}
+	}
+	if (moneyWin == nullptr || powerWin == nullptr)
+		return; // WarPowers @debug bail instead of crashing while UI data is incomplete
 //	if( moneyWin == nullptr )
 //	{
 //		NameKeyType moneyWindowKey = TheNameKeyGenerator->nameToKey( "ControlBar.wnd:MoneyDisplay" );
