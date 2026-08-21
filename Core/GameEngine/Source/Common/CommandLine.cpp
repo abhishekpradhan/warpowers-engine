@@ -724,6 +724,19 @@ Int parseVTune ( char *args[], int num )
 
 #endif // defined(RTS_DEBUG)
 
+// WarPowers @tweak Make -file available in Release builds for original-data bring-up.
+#if !defined(RTS_DEBUG)
+Int parseFile(char *args[], int num)
+{
+	if (num > 1)
+	{
+		TheWritableGlobalData->m_initialFile = args[1];
+		ConvertShortMapPathToLongMapPath(TheWritableGlobalData->m_initialFile);
+	}
+	return 2;
+}
+#endif // !defined(RTS_DEBUG)
+
 //=============================================================================
 //=============================================================================
 
@@ -1178,6 +1191,12 @@ static CommandLineParam paramsForEngineInit[] =
 
 	// TheSuperHackers @feature xezon 03/08/2025 Force full viewport for 'Control Bar Pro' Addons like GenTool did it.
 	{ "-forcefullviewport", parseFullViewport },
+
+	// WarPowers @tweak -file and -buildmapcache are available in Release builds for original-data bring-up.
+#if !defined(RTS_DEBUG)
+	{ "-file", parseFile },
+	{ "-buildmapcache", parseBuildMapCache },
+#endif
 
 #if defined(RTS_DEBUG)
 	{ "-noaudio", parseNoAudio },
