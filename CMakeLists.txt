@@ -52,6 +52,9 @@ include(cmake/debug_strip.cmake)
 
 include(FetchContent)
 
+# Igroteka @build 05/07/2026 wasm dependency layer (no-op off Emscripten)
+include(cmake/wasm-deps.cmake)
+
 # MinGW-w64 specific configuration
 if(MINGW)
     include(cmake/mingw.cmake)

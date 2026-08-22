@@ -95,3 +95,15 @@ endif()
 if(MINGW AND COMMAND add_debug_strip_target)
     add_debug_strip_target(z_generals)
 endif()
+
+# Igroteka @build 06/07/2026 wasm: statically link the d8web D3D8 bridge.
+# The bridge compiles against the same DXVK/CompatLib header set as the engine
+# (d3d8lib) plus d8web's namespaced mirror.
+if(EMSCRIPTEN)
+    add_library(d8web_bridge STATIC ${CMAKE_SOURCE_DIR}/wasm/d8web_bridge/d8web_bridge.cpp)
+    set_property(TARGET d8web_bridge PROPERTY CXX_STANDARD 20)
+    target_link_libraries(d8web_bridge PRIVATE d8web d3d8lib)
+    target_include_directories(d8web_bridge PRIVATE
+        ${CMAKE_SOURCE_DIR}/Core/Libraries/Source/WWVegas/WWLib)
+    target_link_libraries(z_generals PRIVATE d8web_bridge d8web)
+endif()

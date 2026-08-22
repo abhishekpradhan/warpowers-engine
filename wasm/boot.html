@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Igroteka ZH boot test</title>
+  <style>
+    html, body { margin: 0; background: #101116; color: #cfd2dd;
+                 font: 12px/1.45 ui-monospace, monospace; }
+    #status { position: sticky; top: 0; background: #1a1c26; padding: 8px 12px;
+              border-bottom: 1px solid #2a2d3a; font-weight: 600; z-index: 2; }
+    #stage { display: flex; justify-content: center; padding: 10px; background: #000; }
+    canvas { width: 1024px; height: 768px; background: #000; border: 1px solid #2a2d3a; }
+    #log { height: 260px; overflow-y: auto; padding: 10px 12px; white-space: pre-wrap;
+           word-break: break-all; border-top: 1px solid #2a2d3a; background: #14151d; }
+  </style>
+</head>
+<body>
+  <div id="status">igroteka: fetching game data…</div>
+  <div id="stage"><canvas id="canvas" width="1024" height="768" oncontextmenu="event.preventDefault()"></canvas></div>
+  <div id="log"></div>
+  <script>
+    var statusEl = document.getElementById('status');
+    var logEl = document.getElementById('log');
+    var lineCount = 0;
+    var pinned = true;
+    logEl.addEventListener('scroll', function() {
+      // stay pinned to the bottom unless the user scrolls up
+      pinned = logEl.scrollTop + logEl.clientHeight >= logEl.scrollHeight - 8;
+    });
+    function log(t) {
+      lineCount++;
+      if (lineCount < 6000) {
+        logEl.textContent += t + '\n';
+        if (pinned) logEl.scrollTop = logEl.scrollHeight;
+      }
+      console.log(t);
+      statusEl.textContent = 'igroteka boot [' + lineCount + ']: ' + t.slice(0, 160);
+    }
+    window.addEventListener('error', function(e) {
+      log('UNCAUGHT: ' + (e.error && e.error.stack ? e.error.stack : e.message));
+    });
+    window.addEventListener('unhandledrejection', function(e) {
+      log('REJECTION: ' + e.reason + '\n' + (e.reason && e.reason.stack ? e.reason.stack : ''));
+    });
+
+    // WebRTC multiplayer: route the UDP-over-DataChannel bridge's logs into this
+    // panel and configure which cafe room to join. Two windows on the same room
+    // (?room=foo) discover each other in the in-game LAN lobby.
+    //   boot.html?room=duel&player=alice
+    window.__udplog = function(m) { log(m); };
+    (function() {
+      var p = new URLSearchParams(location.search);
+      window.CAFE_ENABLE = true; // dev harness always joins a lobby room
+      window.CAFE_URL  = p.get('cafe')   || 'https://cafe-nw.mrz.sh';
+      window.CAFE_ROOM = p.get('room')   || 'lan';
+      window.CAFE_NAME = p.get('player') || ('gx-' + Math.floor(Math.random() * 1e4));
+      window.CAFE_TOKEN = p.get('token') || null; // set when testing a private room
+      // Autopilot: ?host=1 auto-creates the game, ?autojoin=1 auto-joins the host.
+      // Lets Igroteka gather a party then open each tab straight into the match.
+      window.CAFE_AUTO = p.get('host') ? 'host' : (p.get('autojoin') ? 'join' : '');
+      log('[cafe] room=' + window.CAFE_ROOM + ' name=' + window.CAFE_NAME +
+          (window.CAFE_AUTO ? ' auto=' + window.CAFE_AUTO : ''));
+    })();
+
+    // Room + connection HUD (top-right). Shows the room code so players don't get
+    // confused, and doubles as the "is the host alive/connectable" helper.
+    (function() {
+      var hud = document.createElement('div');
+      hud.id = 'cafeHud';
+      hud.style.cssText = 'position:fixed;top:6px;right:10px;z-index:20;' +
+        'background:rgba(16,18,26,.82);color:#9fe;padding:5px 11px;' +
+        'border:1px solid #2a3a4a;border-radius:5px;font:12px/1.5 ui-monospace,monospace;' +
+        'pointer-events:none;white-space:nowrap;';
+      document.body.appendChild(hud);
+      setInterval(function() {
+        if (!window.CafeUdp) return;
+        var s = window.CafeUdp.status();
+        hud.textContent = 'ROOM ' + s.room + '  ·  you ' + s.myIP +
+          '  ·  players ' + s.peers +
+          '  ·  host ' + (s.isHost ? 'you' : (s.hostAlive ? 'live' : 'waiting…'));
+      }, 500);
+    })();
+
+    var Module = {
+      canvas: document.getElementById('canvas'),
+      // Cache-bust the .wasm fetch — a stale cached build after a rebuild is
+      // indistinguishable from "the fix didn't work". Local serving, so the
+      // re-download cost is irrelevant.
+      locateFile: function(path) { return path + '?v=' + Date.now(); },
+      // Engine args from the URL for fast test scenarios, e.g.:
+      //   boot.html?args=-noshellmap          (menu without the 3D shell map)
+      //   boot.html?args=-noshellmap,-noaudio
+      arguments: ['-win'].concat(
+        (new URLSearchParams(location.search).get('args') || '')
+          .split(',').filter(function(a) { return a.length > 0; })),
+      print: log,
+      printErr: log,
+      onAbort: function(w) { log('ABORT: ' + w); },
+      preRun: [function() {
+        ENV.CNC_GENERALS_ZH_PATH = '/game';
+        ENV.CNC_GENERALS_PATH = '/game-base';  // base-game archives (ZH mounts first, wins conflicts)
+        ENV.HOME = '/home/web_user';
+        FS.mkdir('/game');
+        FS.mkdir('/game-base');
+        FS.mkdir('/fonts');
+        // User prefs. Shadows default OFF (d8web has no stencil yet — shadow
+        // volumes draw as solid black prisms). Re-enable with boot.html?shadows=on
+        var userDir = '/home/web_user/.local/share/GeneralsX/GeneralsZH';
+        FS.mkdirTree(userDir);
+        var shadows = (new URLSearchParams(location.search).get('shadows') === 'on') ? 'yes' : 'no';
+        FS.writeFile(userDir + '/Options.ini',
+          'StaticGameLOD = Low\n' +
+          'UseShadowVolumes = ' + shadows + '\n' +
+          'UseShadowDecals = ' + shadows + '\n' +
+          'Resolution = 1024 768\n');
+        log('[prefs] detail=Low shadows=' + shadows);
+        addRunDependency('gamedata');
+        // name → path in the wasm FS; the fontconfig stub resolves every font
+        // query to /fonts/default.ttf, so a real TTF must be staged there.
+        // ZH is an expansion: much of its art (terrain, effects, models) lives
+        // in the BASE game's archives, mounted from CNC_GENERALS_PATH.
+        FS.mkdirTree('/game/Data/Scripts');
+        var files = [
+          // Loose script files — retail ships these OUTSIDE the .big archives;
+          // SkirmishScripts.scb is the entire skirmish AI (without it the AI
+          // sits idle).
+          ['Scripts/SkirmishScripts.scb', '/game/Data/Scripts/SkirmishScripts.scb'],
+          ['Scripts/MultiplayerScripts.scb', '/game/Data/Scripts/MultiplayerScripts.scb'],
+          ['Scripts/Scripts.ini', '/game/Data/Scripts/Scripts.ini'],
+          ['INIZH.big', '/game/INIZH.big'],
+          ['EnglishZH.big', '/game/EnglishZH.big'],
+          ['WindowZH.big', '/game/WindowZH.big'],
+          ['gensecZH.big', '/game/gensecZH.big'],
+          ['TexturesZH.big', '/game/TexturesZH.big'],
+          ['W3DZH.big', '/game/W3DZH.big'],
+          ['TerrainZH.big', '/game/TerrainZH.big'],
+          ['MapsZH.big', '/game/MapsZH.big'],
+          ['base-Textures.big', '/game-base/Textures.big'],
+          ['base-W3D.big', '/game-base/W3D.big'],
+          ['base-Terrain.big', '/game-base/Terrain.big'],
+          ['base-Window.big', '/game-base/Window.big'],
+          ['default.ttf', '/fonts/default.ttf'],
+        ];
+        var done = 0;
+        files.forEach(function(entry) {
+          var name = entry[0], dest = entry[1];
+          fetch('/gamedata/' + name).then(function(r) {
+            if (!r.ok) throw new Error(name + ': HTTP ' + r.status);
+            return r.arrayBuffer();
+          }).then(function(buf) {
+            FS.writeFile(dest, new Uint8Array(buf));
+            log('[staged] ' + name + ' → ' + dest + ' (' + (buf.byteLength / 1048576).toFixed(1) + ' MB)');
+            if (++done === files.length) removeRunDependency('gamedata');
+          }).catch(function(err) {
+            log('[stage failed] ' + err);
+            if (++done === files.length) removeRunDependency('gamedata');
+          });
+        });
+      }]
+    };
+  </script>
+  <script src="webrtc_udp.js"></script>
+  <script>
+    // Cache-bust the engine glue too (locateFile already busts the .wasm). A
+    // stale cached GeneralsXZH.js against a fresh .wasm mismatches the EM_ASM
+    // ASM_CONSTS table -> "ASM_CONSTS[emAsmAddr] is not a function".
+    (function() {
+      var s = document.createElement('script');
+      s.src = 'GeneralsXZH.js?v=' + Date.now();
+      document.body.appendChild(s);
+    })();
+  </script>
+</body>
+</html>

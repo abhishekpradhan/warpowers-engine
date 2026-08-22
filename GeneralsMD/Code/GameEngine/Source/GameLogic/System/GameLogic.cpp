@@ -84,6 +84,9 @@
 #include "GameClient/LoadScreen.h"
 #include "GameClient/MapUtil.h"
 #include "GameClient/Mouse.h"
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>  // emscripten_sleep — yield the multiplayer load barrier
+#endif
 #include "GameClient/ParticleSys.h"
 #include "GameClient/TerrainVisual.h"
 #include "GameClient/View.h"
@@ -1234,7 +1237,20 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 			/// @todo: Here is where we would look at the game mode & play an intro movie or something.
 			// Failing that, we just set the flag so the actual game can start from a uniform
 			// entry point (startNewGame() called from update()).
+#ifdef __EMSCRIPTEN__
+			// wasm: skirmish gets the same one-frame defer single player has.
+			// The browser only composites the canvas BETWEEN frame tasks —
+			// with the blocking map load running inside the click frame, the
+			// game's own load screen was drawn but never presented, so the
+			// player stared at a frozen menu for the whole load.
+			// TheGameInfo gate: MultiPlayerLoadScreen::init dereferences the
+			// game info; when it isn't set yet at this early point, fall back
+			// to the old path (frozen menu, but it loads).
+			if( m_gameMode == GAME_SINGLE_PLAYER
+				|| (m_gameMode == GAME_SKIRMISH && TheGameInfo != NULL) )
+#else
 			if( m_gameMode == GAME_SINGLE_PLAYER )
+#endif
 			{
 
 				if(m_background)
@@ -1247,17 +1263,102 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 				if(m_loadScreen)
 				{
 					TheWritableGlobalData->m_loadScreenRender = TRUE;	///< mark it so only a few select things are rendered during load
+#ifdef __EMSCRIPTEN__
+					// The skirmish load screen reads player slots from the
+					// game info; single player expects null.
+					m_loadScreen->init(m_gameMode == GAME_SKIRMISH ? TheGameInfo : nullptr);
+#else
 					m_loadScreen->init(nullptr);
+#endif
 				}
 
 			}
 
+#ifdef __EMSCRIPTEN__
+			// Igroteka: exactly one browser paint happens between this tick
+			// (flag set, return) and the next tick's fully-synchronous map load
+			// (update() -> startNewGame). Tell the page NOW so it can raise a
+			// loading overlay in that paint; only compositor-driven CSS
+			// (transform/opacity) keeps animating once the load blocks the
+			// main thread. Fires for every mode incl. LAN/multiplayer.
+			// The payload mirrors the game's own load screen: map + per-slot
+			// name/faction/color (JSON; strings escaped, non-ASCII folded).
+			{
+				AsciiString payload;
+				payload.concat("{");
+				if (TheGameInfo)
+				{
+					payload.concat("\"map\":\"");
+					for (const char *c = TheGameInfo->getMap().str(); *c; ++c)
+					{
+						if (*c == '"' || *c == '\\') payload.concat('\\');
+						payload.concat((*c >= 0x20 && *c < 0x7f) ? *c : '?');
+					}
+					payload.concat("\",\"players\":[");
+					Bool firstSlot = TRUE;
+					for (Int s = 0; s < MAX_SLOTS; ++s)
+					{
+						GameSlot *slot = TheGameInfo->getSlot(s);
+						if (!slot || !slot->isOccupied())
+							continue;
+						if (!firstSlot) payload.concat(",");
+						firstSlot = FALSE;
+						payload.concat("{\"name\":\"");
+						UnicodeString uname = slot->getName();
+						for (const WideChar *w = uname.str(); *w; ++w)
+						{
+							char c = (*w >= 0x20 && *w < 0x7f) ? (char)*w : '?';
+							if (c == '"' || c == '\\') payload.concat('\\');
+							payload.concat(c);
+						}
+						payload.concat("\",\"faction\":\"");
+						Int pt = slot->getPlayerTemplate();
+						if (pt == PLAYERTEMPLATE_OBSERVER)
+							payload.concat("Observer");
+						else if (pt < 0 || pt >= ThePlayerTemplateStore->getPlayerTemplateCount())
+							payload.concat("Random");
+						else
+						{
+							UnicodeString disp = ThePlayerTemplateStore->getNthPlayerTemplate(pt)->getDisplayName();
+							for (const WideChar *w = disp.str(); *w; ++w)
+							{
+								char c = (*w >= 0x20 && *w < 0x7f) ? (char)*w : '?';
+								if (c == '"' || c == '\\') payload.concat('\\');
+								payload.concat(c);
+							}
+						}
+						payload.concat("\",\"human\":");
+						payload.concat(slot->isHuman() ? "true" : "false");
+						payload.concat(",\"color\":");
+						AsciiString colorStr;
+						colorStr.format("%d", slot->getColor());
+						payload.concat(colorStr);
+						payload.concat("}");
+					}
+					payload.concat("]");
+				}
+				payload.concat("}");
+				EM_ASM({
+					if (typeof Module !== 'undefined' && Module.onMatchLoadBegin)
+						Module.onMatchLoadBegin(UTF8ToString($0));
+				}, payload.str());
+			}
+#endif
 			m_startNewGame = TRUE;
 			return;
 
 		}
 
 	}
+
+#ifdef __EMSCRIPTEN__
+	// wasm: the blocking map load below starves the main-thread audio
+	// callback — playing sounds turn into choppy repeats for the whole
+	// load. Stop them for clean silence; map scripts start the in-game
+	// music and sounds fresh once the match begins.
+	if (TheAudio)
+		TheAudio->stopAudio(AudioAffect_All);
+#endif
 
 	m_rankLevelLimit = 1000;	// this is reset every game.
 
@@ -2301,6 +2402,11 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 	{
 		updateLoadProgress(101); // keep greater then 100
 		testTimeOut();
+#ifdef __EMSCRIPTEN__
+		// Multiplayer load barrier: pump the network so the peer's "load complete"
+		// is received (harmless in single-player, where this loop doesn't run).
+		if (TheNetwork) TheNetwork->liteupdate();
+#endif
 		Sleep(100);
 	}
 
@@ -2337,6 +2443,13 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 			deleteLoadScreen();
 
 	}
+
+#ifdef __EMSCRIPTEN__
+	// Igroteka: the synchronous load (and the MP wait-for-peers barrier above)
+	// is over — the page can fade its loading overlay. Unconditional: fires for
+	// every game mode, with or without an engine load screen.
+	EM_ASM({ if (typeof Module !== 'undefined' && Module.onMatchLoadEnd) Module.onMatchLoadEnd(); });
+#endif
 
 	#ifdef DUMP_PERF_STATS
 	GetPrecisionTimer(&endTime64);

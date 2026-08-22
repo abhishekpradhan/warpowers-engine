@@ -4,13 +4,35 @@
 #include <streambuf>
 #include <ostream>
 
+// Igroteka @bugfix 10/07/2026 The stringbuf version silently wrote NOTHING:
+// libc++'s basic_stringbuf::setbuf is a no-op (allowed by the standard), so
+// the digits went to the stringbuf's internal string and `str` was returned
+// as uninitialized stack garbage — rendered as a tofu box everywhere itoa
+// feeds UI text (Disconnection Menu vote counts / countdowns).
 char* itoa(int value, char* str, int base)
 {
-  // Create stringbuf from str
-  std::stringbuf buf;
-  buf.pubsetbuf(str, 33);
-  std::ostream os(&buf);
-  os << value << '\0';
+  static const char digits[] = "0123456789abcdefghijklmnopqrstuvwxyz";
+  if (base < 2 || base > 36) { str[0] = '\0'; return str; }
+
+  char tmp[33];
+  int pos = 0;
+  // MSVC semantics: only base 10 is signed; other bases format the bit pattern.
+  unsigned int uvalue;
+  bool negative = (base == 10 && value < 0);
+  if (negative)
+    uvalue = (unsigned int)(-(long long)value);
+  else
+    uvalue = (unsigned int)value;
+
+  do {
+    tmp[pos++] = digits[uvalue % (unsigned int)base];
+    uvalue /= (unsigned int)base;
+  } while (uvalue != 0);
+
+  int out = 0;
+  if (negative) str[out++] = '-';
+  while (pos > 0) str[out++] = tmp[--pos];
+  str[out] = '\0';
   return str;
 }
 
@@ -18,8 +40,19 @@ int _vsnwprintf(wchar_t* buffer, size_t count, const wchar_t* format, va_list ar
 {
   std::wstring format_fixup(format);
 
+  // Igroteka @bugfix 10/07/2026 MSVC '%hs' (narrow string in a wide format)
+  // doesn't exist in musl's vswprintf — rewrite to plain '%s' (POSIX wide
+  // printf's %s already means narrow) BEFORE the %s->%ls pass below would
+  // otherwise leave it as the unsupported '%hs'.
+  size_t pos = format_fixup.find(L"%hs", 0);
+  while (pos != std::wstring::npos)
+  {
+    format_fixup.replace(pos, 3, L"%\x01s"); // placeholder so %s pass skips it
+    pos = format_fixup.find(L"%hs", pos);
+  }
+
   // Replace all %s with %ls
-  size_t pos = format_fixup.find(L"%s", 0);
+  pos = format_fixup.find(L"%s", 0);
   while (pos != std::wstring::npos)
   {
     format_fixup.replace(pos, 2, L"%ls");
@@ -36,6 +69,13 @@ int _vsnwprintf(wchar_t* buffer, size_t count, const wchar_t* format, va_list ar
     pos = format_fixup.find(L"%S", pos);
   }
 
+  // resolve the %hs placeholders to plain narrow %s
+  pos = format_fixup.find(L"%\x01s", 0);
+  while (pos != std::wstring::npos)
+  {
+    format_fixup.replace(pos, 3, L"%s");
+    pos = format_fixup.find(L"%\x01s", pos);
+  }
 
   return vswprintf(buffer, count, format_fixup.c_str(), args);
 }

@@ -10,6 +10,34 @@
 if(SAGE_USE_SDL3)
     set(SDL3_FOUND FALSE)
     set(SDL3_image_FOUND FALSE)
+
+    # Igroteka @build 05/07/2026 - Emscripten: SDL3 static from source, no
+    # SDL3_image (cursor .ico decoding is stubbed on wasm), no X11/Wayland/libpng.
+    if(EMSCRIPTEN)
+        include(FetchContent)
+        set(SDL3_VERSION "3.4.2")
+        FetchContent_Declare(
+            SDL3
+            URL https://github.com/libsdl-org/SDL/releases/download/release-3.4.2/SDL3-3.4.2.tar.gz
+            URL_HASH SHA256=ef39a2e3f9a8a78296c40da701967dd1b0d0d6e267e483863ce70f8a03b4050c
+        )
+        set(SDL_SHARED OFF CACHE BOOL "" FORCE)
+        set(SDL_STATIC ON CACHE BOOL "" FORCE)
+        set(SDL_TESTS OFF CACHE BOOL "" FORCE)
+        set(SDL_EXAMPLES OFF CACHE BOOL "" FORCE)
+        FetchContent_MakeAvailable(SDL3)
+        add_library(sdl3lib INTERFACE)
+        target_link_libraries(sdl3lib INTERFACE SDL3::SDL3)
+        target_include_directories(sdl3lib INTERFACE "${SDL3_SOURCE_DIR}/include")
+        message(STATUS "SDL3 ${SDL3_VERSION} configured for Emscripten (static, no SDL3_image)")
+        return()
+    endif()
+
+    # GeneralsX @build BenderAI 22/02/2026 (updated)
+    # Strategy: FetchContent to compile SDL3 + SDL3_image from source
+    # Docker environment (ubuntu:24.04) has build dependencies pre-installed
+    # This ensures local build compatibility (same glibc, same distro as developer machine)
+    # Reference: https://github.com/libsdl-org/SDL/releases/download/release-3.4.2/SDL3-3.4.2.tar.gz
     
     if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         find_package(SDL3 3.4.0 QUIET)

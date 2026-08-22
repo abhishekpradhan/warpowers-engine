@@ -3,9 +3,28 @@
 
 #include "d3dx8core.h"
 
+// Igroteka wasm: boot trace logs are off by default — thousands per boot,
+// each crossing wasm->JS. Enable with window.IG_TRACE = 1 before the engine
+// script loads (native: IG_TRACE env var).
+#ifdef __EMSCRIPTEN__
+#include <emscripten/emscripten.h>
+static bool igTraceEnabled() {
+    static const bool on = EM_ASM_INT({
+        return (typeof window !== 'undefined' && window.IG_TRACE) ? 1 : 0;
+    }) != 0;
+    return on;
+}
+#else
+#include <cstdlib>
+static bool igTraceEnabled() {
+    static const bool on = getenv("IG_TRACE") && *getenv("IG_TRACE") != '0';
+    return on;
+}
+#endif
+
 // GeneralsX @build felipebraz 20/06/2025 GLI causes make_vec4 ambiguity with Apple Clang (GLM version mismatch).
 // On macOS, exclude GLI and use stub implementations for the surface scaling path.
-#ifndef __APPLE__
+#if !defined(__APPLE__) && !defined(__EMSCRIPTEN__)
 #include <gli/gli.hpp>
 #include <gli/generate_mipmaps.hpp>
 #endif
@@ -84,6 +103,13 @@ D3DXLoadSurfaceFromSurface(
 	pSrcSurface->GetDesc(&descSrc);
 	pDestSurface->GetDesc(&descDest);
 
+#ifdef __EMSCRIPTEN__
+	if (descSrc.Width >= 512 || descDest.Width >= 256)
+		fprintf(stderr, "[LSFS] src=%ux%u fmt=%u dst=%ux%u fmt=%u\n",
+		        descSrc.Width, descSrc.Height, (unsigned)descSrc.Format,
+		        descDest.Width, descDest.Height, (unsigned)descDest.Format);
+#endif
+
 	if (descSrc.Format != descDest.Format)
 	{
 		// Currently we only support scaling between formats of the same type
@@ -106,7 +132,7 @@ D3DXLoadSurfaceFromSurface(
 		return D3D_OK;
 	}
 
-#ifndef __APPLE__
+#if !defined(__APPLE__) && !defined(__EMSCRIPTEN__)
 	// GeneralsX @bugfix Antigravity 26/06/2026 Linux: GLI lacks support for A4R4G4B4/R5G6B5 formats.
 	// We use manual box filter downsampling for these formats to fix black infantry rendering.
 	if (descDest.Width == descSrc.Width / 2 && descDest.Height == descSrc.Height / 2)
@@ -371,6 +397,11 @@ D3DXLoadSurfaceFromSurface(
 	}
 
 	// Non-power-of-two scaling not supported
+#ifdef __EMSCRIPTEN__
+	fprintf(stderr, "[LSFS] UNSUPPORTED scale %ux%u -> %ux%u fmt=%u\n",
+	        descSrc.Width, descSrc.Height, descDest.Width, descDest.Height,
+	        (unsigned)descSrc.Format);
+#endif
 	pDestSurface->UnlockRect();
 	pSrcSurface->UnlockRect();
 	return D3DERR_INVALIDCALL;
@@ -429,6 +460,10 @@ D3DXFilterTexture(
 
 			while (tex->GetSurfaceLevel(Level, &mipsurf) == D3D_OK)
 			{
+#ifdef __EMSCRIPTEN__
+				if (desc.Width >= 512)
+					if (igTraceEnabled()) fprintf(stderr, "[FILTER_PASS] level=%d top=%p mip=%p\n", Level, (void*)topsurf, (void*)mipsurf);
+#endif
 				// Copy the data
 				D3DXLoadSurfaceFromSurface(mipsurf, NULL, NULL, topsurf, NULL, NULL, Filter, 0);
 
