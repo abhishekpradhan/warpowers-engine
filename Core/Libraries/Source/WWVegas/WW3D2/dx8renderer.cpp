@@ -1055,6 +1055,16 @@ void DX8RigidFVFCategoryContainer::Add_Mesh(MeshModelClass* mmc_)
 		vb+=fi.Get_FVF_Size();
 	}
 
+	// WarPowers @debug temporary bring-up trace
+	if (mmc_->Get_Name() && strstr(mmc_->Get_Name(), "WP")) {
+		const unsigned char *wp_vb0 = (const unsigned char*)l.Get_Vertex_Array();
+		const float *wp_f = (const float*)(wp_vb0 + fi.Get_Location_Offset());
+		fprintf(stderr, "[WP_VBFILL] '%s' FVF=0x%X fvfSize=%u usedVerts=%u count=%u writtenV0=(%.1f,%.1f,%.1f)\n",
+			mmc_->Get_Name(), FVF, fi.Get_FVF_Size(), used_vertices, split_table.Get_Vertex_Count(),
+			wp_f[0], wp_f[1], wp_f[2]);
+		fflush(stderr);
+	}
+
 
 	/*
 	** Append the UV coordinates to the vertex buffer
@@ -1899,6 +1909,17 @@ void DX8TextureCategoryClass::Render()
 		//(gth) this if statement's contents are not tabbed to avoid perforce merge problems...
 		if (!DX8RendererDebugger::Is_Enabled() || !mesh->Is_Disabled_By_Debugger()) {
 
+		// WarPowers @debug temporary bring-up trace
+		{
+			static int wp_b = 0;
+			if (wp_b < 6 && mesh->Get_Name() && strstr(mesh->Get_Name(), "WP")) {
+				fprintf(stderr, "[WP_BRANCH] '%s' sortFlag=%d sortingEnabled=%d alphaOverride=%.2f\n",
+					mesh->Get_Name(), (int)(!!mesh->Peek_Model()->Get_Flag(MeshGeometryClass::SORT)),
+					(int)WW3D::Is_Sorting_Enabled(), mesh->Get_Alpha_Override());
+				fflush(stderr);
+				wp_b++;
+			}
+		}
 		if ((!!mesh->Peek_Model()->Get_Flag(MeshGeometryClass::SORT)) && WW3D::Is_Sorting_Enabled()) {
 			renderer->Render_Sorted(mesh->Get_Base_Vertex_Offset(),mesh->Get_Bounding_Sphere());
 		} else {
