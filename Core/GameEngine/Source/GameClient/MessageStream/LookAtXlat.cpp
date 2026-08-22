@@ -117,7 +117,11 @@ Bool LookAtTranslator::canScrollAtScreenEdge() const
 	if (!TheMouse->isCursorCaptured())
 		return false;
 
-#ifdef _WIN32
+	// TheSuperHackers-style fix (WarPowers): this windowed/fullscreen gate was
+	// #ifdef _WIN32, so non-Windows builds edge-scrolled in windowed mode even
+	// though the default mode is fullscreen-only. That made every unattended
+	// windowed run scroll the camera to the map corner (cursor at 0,0). The
+	// check is platform-independent; apply it everywhere.
 	if (TheDisplay->getWindowed())
 	{
 		if ((m_screenEdgeScrollMode & ScreenEdgeScrollMode_EnabledInWindowedApp) == 0)
@@ -128,7 +132,6 @@ Bool LookAtTranslator::canScrollAtScreenEdge() const
 		if ((m_screenEdgeScrollMode & ScreenEdgeScrollMode_EnabledInFullscreenApp) == 0)
 			return false;
 	}
-#endif
 
 	return true;
 }

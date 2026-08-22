@@ -40,6 +40,9 @@
 #include "Common/PlayerList.h"
 #include "Common/ThingTemplate.h"  // WarPowers @debug WP_VIS
 #include "GameLogic/Object.h"  // WarPowers @debug WP_VIS
+#include "GameLogic/Module/BodyModule.h"  // WarPowers @debug WP_AUTOTEST
+#include "GameClient/ControlBar.h"  // WarPowers @debug WP_AUTOTEST
+#include "GameLogic/Module/ProductionUpdate.h"  // WarPowers @debug WP_AUTOTEST
 #include "Common/GameAudio.h"
 #include "Common/GameEngine.h"
 #include "Common/INI.h"
@@ -1006,6 +1009,141 @@ void GameEngine::update()
 
 			TheAudio->UPDATE();
 			TheGameClient->UPDATE();
+			// WarPowers @debug WP_AUTOTEST: scripted input smoke test. Injects
+			// the same logic messages real mouse input produces: select the
+			// local command center, queue a tank, select the tank, move it,
+			// then attack the enemy command center. Env-gated; verifies the
+			// full command chain headlessly.
+			{
+				static const char* wp_autoEnv = getenv("WP_AUTOTEST");
+				static const Bool wp_auto = wp_autoEnv != nullptr;
+				// WP_AUTOTEST=build stops after the tank spawns (stages 0-2),
+				// leaving move/attack to a human at the mouse.
+				static const Bool wp_buildOnly = wp_autoEnv && strcmp(wp_autoEnv, "build") == 0;
+				if (wp_auto && TheGameLogic && TheGameLogic->isInGame() && ThePlayerList)
+				{
+					const UnsignedInt wp_f = TheGameLogic->getFrame();
+					static UnsignedInt wp_stage = 0;
+					static ObjectID wp_ccId = INVALID_ID, wp_enemyCcId = INVALID_ID, wp_tankId = INVALID_ID;
+					static Coord3D wp_ccPos = {0,0,0};
+					const Int wp_localIdx = ThePlayerList->getLocalPlayer() ? ThePlayerList->getLocalPlayer()->getPlayerIndex() : -1;
+
+					if (wp_stage == 0 && wp_f >= 90)
+					{
+						for (Object* o = TheGameLogic->getFirstObject(); o; o = o->getNextObject())
+						{
+							if (o->getTemplate()->getName() != "WP_CommandCenter")
+								continue;
+							Int idx = o->getControllingPlayer() ? o->getControllingPlayer()->getPlayerIndex() : -1;
+							if (idx == wp_localIdx) { wp_ccId = o->getID(); wp_ccPos = *o->getPosition(); }
+							else                    { wp_enemyCcId = o->getID(); }
+						}
+						if (wp_ccId != INVALID_ID)
+						{
+							GameMessage* m = TheMessageStream->appendMessage(GameMessage::MSG_CREATE_SELECTED_GROUP);
+							m->appendBooleanArgument(TRUE);
+							m->appendObjectIDArgument(wp_ccId);
+							fprintf(stderr, "[WP_AUTO] f=%u selected CC id=%u at (%.0f,%.0f); enemy CC id=%u\n",
+								wp_f, (unsigned)wp_ccId, wp_ccPos.x, wp_ccPos.y, (unsigned)wp_enemyCcId);
+							wp_stage = 1;
+						}
+					}
+					else if (wp_stage == 1 && wp_f >= 120)
+					{
+						const ThingTemplate* tt = TheThingFactory->findTemplate("WP_Tank");
+						Object* wp_cc = TheGameLogic->findObjectByID(wp_ccId);
+						if (tt && wp_cc)
+						{
+							const CommandSet* cs = TheControlBar ? TheControlBar->findCommandSet(wp_cc->getCommandSetString()) : nullptr;
+							const CommandButton* cb = cs ? cs->getCommandButton(0) : nullptr;
+							fprintf(stderr, "[WP_AUTO] gates: cmdSetStr='%s' cs=%p cb=%p cbType=%d cbTT=%p canMake=%d\n",
+								wp_cc->getCommandSetString().str(), (const void*)cs, (const void*)cb,
+								cb ? (int)cb->getCommandType() : -1,
+								cb ? (const void*)cb->getThingTemplate() : nullptr,
+								(int)TheBuildAssistant->canMakeUnit(wp_cc, tt));
+						}
+						if (tt)
+						{
+							GameMessage* m = TheMessageStream->appendMessage(GameMessage::MSG_QUEUE_UNIT_CREATE);
+							m->appendIntegerArgument(tt->getTemplateID());
+							m->appendIntegerArgument(1);
+							fprintf(stderr, "[WP_AUTO] f=%u queued WP_Tank (templateID=%d)\n", wp_f, (int)tt->getTemplateID());
+						}
+						wp_stage = 2;
+					}
+					else if (wp_stage == 2 && wp_f >= 330)
+					{
+						for (Object* o = TheGameLogic->getFirstObject(); o; o = o->getNextObject())
+						{
+							if (o->getTemplate()->getName() == "WP_Tank" &&
+								o->getControllingPlayer() && o->getControllingPlayer()->getPlayerIndex() == wp_localIdx)
+							{ wp_tankId = o->getID(); break; }
+						}
+						if (wp_tankId != INVALID_ID)
+						{
+							GameMessage* m = TheMessageStream->appendMessage(GameMessage::MSG_CREATE_SELECTED_GROUP);
+							m->appendBooleanArgument(TRUE);
+							m->appendObjectIDArgument(wp_tankId);
+							fprintf(stderr, "[WP_AUTO] f=%u tank spawned id=%u, selected\n", wp_f, (unsigned)wp_tankId);
+							wp_stage = 3;
+						}
+						else if (wp_f >= 600)
+						{
+							fprintf(stderr, "[WP_AUTO] f=%u FAIL: no tank spawned by frame 600\n", wp_f);
+							wp_stage = 99;
+						}
+					}
+					else if (wp_stage == 3 && wp_buildOnly)
+					{
+						fprintf(stderr, "[WP_AUTO] build-only mode: tank ready, handing over to the mouse\n");
+						wp_stage = 99;
+					}
+					else if (wp_stage == 3 && wp_f >= 360)
+					{
+						GameMessage* m = TheMessageStream->appendMessage(GameMessage::MSG_DO_MOVETO);
+						Coord3D dest = wp_ccPos;
+						dest.x += 150.0f;
+						m->appendLocationArgument(dest);
+						fprintf(stderr, "[WP_AUTO] f=%u move order to (%.0f,%.0f)\n", wp_f, dest.x, dest.y);
+						wp_stage = 4;
+					}
+					else if (wp_stage == 4 && wp_f >= 700)
+					{
+						if (wp_enemyCcId != INVALID_ID)
+						{
+							GameMessage* s2 = TheMessageStream->appendMessage(GameMessage::MSG_CREATE_SELECTED_GROUP);
+							s2->appendBooleanArgument(TRUE);
+							s2->appendObjectIDArgument(wp_tankId);
+							GameMessage* m = TheMessageStream->appendMessage(GameMessage::MSG_DO_ATTACK_OBJECT);
+							m->appendObjectIDArgument(wp_enemyCcId);
+							fprintf(stderr, "[WP_AUTO] f=%u attack order on enemy CC id=%u\n", wp_f, (unsigned)wp_enemyCcId);
+						}
+						wp_stage = 5;
+					}
+
+					static UnsignedInt wp_lastStatus = 0;
+					if (wp_f >= wp_lastStatus + 150)
+					{
+						wp_lastStatus = wp_f;
+						for (Object* o = TheGameLogic->getFirstObject(); o; o = o->getNextObject())
+						{
+							if (strncmp(o->getTemplate()->getName().str(), "WP_", 3) != 0)
+								continue;
+							Real hp = o->getBodyModule() ? o->getBodyModule()->getHealth() : -1.0f;
+							ProductionUpdateInterface* pui = o->getProductionUpdateInterface();
+							Real pct = -1.0f;
+							if (pui && pui->firstProduction())
+								pct = pui->firstProduction()->getPercentComplete();
+							fprintf(stderr, "[WP_AUTO] f=%u status '%s' id=%u pos=(%.0f,%.0f) hp=%.0f prodQ=%d pct=%.0f disabled=%d\n",
+								wp_f, o->getTemplate()->getName().str(), (unsigned)o->getID(),
+								o->getPosition()->x, o->getPosition()->y, hp,
+								pui ? (int)pui->getProductionCount() : -1, pct,
+								(int)o->isDisabled());
+						}
+						fflush(stderr);
+					}
+				}
+			}
 			TheMessageStream->propagateMessages();
 
 			if (TheNetwork != nullptr)
