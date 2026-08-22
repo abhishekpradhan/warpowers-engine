@@ -2084,7 +2084,21 @@ void DX8Wrapper::End_Scene(bool flip_frames)
 	DX8WebBrowser::Render(0);
 #endif
 
-	if (flip_frames) {
+	// WarPowers @feature headless throttle bypass: when the window is occluded
+	// (locked screen) CAMetalLayer starves drawables and Present blocks at
+	// ~1Hz, dragging the whole sim down. WP_PRESENT_SKIP=N presents only every
+	// Nth frame so rendering and sim run at full speed; WP_FRAME_DUMP still
+	// captures real frames via backbuffer readback.
+	static int wp_present_skip = -1;
+	if (wp_present_skip < 0) {
+		const char* wp_env = getenv("WP_PRESENT_SKIP");
+		wp_present_skip = (wp_env && wp_env[0]) ? atoi(wp_env) : 0;
+		if (wp_present_skip < 0) wp_present_skip = 0;
+	}
+	static unsigned wp_flip_count = 0;
+	if (flip_frames && wp_present_skip > 1 && (++wp_flip_count % wp_present_skip) != 0) {
+		FrameCount++;
+	} else if (flip_frames) {
 		DX8_Assert();
 		HRESULT hr;
 		{

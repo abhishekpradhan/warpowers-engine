@@ -1012,7 +1012,24 @@ void GameEngine::update()
 		}
 
 		// TheSuperHackers @info Ignores frozen time because the script engine needs updating in the logic update regardless.
-		if (canUpdateGameLogic(FramePacer::IgnoreFrozenTime))
+		Bool wp_canUpdate = canUpdateGameLogic(FramePacer::IgnoreFrozenTime);
+		// WarPowers @debug WP_LOOP_TRACE: periodic sim-gate breadcrumb for
+		// diagnosing a frozen sim (logic frame stuck at 0).
+		static const Bool wp_loopTrace = getenv("WP_LOOP_TRACE") != nullptr;
+		if (wp_loopTrace)
+		{
+			static unsigned wp_iter = 0;
+			if ((++wp_iter % 120) == 0)
+			{
+				fprintf(stderr, "[WP_LOOP] iter=%u can=%d logicFrame=%u timeFrozen=%d halted=%d logicFps=%d renderCap=%d\n",
+					wp_iter, (int)wp_canUpdate, (unsigned)TheGameLogic->getFrame(),
+					(int)TheFramePacer->isTimeFrozen(), (int)isGameHalted(),
+					(int)TheFramePacer->getActualLogicTimeScaleFps(FramePacer::IgnoreFrozenTime),
+					(int)TheFramePacer->getActualFramesPerSecondLimit());
+				fflush(stderr);
+			}
+		}
+		if (wp_canUpdate)
 		{
 			TheGameLogic->UPDATE();
 
