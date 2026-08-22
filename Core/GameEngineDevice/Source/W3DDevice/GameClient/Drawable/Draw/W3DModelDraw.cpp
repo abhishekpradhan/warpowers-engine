@@ -3028,6 +3028,8 @@ void W3DModelDraw::setModelState(const ModelConditionInfo* newState)
 		{
 			m_renderObject = W3DDisplay::m_assetManager->Create_Render_Obj(newState->m_modelName.str(), draw->getScale(), m_hexColor);
 			DEBUG_ASSERTCRASH(m_renderObject, ("*** ASSET ERROR: Model %s not found!",newState->m_modelName.str()));
+			// WarPowers @debug temporary bring-up trace
+			fprintf(stderr, "[WP_MODEL] Create_Render_Obj('%s') -> %p\n", newState->m_modelName.str(), (void*)m_renderObject); fflush(stderr);
 		}
 
 		//BONEPOS_LOG(("validateStuff() from within W3DModelDraw::setModelState()"));
@@ -3126,6 +3128,16 @@ void W3DModelDraw::setModelState(const ModelConditionInfo* newState)
 			// add render object to our scene
 			if (W3DDisplay::m_3DScene != nullptr)
 				W3DDisplay::m_3DScene->Add_Render_Object(m_renderObject);
+			else
+				fprintf(stderr, "[WP_MODEL] no 3DScene for '%s'!\n", newState->m_modelName.str());
+			{
+				// WarPowers @debug temporary bring-up trace
+				Vector3 wp_pos = m_renderObject->Get_Position();
+				fprintf(stderr, "[WP_MODEL] '%s' scene-add pos=(%.1f,%.1f,%.1f) hidden=%d visible=%d classid=%d\n",
+					newState->m_modelName.str(), wp_pos.X, wp_pos.Y, wp_pos.Z,
+					(int)m_renderObject->Is_Hidden(), (int)m_renderObject->Is_Really_Visible(), m_renderObject->Class_ID());
+				fflush(stderr);
+			}
 
 			// tie in our drawable as the user data pointer in the render object
 			m_renderObject->Set_User_Data(draw->getDrawableInfo());

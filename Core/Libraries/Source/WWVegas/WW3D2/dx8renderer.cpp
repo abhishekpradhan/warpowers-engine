@@ -1742,6 +1742,21 @@ void DX8TextureCategoryClass::Render()
 	PolyRenderTaskClass * prt = render_task_head;
 	PolyRenderTaskClass * last_prt = nullptr;
 
+	// WarPowers @debug temporary bring-up trace
+	{
+		static int wp_f = 0;
+		for (PolyRenderTaskClass *wp_p = render_task_head; wp_p && wp_f < 6; wp_p = wp_p->Get_Next_Visible()) {
+			MeshClass *wp_m = wp_p->Peek_Mesh();
+			if (wp_m && wp_m->Get_Name() && strstr(wp_m->Get_Name(), "WP")) {
+				fprintf(stderr, "[WP_FLUSH] task mesh='%s' baseVertexOffset=%d overflow=%d\n",
+					wp_m->Get_Name(), (int)wp_m->Get_Base_Vertex_Offset(),
+					(int)(wp_m->Get_Base_Vertex_Offset() == VERTEX_BUFFER_OVERFLOW));
+				fflush(stderr);
+				wp_f++;
+			}
+		}
+	}
+
 	while (prt) {
 
 		/*

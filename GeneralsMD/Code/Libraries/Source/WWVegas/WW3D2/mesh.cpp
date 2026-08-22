@@ -658,6 +658,17 @@ int MeshClass::Get_Num_Polys() const
 void MeshClass::Render(RenderInfoClass & rinfo)
 {
 	WWPROFILE("Mesh::Render");
+	// WarPowers @debug temporary bring-up trace (fires once per named mesh family)
+	{
+		static int wp_logged = 0;
+		if (wp_logged < 6 && Get_Name() && strstr(Get_Name(), "WP")) {
+			Vector3 p = Get_Position();
+			fprintf(stderr, "[WP_RENDER] Mesh '%s' Render pos=(%.1f,%.1f,%.1f) hiddenOK=%d\n",
+				Get_Name(), p.X, p.Y, p.Z, (int)Is_Not_Hidden_At_All());
+			fflush(stderr);
+			wp_logged++;
+		}
+	}
 	if (Is_Not_Hidden_At_All() == false) {
 		return;
 	}
@@ -688,8 +699,25 @@ void MeshClass::Render(RenderInfoClass & rinfo)
 
 		const FrustumClass & frustum=rinfo.Camera.Get_Frustum();
 
-		if (	Model->Get_Flag(MeshGeometryClass::SKIN) ||
-				CollisionMath::Overlap_Test(frustum,Get_Bounding_Box())!=CollisionMath::OUTSIDE )
+		// WarPowers @debug temporary bring-up trace
+		bool wp_in_frustum = Model->Get_Flag(MeshGeometryClass::SKIN) ||
+				CollisionMath::Overlap_Test(frustum,Get_Bounding_Box())!=CollisionMath::OUTSIDE;
+		{
+			static int wp_n = 0;
+			if (wp_n < 6 && Get_Name() && strstr(Get_Name(), "WP")) {
+				AABoxClass wp_bb = Get_Bounding_Box();
+				const Vector3 * wp_v = Model->Get_Vertex_Array();
+				fprintf(stderr, "[WP_RENDER] '%s' inFrustum=%d bbExt=(%.1f,%.1f,%.1f) nVerts=%d v0=(%.1f,%.1f,%.1f) v5=(%.1f,%.1f,%.1f)\n",
+					Get_Name(), (int)wp_in_frustum,
+					wp_bb.Extent.X, wp_bb.Extent.Y, wp_bb.Extent.Z,
+					Model->Get_Vertex_Count(),
+					wp_v ? wp_v[0].X : -999.0f, wp_v ? wp_v[0].Y : -999.0f, wp_v ? wp_v[0].Z : -999.0f,
+					wp_v ? wp_v[5].X : -999.0f, wp_v ? wp_v[5].Y : -999.0f, wp_v ? wp_v[5].Z : -999.0f);
+				fflush(stderr);
+				wp_n++;
+			}
+		}
+		if (	wp_in_frustum )
 		{
 			bool rendered_something = false;
 
@@ -699,6 +727,15 @@ void MeshClass::Render(RenderInfoClass & rinfo)
 			if (Model->PolygonRendererList.Is_Empty()) {
 				Model->Register_For_Rendering();
 				WWASSERT(!Model->PolygonRendererList.Is_Empty());
+			}
+			{
+				static int wp_m = 0;
+				if (wp_m < 4 && Get_Name() && strstr(Get_Name(), "WP")) {
+					fprintf(stderr, "[WP_RENDER] '%s' registered, rendererEmpty=%d\n",
+						Get_Name(), (int)Model->PolygonRendererList.Is_Empty());
+					fflush(stderr);
+					wp_m++;
+				}
 			}
 
 			/*
