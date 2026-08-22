@@ -1137,6 +1137,8 @@ void GameEngine::update()
 							Real pct = -1.0f;
 							if (pui && pui->firstProduction())
 								pct = pui->firstProduction()->getPercentComplete();
+							fprintf(stderr, "[WP_AUTO] f=%u particles=%u\n", wp_f,
+								TheParticleSystemManager ? (unsigned)TheParticleSystemManager->getParticleCount() : 0u);
 							fprintf(stderr, "[WP_AUTO] f=%u status '%s' id=%u pos=(%.0f,%.0f) hp=%.0f prodQ=%d pct=%.0f disabled=%d\n",
 								wp_f, o->getTemplate()->getName().str(), (unsigned)o->getID(),
 								o->getPosition()->x, o->getPosition()->y, hp,
