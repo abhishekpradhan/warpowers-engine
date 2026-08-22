@@ -2042,20 +2042,12 @@ void InGameUI::update()
 
 	GameWindow *moneyWin = TheWindowManager->winGetWindowFromId( nullptr, moneyWindowKey );
 	GameWindow *powerWin = TheWindowManager->winGetWindowFromId( nullptr, powerWindowKey );
-	// WarPowers @debug temporary breadcrumb
+	// WarPowers @fix: tolerate a ControlBar layout without these windows —
+	// skip only the money/power readout instead of abandoning the whole
+	// update (the old early-return also silently disabled the ControlBar
+	// context system further down).
+	if (moneyWin != nullptr && powerWin != nullptr)
 	{
-		static Bool logged = FALSE;
-		if (!logged)
-		{
-			fprintf(stderr, "[WP_UI] update: moneyWin=%p powerWin=%p\n", (void*)moneyWin, (void*)powerWin);
-			for (GameWindow *w = TheWindowManager->winGetWindowList(); w; w = w->winGetNext())
-				fprintf(stderr, "[WP_UI]   toplevel win id=%d hidden=%d\n", (int)w->winGetWindowId(), (int)w->winIsHidden());
-			fflush(stderr);
-			logged = TRUE;
-		}
-	}
-	if (moneyWin == nullptr || powerWin == nullptr)
-		return; // WarPowers @debug bail instead of crashing while UI data is incomplete
 //	if( moneyWin == nullptr )
 //	{
 //		NameKeyType moneyWindowKey = TheNameKeyGenerator->nameToKey( "ControlBar.wnd:MoneyDisplay" );
@@ -2108,6 +2100,7 @@ void InGameUI::update()
 		moneyWin->winHide(TRUE);
 		powerWin->winHide(TRUE);
 	}
+	} // WarPowers @fix end money/power guard
 
 	// Update the floating Text;
 	updateFloatingText();

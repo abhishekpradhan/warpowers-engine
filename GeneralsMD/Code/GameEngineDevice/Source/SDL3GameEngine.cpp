@@ -45,6 +45,9 @@
 #include "GameLogic/GameLogic.h"    // WarPowers @debug WP_CLICKTEST
 #include "GameLogic/Object.h"       // WarPowers @debug WP_CLICKTEST
 #include "Common/ThingTemplate.h"   // WarPowers @debug WP_CLICKTEST
+#include "Common/NameKeyGenerator.h"          // WarPowers @debug WP_CLICKTEST ui
+#include "Common/PlayerList.h"                // WarPowers @debug WP_CLICKTEST ui
+#include "GameLogic/Module/ProductionUpdate.h" // WarPowers @debug WP_CLICKTEST ui
 #include "GameClient/GameWindow.h"
 #include "GameClient/GameWindowManager.h"
 #include "GameClient/Gadget.h"
@@ -261,7 +264,109 @@ void SDL3GameEngine::update(void)
 			};
 
 			static ICoord2D wp_pt = {0,0};
-			if (wp_mouse)
+			static const Bool wp_uiMode = getenv("WP_CLICKTEST") && strcmp(getenv("WP_CLICKTEST"), "ui") == 0;
+			{
+				static Bool wp_gateLogged = FALSE;
+				if (!wp_gateLogged && wp_f >= 60)
+				{
+					fprintf(stderr, "[WP_CLICKGATE] f=%u mouse=%p uiMode=%d stage=%u\n",
+						wp_f, (void*)wp_mouse, (int)wp_uiMode, wp_stage);
+					fflush(stderr);
+					wp_gateLogged = TRUE;
+				}
+			}
+			if (wp_mouse && wp_uiMode)
+			{
+				// UI mode: human-path production — click the CC, click the
+				// build button in the ControlBar, verify the tank appears.
+				if (wp_stage == 0 && wp_f >= 120)
+				{
+					for (Object* o = TheGameLogic->getFirstObject(); o; o = o->getNextObject())
+					{
+						if (o->getTemplate()->getName() == "WP_CommandCenter" &&
+								o->getControllingPlayer() == ThePlayerList->getLocalPlayer())
+						{ wp_tankPos = *o->getPosition(); break; }
+					}
+					if (TheTacticalView->worldToScreen(&wp_tankPos, &wp_pt))
+					{
+						fprintf(stderr, "[WP_CLICK] f=%u UI: CC world (%.0f,%.0f) -> screen (%d,%d)\n",
+							wp_f, wp_tankPos.x, wp_tankPos.y, wp_pt.x, wp_pt.y);
+						wp_sendClick(wp_pt.x, wp_pt.y, TRUE);
+						wp_stage = 1;
+					}
+					else
+					{
+						static Bool wp_w2sLogged = FALSE;
+						if (!wp_w2sLogged)
+						{
+							fprintf(stderr, "[WP_CLICK] f=%u UI: worldToScreen FAILED for CC (%.0f,%.0f,%.0f) -> (%d,%d)\n",
+								wp_f, wp_tankPos.x, wp_tankPos.y, wp_tankPos.z, wp_pt.x, wp_pt.y);
+							fflush(stderr);
+							wp_w2sLogged = TRUE;
+						}
+					}
+				}
+				else if (wp_stage == 1) { wp_sendClick(wp_pt.x, wp_pt.y, FALSE); wp_stage = 2; }
+				else if (wp_stage == 2 && wp_f >= 180)
+				{
+					fprintf(stderr, "[WP_CLICK] f=%u UI: selectCount=%d\n", wp_f, (int)TheInGameUI->getSelectCount());
+					GameWindow *wp_btn = TheWindowManager->winGetWindowFromId(nullptr,
+						TheNameKeyGenerator->nameToKey("ControlBar.wnd:ButtonCommand01"));
+					if (wp_btn)
+					{
+						Int bx = 0, by = 0, bw = 0, bh = 0;
+						wp_btn->winGetScreenPosition(&bx, &by);
+						wp_btn->winGetSize(&bw, &bh);
+						fprintf(stderr, "[WP_CLICK] f=%u UI: ButtonCommand01 at (%d,%d) %dx%d hidden=%d enabled=%d\n",
+							wp_f, bx, by, bw, bh, (int)wp_btn->winIsHidden(),
+							(int)((wp_btn->winGetStatus() & WIN_STATUS_ENABLED) != 0));
+						wp_pt.x = bx + bw / 2;
+						wp_pt.y = by + bh / 2;
+						wp_sendClick(wp_pt.x, wp_pt.y, TRUE);
+						wp_stage = 3;
+					}
+					else
+					{
+						fprintf(stderr, "[WP_CLICK] f=%u UI FAIL: ButtonCommand01 window missing\n", wp_f);
+						wp_stage = 99;
+					}
+				}
+				else if (wp_stage == 3) { wp_sendClick(wp_pt.x, wp_pt.y, FALSE); wp_stage = 4; }
+				else if (wp_stage == 4 && wp_f >= 240)
+				{
+					for (Object* o = TheGameLogic->getFirstObject(); o; o = o->getNextObject())
+					{
+						if (o->getTemplate()->getName() == "WP_CommandCenter" &&
+								o->getControllingPlayer() == ThePlayerList->getLocalPlayer())
+						{
+							ProductionUpdateInterface *wp_pui = o->getProductionUpdateInterface();
+							fprintf(stderr, "[WP_CLICK] f=%u UI: CC prodQ=%d\n",
+								wp_f, wp_pui ? (int)wp_pui->getProductionCount() : -1);
+							break;
+						}
+					}
+					wp_stage = 5;
+				}
+				else if (wp_stage == 5 && wp_f >= 600)
+				{
+					Bool wp_found = FALSE;
+					for (Object* o = TheGameLogic->getFirstObject(); o; o = o->getNextObject())
+					{
+						if (o->getTemplate()->getName() == "WP_Tank")
+						{
+							fprintf(stderr, "[WP_CLICK] f=%u UI BUILD SUCCESS: tank at (%.0f,%.0f)\n",
+								wp_f, o->getPosition()->x, o->getPosition()->y);
+							wp_found = TRUE;
+							break;
+						}
+					}
+					if (!wp_found)
+						fprintf(stderr, "[WP_CLICK] f=%u UI BUILD FAIL: no tank spawned\n", wp_f);
+					wp_stage = 6;
+				}
+				fflush(stderr);
+			}
+			else if (wp_mouse)
 			{
 				if (wp_stage == 0 && wp_f >= 450)
 				{
