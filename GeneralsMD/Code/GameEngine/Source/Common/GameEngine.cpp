@@ -34,9 +34,12 @@
 #include "Common/CRCDebug.h"
 #include "Common/FramePacer.h"
 #include "Common/Radar.h"
+#include "Common/Player.h"  // WarPowers @debug WP_VIS
 #include "Common/PlayerTemplate.h"
 #include "Common/Team.h"
 #include "Common/PlayerList.h"
+#include "Common/ThingTemplate.h"  // WarPowers @debug WP_VIS
+#include "GameLogic/Object.h"  // WarPowers @debug WP_VIS
 #include "Common/GameAudio.h"
 #include "Common/GameEngine.h"
 #include "Common/INI.h"
@@ -1026,6 +1029,24 @@ void GameEngine::update()
 					(int)TheFramePacer->isTimeFrozen(), (int)isGameHalted(),
 					(int)TheFramePacer->getActualLogicTimeScaleFps(FramePacer::IgnoreFrozenTime),
 					(int)TheFramePacer->getActualFramesPerSecondLimit());
+				// WarPowers @debug shroud-visibility snapshot of WP objects.
+				Player* wp_local = ThePlayerList ? ThePlayerList->getLocalPlayer() : nullptr;
+				Int wp_localIdx = wp_local ? wp_local->getPlayerIndex() : -1;
+				fprintf(stderr, "[WP_VIS] localPlayerIdx=%d isNeutral=%d\n", (int)wp_localIdx,
+					(int)(wp_local && ThePlayerList && wp_local == ThePlayerList->getNeutralPlayer()));
+				for (Object* wp_o = TheGameLogic->getFirstObject(); wp_o; wp_o = wp_o->getNextObject())
+				{
+					const AsciiString& wp_n = wp_o->getTemplate()->getName();
+					if (strncmp(wp_n.str(), "WP_", 3) == 0)
+					{
+						fprintf(stderr, "[WP_VIS]   obj '%s' id=%u owner=%d shroud(local)=%d offMap=%d dead=%d drawable=%p\n",
+							wp_n.str(), (unsigned)wp_o->getID(),
+							wp_o->getControllingPlayer() ? (int)wp_o->getControllingPlayer()->getPlayerIndex() : -1,
+							(int)wp_o->getShroudedStatus(wp_localIdx >= 0 ? wp_localIdx : 0),
+							(int)wp_o->isOffMap(), (int)wp_o->isEffectivelyDead(),
+							(void*)wp_o->getDrawable());
+					}
+				}
 				fflush(stderr);
 			}
 		}

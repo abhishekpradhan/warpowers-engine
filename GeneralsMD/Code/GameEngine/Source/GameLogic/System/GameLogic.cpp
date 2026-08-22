@@ -2188,7 +2188,11 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 	if (way)
 	{
 		Coord3D pos = *way->getLocation();
+		fprintf(stderr, "[WP_TSNG] camera waypoint '%s' -> (%.0f,%.0f,%.0f)\n",
+			startingCamName.str(), pos.x, pos.y, pos.z); fflush(stderr); // WarPowers @debug
 		TheTacticalView->lookAt( &pos );
+		fprintf(stderr, "[WP_TSNG] after lookAt, view pos=(%.0f,%.0f)\n",
+			TheTacticalView->getPosition().x, TheTacticalView->getPosition().y); fflush(stderr); // WarPowers @debug
 	}
 	else
 	{

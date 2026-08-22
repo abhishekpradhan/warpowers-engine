@@ -669,6 +669,21 @@ void MeshClass::Render(RenderInfoClass & rinfo)
 			wp_logged++;
 		}
 	}
+	// WarPowers @debug WP_SUB: unbudgeted long-horizon counter of WP mesh
+	// render submissions, printed every ~5s of calls, to see when (or if)
+	// the engine stops submitting the meshes.
+	{
+		static long wp_all = 0, wp_wp = 0, wp_wpHidden = 0;
+		wp_all++;
+		if (Get_Name() && strstr(Get_Name(), "WP")) {
+			wp_wp++;
+			if (!Is_Not_Hidden_At_All()) wp_wpHidden++;
+		}
+		if ((wp_all % 1000) == 0) {
+			fprintf(stderr, "[WP_SUB] meshRenders=%ld wpRenders=%ld wpHidden=%ld\n", wp_all, wp_wp, wp_wpHidden);
+			fflush(stderr);
+		}
+	}
 	if (Is_Not_Hidden_At_All() == false) {
 		return;
 	}

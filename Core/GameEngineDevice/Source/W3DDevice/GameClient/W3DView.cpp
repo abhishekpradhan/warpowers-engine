@@ -1677,6 +1677,28 @@ void W3DView::update()
 		}
 	}
 
+	// WarPowers @debug WP_CAM: log the camera-update gates periodically.
+	{
+		static const bool wp_trace = getenv("WP_LOOP_TRACE") != nullptr;
+		static unsigned wp_i = 0;
+		if (wp_trace && (++wp_i % 120) == 0) {
+			Vector3 wp_sp, wp_tp;
+			buildCameraPosition(wp_sp, wp_tp);
+			Region3D wp_ext; wp_ext.lo.x = wp_ext.lo.y = wp_ext.hi.x = wp_ext.hi.y = -1;
+			if (TheTerrainLogic) TheTerrainLogic->getExtent(&wp_ext);
+			fprintf(stderr, "[WP_CAM] mapExt=(%.0f,%.0f)-(%.0f,%.0f) constr=(%.0f,%.0f)-(%.0f,%.0f) mpos=(%.0f,%.0f,%.0f)\n",
+				wp_ext.lo.x, wp_ext.lo.y, wp_ext.hi.x, wp_ext.hi.y,
+				m_cameraAreaConstraints.lo.x, m_cameraAreaConstraints.lo.y,
+				m_cameraAreaConstraints.hi.x, m_cameraAreaConstraints.hi.y,
+				m_pos.x, m_pos.y, m_pos.z);
+			fprintf(stderr, "[WP_CAM] timeFast=%d recalc=%d slaved=%d scripted=%d headless=%d src=(%.0f,%.0f,%.0f) tgt=(%.0f,%.0f,%.0f)\n",
+				(int)TheScriptEngine->isTimeFast(), (int)m_recalcCamera,
+				(int)m_isCameraSlaved, (int)didScriptedMovement,
+				(int)TheGlobalData->m_headless,
+				wp_sp.X, wp_sp.Y, wp_sp.Z, wp_tp.X, wp_tp.Y, wp_tp.Z);
+			fflush(stderr);
+		}
+	}
 	if (TheScriptEngine->isTimeFast()) {
 		return; // don't draw - makes it faster :) jba.
 	}

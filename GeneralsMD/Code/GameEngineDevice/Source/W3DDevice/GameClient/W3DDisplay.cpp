@@ -2003,6 +2003,67 @@ void W3DDisplay::draw()
 {
 	//USE_PERF_TIMER(W3DDisplay_draw)
 
+	// WarPowers @debug WP_ROBJ: periodic render-object state probe for WP
+	// drawables (hidden flags, scene membership, position).
+	{
+		static const bool wp_trace = getenv("WP_LOOP_TRACE") != nullptr;
+		static unsigned wp_iter = 0;
+		if (wp_trace && (++wp_iter % 120) == 0)
+		{
+			// Drawable-side state
+			for (Drawable* wp_d = TheGameClient->firstDrawable(); wp_d; wp_d = wp_d->getNextDrawable())
+			{
+				const ThingTemplate* wp_t = wp_d->getTemplate();
+				if (!wp_t || strncmp(wp_t->getName().str(), "WP_", 3) != 0)
+					continue;
+				Coord3D wp_p = *wp_d->getPosition();
+				fprintf(stderr, "[WP_ROBJ] drawable '%s' hidden=%d pos=(%.0f,%.0f,%.0f)\n",
+					wp_t->getName().str(), (int)wp_d->isDrawableEffectivelyHidden(),
+					wp_p.x, wp_p.y, wp_p.z);
+			}
+			// Scene-side state: which WP render objects are in the 3D scene?
+			if (m_3DScene)
+			{
+				int wp_total = 0, wp_wp = 0;
+				SceneIterator* wp_it = m_3DScene->Create_Iterator();
+				for (wp_it->First(); !wp_it->Is_Done(); wp_it->Next())
+				{
+					RenderObjClass* wp_r = wp_it->Current_Item();
+					wp_total++;
+					if (wp_r && wp_r->Get_Name() && strstr(wp_r->Get_Name(), "WP"))
+					{
+						wp_wp++;
+						Vector3 wp_v = wp_r->Get_Position();
+						SphereClass wp_s = wp_r->Get_Bounding_Sphere();
+						fprintf(stderr, "[WP_ROBJ] scene robj '%s' vis=%d reallyVis=%d pos=(%.0f,%.0f,%.0f) sph=(%.0f,%.0f,%.0f r=%.1f)\n",
+							wp_r->Get_Name(), (int)wp_r->Is_Not_Hidden_At_All(),
+							(int)wp_r->Is_Really_Visible(),
+							wp_v.X, wp_v.Y, wp_v.Z,
+							wp_s.Center.X, wp_s.Center.Y, wp_s.Center.Z, wp_s.Radius);
+					}
+				}
+				m_3DScene->Destroy_Iterator(wp_it);
+				W3DView* wp_wv = (W3DView*)TheTacticalView;
+				CameraClass* wp_cam = wp_wv ? wp_wv->get3DCamera() : nullptr;
+				if (wp_cam)
+				{
+					Vector3 wp_ce = wp_cam->Get_Position();
+					SphereClass wp_test(Vector3(480, 480, 25), 32.0f);
+					fprintf(stderr, "[WP_ROBJ] camEye=(%.0f,%.0f,%.0f) cullSphereAtCC=%d\n",
+						wp_ce.X, wp_ce.Y, wp_ce.Z, (int)wp_cam->Cull_Sphere(wp_test));
+				}
+				Coord3D wp_cp = TheTacticalView ? TheTacticalView->getPosition() : Coord3D();
+				fprintf(stderr, "[WP_ROBJ] scene totals: robjs=%d wpRobjs=%d cam=(%.0f,%.0f) angle=%.2f pitch=%.2f zoom=%.2f\n",
+					wp_total, wp_wp,
+					wp_cp.x, wp_cp.y,
+					TheTacticalView ? TheTacticalView->getAngle() : 0.f,
+					TheTacticalView ? TheTacticalView->getPitch() : 0.f,
+					TheTacticalView ? TheTacticalView->getZoom() : 0.f);
+			}
+			fflush(stderr);
+		}
+	}
+
 	// GeneralsX @feature xxorza 15/04/2026 Process deferred window resize for pillarbox
 	DX8Wrapper::Pillarbox_Process_Resize();
 
