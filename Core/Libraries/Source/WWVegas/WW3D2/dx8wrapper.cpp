@@ -2037,6 +2037,48 @@ void DX8Wrapper::End_Scene(bool flip_frames)
 	}
 	DX8CALL(EndScene());
 
+	// WarPowers @feature headless frame dump: when WP_FRAME_DUMP names a .tga
+	// path, write the backbuffer there every 60th frame. Display-independent
+	// (works with the screen locked/occluded); doubles as a visual-regression
+	// hook for automated testing.
+	{
+		static const char* wp_dump_path = getenv("WP_FRAME_DUMP");
+		if (wp_dump_path && wp_dump_path[0]) {
+			static unsigned wp_frame = 0;
+			if ((++wp_frame % 60) == 0) {
+				IDirect3DSurface8* wp_bb = nullptr;
+				if (SUCCEEDED(_Get_D3D_Device8()->GetBackBuffer(0, D3DBACKBUFFER_TYPE_MONO, &wp_bb)) && wp_bb) {
+					D3DSURFACE_DESC wp_desc;
+					wp_bb->GetDesc(&wp_desc);
+					IDirect3DSurface8* wp_sys = nullptr;
+					if (SUCCEEDED(_Get_D3D_Device8()->CreateImageSurface(wp_desc.Width, wp_desc.Height, wp_desc.Format, &wp_sys)) && wp_sys) {
+						if (SUCCEEDED(_Get_D3D_Device8()->CopyRects(wp_bb, nullptr, 0, wp_sys, nullptr))) {
+							D3DLOCKED_RECT wp_lr;
+							if (SUCCEEDED(wp_sys->LockRect(&wp_lr, nullptr, D3DLOCK_READONLY))) {
+								FILE* wp_f = fopen(wp_dump_path, "wb");
+								if (wp_f) {
+									unsigned char wp_hdr[18] = {0};
+									wp_hdr[2] = 2;
+									wp_hdr[12] = wp_desc.Width & 0xFF;  wp_hdr[13] = (wp_desc.Width >> 8) & 0xFF;
+									wp_hdr[14] = wp_desc.Height & 0xFF; wp_hdr[15] = (wp_desc.Height >> 8) & 0xFF;
+									wp_hdr[16] = 32;
+									wp_hdr[17] = 0x20; // top-left origin
+									fwrite(wp_hdr, 1, 18, wp_f);
+									for (unsigned wp_y = 0; wp_y < wp_desc.Height; ++wp_y)
+										fwrite((const unsigned char*)wp_lr.pBits + wp_y * wp_lr.Pitch, 1, wp_desc.Width * 4, wp_f);
+									fclose(wp_f);
+								}
+								wp_sys->UnlockRect();
+							}
+						}
+						wp_sys->Release();
+					}
+					wp_bb->Release();
+				}
+			}
+		}
+	}
+
 	// GeneralsX @build BenderAI 10/02/2026 - Embedded browser Windows-only
 #ifdef _WIN32
 	DX8WebBrowser::Render(0);
@@ -2389,6 +2431,17 @@ void DX8Wrapper::Draw(
 
 	DX8_THREAD_ASSERT();
 	SNAPSHOT_SAY(("DX8 - draw"));
+
+	// WarPowers @debug buffer-type probe
+	{
+		static int wp_a = 0, wp_b = 0;
+		if ((polygon_count == 12 && wp_a < 4) || (polygon_count > 1000 && wp_b < 4)) {
+			fprintf(stderr, "[WP_VBT] pc=%u vbt=%d ibt=%d\n", (unsigned)polygon_count,
+				(int)render_state.vertex_buffer_types[0], (int)render_state.index_buffer_type);
+			fflush(stderr);
+			if (polygon_count == 12) wp_a++; else wp_b++;
+		}
+	}
 
 	Apply_Render_State_Changes();
 
