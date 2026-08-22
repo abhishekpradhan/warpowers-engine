@@ -323,7 +323,9 @@ int main(int argc, char* argv[])
 		windowFlags |= SDL_WINDOW_HIGH_PIXEL_DENSITY;
 #endif
 		TheSDL3Window = SDL_CreateWindow(
-			"Command & Conquer Generals: Zero Hour",
+			// WarPowers @rebrand: no EA trademarks on any product surface
+			// (GPL v3 EA additional terms; the title is the browser tab on wasm)
+			"War Powers",
 			1024, 768,  // Default resolution
 			windowFlags
 		);
