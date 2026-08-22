@@ -242,21 +242,6 @@ GameMessageDisposition WindowTranslator::translateGameMessage(const GameMessage 
 			if( TheWindowManager )
 				returnCode = TheWindowManager->winProcessMouseEvent( gwm, &mousePos, nullptr );
 
-			// WarPowers @debug WP_INPUT_TRACE: who eats mouse clicks?
-			{
-				static const Bool wp_trace = getenv("WP_INPUT_TRACE") != nullptr;
-				if (wp_trace && (msg->getType() == GameMessage::MSG_RAW_MOUSE_LEFT_BUTTON_DOWN ||
-								 msg->getType() == GameMessage::MSG_RAW_MOUSE_LEFT_BUTTON_UP))
-				{
-					fprintf(stderr, "[WP_XLAT] winXlat %s pos=(%d,%d) winProc=%d shellActive=%d inputEnabled=%d\n",
-						msg->getType() == GameMessage::MSG_RAW_MOUSE_LEFT_BUTTON_DOWN ? "LDOWN" : "LUP",
-						mousePos.x, mousePos.y, (int)returnCode,
-						(int)(TheShell && TheShell->isShellActive()),
-						(int)(TheInGameUI ? TheInGameUI->getInputEnabled() : -1));
-					fflush(stderr);
-				}
-			}
-
 			if( TheShell && TheShell->isShellActive() )
 				returnCode = WIN_INPUT_USED;
 

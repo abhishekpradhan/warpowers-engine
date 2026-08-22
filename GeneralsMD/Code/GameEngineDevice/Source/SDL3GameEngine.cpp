@@ -238,8 +238,6 @@ void SDL3GameEngine::update(void)
 			static UnsignedInt wp_stage = 0;
 			static Coord3D wp_tankPos = {0,0,0};
 
-			extern int wp_pickTraceFrames;
-			if (wp_pickTraceFrames > 0) wp_pickTraceFrames--;
 			SDL3Mouse* wp_mouse = dynamic_cast<SDL3Mouse*>(TheMouse);
 			auto wp_sendClick = [&](Int ix, Int iy, Bool down)
 			{
@@ -265,16 +263,6 @@ void SDL3GameEngine::update(void)
 
 			static ICoord2D wp_pt = {0,0};
 			static const Bool wp_uiMode = getenv("WP_CLICKTEST") && strcmp(getenv("WP_CLICKTEST"), "ui") == 0;
-			{
-				static Bool wp_gateLogged = FALSE;
-				if (!wp_gateLogged && wp_f >= 60)
-				{
-					fprintf(stderr, "[WP_CLICKGATE] f=%u mouse=%p uiMode=%d stage=%u\n",
-						wp_f, (void*)wp_mouse, (int)wp_uiMode, wp_stage);
-					fflush(stderr);
-					wp_gateLogged = TRUE;
-				}
-			}
 			if (wp_mouse && wp_uiMode)
 			{
 				// UI mode: human-path production — click the CC, click the
@@ -388,7 +376,7 @@ void SDL3GameEngine::update(void)
 						wp_stage = 99;
 					}
 				}
-				else if (wp_stage == 1) { wp_sendClick(wp_pt.x, wp_pt.y, FALSE); wp_pickTraceFrames = 6; wp_stage = 2; }
+				else if (wp_stage == 1) { wp_sendClick(wp_pt.x, wp_pt.y, FALSE); wp_stage = 2; }
 				else if (wp_stage == 2 && wp_f >= 510)
 				{
 					fprintf(stderr, "[WP_CLICK] f=%u selectCount=%d\n", wp_f, (int)TheInGameUI->getSelectCount());

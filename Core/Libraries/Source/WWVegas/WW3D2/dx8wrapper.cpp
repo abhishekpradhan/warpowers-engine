@@ -2446,17 +2446,6 @@ void DX8Wrapper::Draw(
 	DX8_THREAD_ASSERT();
 	SNAPSHOT_SAY(("DX8 - draw"));
 
-	// WarPowers @debug buffer-type probe
-	{
-		static int wp_a = 0, wp_b = 0;
-		if ((polygon_count == 12 && wp_a < 4) || (polygon_count > 1000 && wp_b < 4)) {
-			fprintf(stderr, "[WP_VBT] pc=%u vbt=%d ibt=%d\n", (unsigned)polygon_count,
-				(int)render_state.vertex_buffer_types[0], (int)render_state.index_buffer_type);
-			fflush(stderr);
-			if (polygon_count == 12) wp_a++; else wp_b++;
-		}
-	}
-
 	Apply_Render_State_Changes();
 
 	// Debug feature to disable triangle drawing...

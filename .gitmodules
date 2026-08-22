@@ -1,4 +1,4 @@
 [submodule "references/fbraz3-dxvk"]
 	path = references/fbraz3-dxvk
-	url = https://github.com/fbraz3/dxvk.git
-	branch = generalsx-macos-v2.6
+	url = https://github.com/abhishekpradhan/warpowers-dxvk.git
+	branch = warpowers-dxvk

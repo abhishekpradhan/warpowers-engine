@@ -320,8 +320,6 @@ void RTS3DScene::flagOccludedObjects(CameraClass * camera)
 	CollisionType is used as a mask to ignore certain types of objects.
  */
 //=============================================================================
-int wp_pickTraceFrames = 0;  // WarPowers @debug: set by WP_CLICKTEST around clicks
-
 Bool RTS3DScene::castRay(RayCollisionTestClass & raytest, Bool testAll, Int collisionType)
 {
 // this shouldn't be necessary here, and would be an undesirable performance hit.
@@ -351,23 +349,6 @@ Bool RTS3DScene::castRay(RayCollisionTestClass & raytest, Bool testAll, Int coll
 		RenderObjClass * robj = it.Peek_Obj();
 		it.Next();
 
-		// WarPowers @debug WP_INPUT_TRACE: per-robj pick gates
-		{
-			static const Bool wp_trace = getenv("WP_INPUT_TRACE") != nullptr;
-			if (wp_trace && wp_pickTraceFrames > 0)
-			{
-				static int wp_budget = 60;
-				if (wp_budget > 0)
-				{
-					wp_budget--;
-					fprintf(stderr, "[WP_CAST] click robj '%s' coll=0x%x wanted=0x%x reallyVis=%d hidden=%d\n",
-						robj->Get_Name(), (unsigned)robj->Get_Collision_Type(),
-						(unsigned)collisionType, (int)robj->Is_Really_Visible(),
-						(int)robj->Is_Hidden());
-					fflush(stderr);
-				}
-			}
-		}
 		// only intersect if it was visible or if we must test all
 		if(robj->Get_Collision_Type() & collisionType && (testAll || robj->Is_Really_Visible()))
 		{
@@ -386,22 +367,7 @@ Bool RTS3DScene::castRay(RayCollisionTestClass & raytest, Bool testAll, Int coll
 				continue;	//no intersection
 
 			//Do a more accurate test against object geometry
-			Bool wp_castHit = robj->Cast_Ray(tempRayTest);
-			{
-				static const Bool wp_trace2 = getenv("WP_INPUT_TRACE") != nullptr;
-				if (wp_trace2 && robj->Get_Name() && strstr(robj->Get_Name(), "WP"))
-				{
-					static int wp_budget2 = 40;
-					if (wp_budget2 > 0)
-					{
-						wp_budget2--;
-						fprintf(stderr, "[WP_CAST] robj '%s' sphere-pass castRay=%d\n",
-							robj->Get_Name(), (int)wp_castHit);
-						fflush(stderr);
-					}
-				}
-			}
-			if (wp_castHit)
+			if (robj->Cast_Ray(tempRayTest))
 			{
 				//Found an object closer than last closest object
 				//Adjust our results and refine search
@@ -470,10 +436,6 @@ void RTS3DScene::Visibility_Check(CameraClass * camera)
 				} else {
 					robj->Set_Visible(draw->getDrawsInMirror() && !camera->Cull_Sphere(robj->Get_Bounding_Sphere()));
 				}
-				// WarPowers @debug trace mirror-branch visibility writes on the picked unit
-				if (wp_pickTraceFrames > 0 && robj->Get_Name() && strstr(robj->Get_Name(), "WPTANK"))
-					fprintf(stderr, "[WP_VCHK] MIRROR '%s' drawsInMirror=%d -> vis=%d\n",
-						robj->Get_Name(), (int)draw->getDrawsInMirror(), (int)robj->Is_Visible());
 			}
 			else
 			{
@@ -561,11 +523,6 @@ void RTS3DScene::Visibility_Check(CameraClass * camera)
 				robj->Set_Visible(isVisible);
 			}
 
-			// WarPowers @debug trace normal-branch visibility writes on the picked unit
-			if (wp_pickTraceFrames > 0 && robj->Get_Name() && strstr(robj->Get_Name(), "WPTANK"))
-				fprintf(stderr, "[WP_VCHK] NORMAL '%s' forceVis=%d hid=%d -> vis=%d\n",
-					robj->Get_Name(), (int)robj->Is_Force_Visible(), (int)robj->Is_Hidden(),
-					(int)robj->Is_Visible());
 
 			///@todo: We're not using LOD yet so I disabled this code. MW
 			// Also, should check how multiple passes (reflections) get along
@@ -1156,10 +1113,6 @@ void RTS3DScene::Customized_Render( RenderInfoClass &rinfo )
 
 	const Int localPlayerIndex = rts::getObservedOrLocalPlayerIndex_Safe();
 
-	// WarPowers @debug trace render entry during the pick window
-	if (wp_pickTraceFrames > 0)
-		fprintf(stderr, "[WP_VCHK] Customized_Render enter: visChecked=%d inverted=%d\n",
-			(int)Visibility_Checked, (int)ShaderClass::Is_Backface_Culling_Inverted());
 
 #define USE_LIGHT_ENV 1
 

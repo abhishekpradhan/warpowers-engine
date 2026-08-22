@@ -34,12 +34,12 @@
 #include "Common/CRCDebug.h"
 #include "Common/FramePacer.h"
 #include "Common/Radar.h"
-#include "Common/Player.h"  // WarPowers @debug WP_VIS
+#include "Common/Player.h"  // WarPowers @debug WP_AUTOTEST
 #include "Common/PlayerTemplate.h"
 #include "Common/Team.h"
 #include "Common/PlayerList.h"
-#include "Common/ThingTemplate.h"  // WarPowers @debug WP_VIS
-#include "GameLogic/Object.h"  // WarPowers @debug WP_VIS
+#include "Common/ThingTemplate.h"  // WarPowers @debug WP_AUTOTEST
+#include "GameLogic/Object.h"  // WarPowers @debug WP_AUTOTEST
 #include "GameLogic/Module/BodyModule.h"  // WarPowers @debug WP_AUTOTEST
 #include "GameClient/ControlBar.h"  // WarPowers @debug WP_AUTOTEST
 #include "GameLogic/Module/ProductionUpdate.h"  // WarPowers @debug WP_AUTOTEST
@@ -1153,42 +1153,7 @@ void GameEngine::update()
 		}
 
 		// TheSuperHackers @info Ignores frozen time because the script engine needs updating in the logic update regardless.
-		Bool wp_canUpdate = canUpdateGameLogic(FramePacer::IgnoreFrozenTime);
-		// WarPowers @debug WP_LOOP_TRACE: periodic sim-gate breadcrumb for
-		// diagnosing a frozen sim (logic frame stuck at 0).
-		static const Bool wp_loopTrace = getenv("WP_LOOP_TRACE") != nullptr;
-		if (wp_loopTrace)
-		{
-			static unsigned wp_iter = 0;
-			if ((++wp_iter % 120) == 0)
-			{
-				fprintf(stderr, "[WP_LOOP] iter=%u can=%d logicFrame=%u timeFrozen=%d halted=%d logicFps=%d renderCap=%d\n",
-					wp_iter, (int)wp_canUpdate, (unsigned)TheGameLogic->getFrame(),
-					(int)TheFramePacer->isTimeFrozen(), (int)isGameHalted(),
-					(int)TheFramePacer->getActualLogicTimeScaleFps(FramePacer::IgnoreFrozenTime),
-					(int)TheFramePacer->getActualFramesPerSecondLimit());
-				// WarPowers @debug shroud-visibility snapshot of WP objects.
-				Player* wp_local = ThePlayerList ? ThePlayerList->getLocalPlayer() : nullptr;
-				Int wp_localIdx = wp_local ? wp_local->getPlayerIndex() : -1;
-				fprintf(stderr, "[WP_VIS] localPlayerIdx=%d isNeutral=%d\n", (int)wp_localIdx,
-					(int)(wp_local && ThePlayerList && wp_local == ThePlayerList->getNeutralPlayer()));
-				for (Object* wp_o = TheGameLogic->getFirstObject(); wp_o; wp_o = wp_o->getNextObject())
-				{
-					const AsciiString& wp_n = wp_o->getTemplate()->getName();
-					if (strncmp(wp_n.str(), "WP_", 3) == 0)
-					{
-						fprintf(stderr, "[WP_VIS]   obj '%s' id=%u owner=%d shroud(local)=%d offMap=%d dead=%d drawable=%p\n",
-							wp_n.str(), (unsigned)wp_o->getID(),
-							wp_o->getControllingPlayer() ? (int)wp_o->getControllingPlayer()->getPlayerIndex() : -1,
-							(int)wp_o->getShroudedStatus(wp_localIdx >= 0 ? wp_localIdx : 0),
-							(int)wp_o->isOffMap(), (int)wp_o->isEffectivelyDead(),
-							(void*)wp_o->getDrawable());
-					}
-				}
-				fflush(stderr);
-			}
-		}
-		if (wp_canUpdate)
+		if (canUpdateGameLogic(FramePacer::IgnoreFrozenTime))
 		{
 			TheGameLogic->UPDATE();
 
