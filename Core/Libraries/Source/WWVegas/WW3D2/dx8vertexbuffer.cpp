@@ -404,7 +404,11 @@ DX8VertexBufferClass::~DX8VertexBufferClass()
 	_DX8VertexBufferCount--;
 	WWDEBUG_SAY(("Current vertex buffer count: %d",_DX8VertexBufferCount));
 #endif
-	VertexBuffer->Release();
+	// WarPowers @fix: subsystems destroyed after device shutdown (e.g.
+	// TerrainTracks via ~GameClient) release their buffers late; the D3D
+	// object is already gone. Crash on every clean quit-to-desktop.
+	if (VertexBuffer)
+		VertexBuffer->Release();
 }
 
 // ----------------------------------------------------------------------------

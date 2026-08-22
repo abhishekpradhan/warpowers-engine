@@ -696,6 +696,16 @@ void Shell::doPush( AsciiString layoutFile )
 	
 	DEBUG_ASSERTCRASH( newScreen != nullptr, ("Shell unable to load pending push layout") );
 
+	// WarPowers @fix: a missing .wnd file makes winCreateLayout return null
+	// (harmless by design elsewhere); pushing it anyway null-derefs in
+	// linkScreen. Seen with Menus/ScoreScreen.wnd in the post-game path.
+	if (newScreen == nullptr)
+	{
+		fprintf(stderr, "DEBUG: Shell::doPush() layout '%s' missing, push skipped\n", layoutFile.str());
+		fflush(stderr);
+		return;
+	}
+
 	// link screen to the top
 	linkScreen( newScreen );
 

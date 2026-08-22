@@ -338,7 +338,10 @@ DX8IndexBufferClass::DX8IndexBufferClass(unsigned short index_count_,UsageType u
 
 DX8IndexBufferClass::~DX8IndexBufferClass()
 {
-	index_buffer->Release();
+	// WarPowers @fix: see ~DX8VertexBufferClass — buffers released after
+	// device shutdown must not deref the dead D3D object.
+	if (index_buffer)
+		index_buffer->Release();
 }
 
 // ----------------------------------------------------------------------------
