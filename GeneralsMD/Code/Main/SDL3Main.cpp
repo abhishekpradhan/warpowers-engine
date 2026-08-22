@@ -294,15 +294,27 @@ int main(int argc, char* argv[])
 		FilterPipeWireOpenAL();
 
 		// Load Vulkan library for DXVK DirectX8→Vulkan translation
+#ifndef __EMSCRIPTEN__
 		fprintf(stderr, "INFO: Loading Vulkan library...\n");
 		if (!SDL_Vulkan_LoadLibrary(nullptr)) {
 			fprintf(stderr, "WARNING: Failed to load Vulkan: %s\n", SDL_GetError());
 			fprintf(stderr, "WARNING: Continuing without Vulkan (may use software rendering)\n");
 		}
+#endif
 
 		// Create SDL3 window with Vulkan support
 		fprintf(stderr, "INFO: Creating SDL3 Vulkan window...\n");
+#ifdef __EMSCRIPTEN__
+		// wasm: plain window over #canvas, no Vulkan. NOT resizable: with
+		// SDL_WINDOW_RESIZABLE, SDL3's emscripten backend syncs the canvas
+		// backing store to its CSS size on any page resize (rotation,
+		// fullscreen), while the engine keeps rendering its fixed-resolution
+		// viewport — the picture comes out cropped/offset. The page scales
+		// the fixed-size canvas with CSS instead.
+		Uint32 windowFlags = 0;
+#else
 		Uint32 windowFlags = SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIDDEN;  // Start hidden, show after D3D init
+#endif
 #ifdef __APPLE__
 		// GeneralsX @bugfix macOS HiDPI: request a native-resolution (Retina) Metal drawable so the
 		// DXVK swapchain renders at physical pixels instead of being upscaled by the compositor.
