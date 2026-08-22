@@ -1183,6 +1183,14 @@ extern HWND ApplicationHWnd;
 static void igrotekaFrameTick(void* arg)
 {
 	GameEngine* engine = static_cast<GameEngine*>(arg);
+	// WarPowers: first tick = engine main loop is live; let the page drop
+	// its loading overlay (main() runs the whole synchronous load first).
+	static bool wp_notifiedRunning = false;
+	if (!wp_notifiedRunning)
+	{
+		wp_notifiedRunning = true;
+		EM_ASM({ if (Module.onEngineRunning) Module.onEngineRunning(); });
+	}
 	if (engine->getQuitting())
 	{
 		fprintf(stderr, "INFO: igrotekaFrameTick - quitting, cancelling main loop\n");

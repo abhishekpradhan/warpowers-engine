@@ -104,7 +104,8 @@ D3DXLoadSurfaceFromSurface(
 	pDestSurface->GetDesc(&descDest);
 
 #ifdef __EMSCRIPTEN__
-	if (descSrc.Width >= 512 || descDest.Width >= 256)
+	static const bool ig_trace_lsfs = getenv("IG_TRACE") && *getenv("IG_TRACE") != '0';
+	if (ig_trace_lsfs && (descSrc.Width >= 512 || descDest.Width >= 256))
 		fprintf(stderr, "[LSFS] src=%ux%u fmt=%u dst=%ux%u fmt=%u\n",
 		        descSrc.Width, descSrc.Height, (unsigned)descSrc.Format,
 		        descDest.Width, descDest.Height, (unsigned)descDest.Format);

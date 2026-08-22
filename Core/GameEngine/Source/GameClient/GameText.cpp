@@ -43,7 +43,9 @@
 //         Includes
 //----------------------------------------------------------------------------
 
-#include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
+#include "PreRTS.h"
+#include <set>
+#include <string>	// This must go first in EVERY cpp file in the GameEngine
 
 #include "GameClient/GameText.h"
 #include "Common/Language.h"
@@ -1411,7 +1413,15 @@ UnicodeString GameTextManager::fetch( const Char *label, Bool *exists )
 		// tofu box wherever a .wnd placeholder label (e.g. "Static Text") had
 		// no CSF entry (seen on the Disconnection Menu). Player-facing builds
 		// render missing labels as EMPTY instead; the miss is still logged.
-		printf("[gametext] missing label: %s\n", label);
+		// WarPowers: log each missing label once — repeated per-frame
+		// fetches (tooltips, HUD) otherwise flood the browser console.
+		{
+			static std::set<std::string> reportedMissing;
+			if (reportedMissing.insert(label).second)
+			{
+				printf("[gametext] missing label: %s\n", label);
+			}
+		}
 		missingString = UnicodeString::TheEmptyString;
 #else
 		missingString.format(L"MISSING: '%hs'", label);
