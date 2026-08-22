@@ -1035,7 +1035,7 @@ void GameEngine::update()
 					{
 						for (Object* o = TheGameLogic->getFirstObject(); o; o = o->getNextObject())
 						{
-							if (o->getTemplate()->getName() != "WP_CommandCenter")
+							if (!o->getTemplate()->isKindOf(KINDOF_COMMANDCENTER))
 								continue;
 							Int idx = o->getControllingPlayer() ? o->getControllingPlayer()->getPlayerIndex() : -1;
 							if (idx == wp_localIdx) { wp_ccId = o->getID(); wp_ccPos = *o->getPosition(); }
