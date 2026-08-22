@@ -2369,7 +2369,30 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 	else
 	{
 
-//		TheShell->hideShell();
+		// WarPowers @fix: the -file entry path bypasses the menu flow, so
+		// nobody hides the shell; its full-screen MainMenu window then stays
+		// visible-status and blocks all in-game drawable picking (every
+		// click dies in W3DView::pickDrawable's window-under-cursor check).
+		// hideShell() alone defers to menu transitions that never complete
+		// with minimal data, so pop the screens immediately and hide the
+		// remainder outright.
+		if (TheShell)
+		{
+			Int wp_guard = 0;
+			while (TheShell->top() && wp_guard++ < 16)
+			{
+				fprintf(stderr, "[WP_TSNG] popping shell screen '%s'\n",
+					TheShell->top()->getFilename().str()); fflush(stderr); // WarPowers @debug
+				TheShell->popImmediate();
+			}
+			TheShell->hide(TRUE);
+		}
+		// WarPowers @fix: with the shell screens popped, MainMenuInit never
+		// runs, so nobody clears the render freeze that Intro::doPostIntro
+		// arms (m_breakTheMovie). Clear it here or the 3D scene is never
+		// rendered again (W3DDisplay::draw skips its whole render block),
+		// leaving every render object's visibility bit stale.
+		TheWritableGlobalData->m_breakTheMovie = FALSE;
 		if(TheStatsCollector)
 		{
 			TheStatsCollector->reset();

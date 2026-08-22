@@ -2556,11 +2556,30 @@ Drawable *W3DView::pickDrawable( const ICoord2D *screen, Bool forceAttack, PickT
 	if (TheWindowManager)
 		window = TheWindowManager->getWindowUnderCursor(screen->x, screen->y);
 
+	// WarPowers @debug WP_INPUT_TRACE
+	static const Bool wp_trace = getenv("WP_INPUT_TRACE") != nullptr;
+	if (wp_trace && window)
+	{
+		fprintf(stderr, "[WP_PICK] windowUnderCursor id=%d name='%s' seeThru=%d at (%d,%d)\n",
+			(int)window->winGetWindowId(),
+			window->winGetInstanceData() ? window->winGetInstanceData()->m_decoratedNameString.str() : "?",
+			(int)BitIsSet(window->winGetStatus(), WIN_STATUS_SEE_THRU),
+			screen->x, screen->y);
+		fflush(stderr);
+	}
+
 	while (window)
 	{
 		// check to see if it or any of its parents are opaque.  If so, we can't select anything.
 		if (!BitIsSet( window->winGetStatus(), WIN_STATUS_SEE_THRU ))
+		{
+			if (wp_trace)
+			{
+				fprintf(stderr, "[WP_PICK] BLOCKED by opaque window id=%d\n", (int)window->winGetWindowId());
+				fflush(stderr);
+			}
 			return nullptr;
+		}
 
 		window = window->winGetParent();
 	}
@@ -2581,6 +2600,13 @@ Drawable *W3DView::pickDrawable( const ICoord2D *screen, Bool forceAttack, PickT
 
 	if( W3DDisplay::m_3DScene->castRay( raytest, false, (Int)pickType ) )
 		renderObj = raytest.CollidedRenderObj;
+
+	if (wp_trace)
+	{
+		fprintf(stderr, "[WP_PICK] castRay at (%d,%d) pickType=%d -> robj=%p\n",
+			screen->x, screen->y, (int)pickType, (void*)renderObj);
+		fflush(stderr);
+	}
 
 	// for right now there is no drawable data in a render object which is			 	// if we've found a render object, return our drawable associated with it,
 

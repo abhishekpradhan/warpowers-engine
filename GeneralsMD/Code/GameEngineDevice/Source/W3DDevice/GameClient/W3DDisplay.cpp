@@ -2006,6 +2006,13 @@ void W3DDisplay::draw()
 	// WarPowers @debug WP_ROBJ: periodic render-object state probe for WP
 	// drawables (hidden flags, scene membership, position).
 	{
+		extern int wp_pickTraceFrames;
+		if (wp_pickTraceFrames > 0)
+			fprintf(stderr, "[WP_VCHK] W3DDisplay::draw logicFrame=%d loadScreenRender=%d breakMovie=%d disableRender=%d\n",
+				TheGameLogic ? (int)TheGameLogic->getFrame() : -1,
+				(int)TheGlobalData->m_loadScreenRender,
+				(int)TheGlobalData->m_breakTheMovie,
+				(int)TheGlobalData->m_disableRender);
 		static const bool wp_trace = getenv("WP_LOOP_TRACE") != nullptr;
 		static unsigned wp_iter = 0;
 		if (wp_trace && (++wp_iter % 120) == 0)
@@ -2017,8 +2024,9 @@ void W3DDisplay::draw()
 				if (!wp_t || strncmp(wp_t->getName().str(), "WP_", 3) != 0)
 					continue;
 				Coord3D wp_p = *wp_d->getPosition();
-				fprintf(stderr, "[WP_ROBJ] drawable '%s' hidden=%d pos=(%.0f,%.0f,%.0f)\n",
+				fprintf(stderr, "[WP_ROBJ] drawable '%s' hidden=%d obscured=%d pos=(%.0f,%.0f,%.0f)\n",
 					wp_t->getName().str(), (int)wp_d->isDrawableEffectivelyHidden(),
+					(int)wp_d->getFullyObscuredByShroud(),
 					wp_p.x, wp_p.y, wp_p.z);
 			}
 			// Scene-side state: which WP render objects are in the 3D scene?
@@ -2035,8 +2043,9 @@ void W3DDisplay::draw()
 						wp_wp++;
 						Vector3 wp_v = wp_r->Get_Position();
 						SphereClass wp_s = wp_r->Get_Bounding_Sphere();
-						fprintf(stderr, "[WP_ROBJ] scene robj '%s' vis=%d reallyVis=%d pos=(%.0f,%.0f,%.0f) sph=(%.0f,%.0f,%.0f r=%.1f)\n",
-							wp_r->Get_Name(), (int)wp_r->Is_Not_Hidden_At_All(),
+						fprintf(stderr, "[WP_ROBJ] scene robj '%s' vis=%d hid=%d animHid=%d reallyVis=%d pos=(%.0f,%.0f,%.0f) sph=(%.0f,%.0f,%.0f r=%.1f)\n",
+							wp_r->Get_Name(), (int)wp_r->Is_Visible(),
+							(int)wp_r->Is_Hidden(), (int)wp_r->Is_Animation_Hidden(),
 							(int)wp_r->Is_Really_Visible(),
 							wp_v.X, wp_v.Y, wp_v.Z,
 							wp_s.Center.X, wp_s.Center.Y, wp_s.Center.Z, wp_s.Radius);
@@ -2048,9 +2057,14 @@ void W3DDisplay::draw()
 				if (wp_cam)
 				{
 					Vector3 wp_ce = wp_cam->Get_Position();
-					SphereClass wp_test(Vector3(480, 480, 25), 32.0f);
-					fprintf(stderr, "[WP_ROBJ] camEye=(%.0f,%.0f,%.0f) cullSphereAtCC=%d\n",
-						wp_ce.X, wp_ce.Y, wp_ce.Z, (int)wp_cam->Cull_Sphere(wp_test));
+					SphereClass wp_tankSph(Vector3(400, 509, 14), 13.5f);
+					SphereClass wp_ccSph(Vector3(400, 400, 25), 32.0f);
+					Vector3 wp_projOut;
+					CameraClass::ProjectionResType wp_pr = wp_cam->Project(wp_projOut, Vector3(400, 509, 14));
+					fprintf(stderr, "[WP_ROBJ] camEye=(%.0f,%.0f,%.0f) cullTank=%d cullCC=%d projTank=%d projXY=(%.2f,%.2f)\n",
+						wp_ce.X, wp_ce.Y, wp_ce.Z,
+						(int)wp_cam->Cull_Sphere(wp_tankSph), (int)wp_cam->Cull_Sphere(wp_ccSph),
+						(int)wp_pr, wp_projOut.X, wp_projOut.Y);
 				}
 				Coord3D wp_cp = TheTacticalView ? TheTacticalView->getPosition() : Coord3D();
 				fprintf(stderr, "[WP_ROBJ] scene totals: robjs=%d wpRobjs=%d cam=(%.0f,%.0f) angle=%.2f pitch=%.2f zoom=%.2f\n",

@@ -23,6 +23,7 @@
 
 #include "GameClient/Display.h"
 #include "GameClient/GameWindowManager.h"
+#include "GameClient/Shell.h"
 
 
 Intro::Intro()
@@ -110,7 +111,13 @@ void Intro::doSizzleMovie()
 
 void Intro::doPostIntro()
 {
-	TheWritableGlobalData->m_breakTheMovie = TRUE;
+	// WarPowers @fix: this render freeze exists to hold the screen black
+	// until the shell's main menu fades in. When the shell has no screens
+	// (the -file direct-load path pops them), nothing ever clears the flag
+	// and W3DDisplay::draw skips scene rendering forever. Only arm the
+	// freeze when a shell screen is actually there to clear it.
+	if (TheShell && TheShell->top())
+		TheWritableGlobalData->m_breakTheMovie = TRUE;
 }
 
 void Intro::doAsyncWait(UnsignedInt milliseconds)

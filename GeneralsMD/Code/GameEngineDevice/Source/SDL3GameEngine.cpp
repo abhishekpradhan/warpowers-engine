@@ -39,6 +39,12 @@
 #include "SDL3Device/GameClient/SDL3Keyboard.h"
 #include "GameClient/Mouse.h"
 #include "GameClient/Keyboard.h"
+#include "GameClient/View.h"        // WarPowers @debug WP_CLICKTEST
+#include "GameClient/Display.h"     // WarPowers @debug WP_CLICKTEST
+#include "GameClient/InGameUI.h"    // WarPowers @debug WP_CLICKTEST
+#include "GameLogic/GameLogic.h"    // WarPowers @debug WP_CLICKTEST
+#include "GameLogic/Object.h"       // WarPowers @debug WP_CLICKTEST
+#include "Common/ThingTemplate.h"   // WarPowers @debug WP_CLICKTEST
 #include "GameClient/GameWindow.h"
 #include "GameClient/GameWindowManager.h"
 #include "GameClient/Gadget.h"
@@ -215,6 +221,99 @@ void SDL3GameEngine::reset(void)
 void SDL3GameEngine::update(void)
 {
 	pollSDL3Events();
+
+	// WarPowers @debug WP_CLICKTEST: self-driving mouse smoke test. Fabricates
+	// real SDL button events at the tank's projected screen position and
+	// pushes them through the exact path OS clicks take (addSDLEvent ->
+	// Mouse::update -> raw messages -> translators). Pair with
+	// WP_AUTOTEST=build so a tank exists. Env-gated.
+	{
+		static const Bool wp_click = getenv("WP_CLICKTEST") != nullptr;
+		if (wp_click && TheGameLogic && TheGameLogic->isInGame() && TheMouse && TheTacticalView && m_SDLWindow)
+		{
+			const UnsignedInt wp_f = TheGameLogic->getFrame();
+			static UnsignedInt wp_stage = 0;
+			static Coord3D wp_tankPos = {0,0,0};
+
+			extern int wp_pickTraceFrames;
+			if (wp_pickTraceFrames > 0) wp_pickTraceFrames--;
+			SDL3Mouse* wp_mouse = dynamic_cast<SDL3Mouse*>(TheMouse);
+			auto wp_sendClick = [&](Int ix, Int iy, Bool down)
+			{
+				int winW = 0, winH = 0;
+				SDL_GetWindowSize(m_SDLWindow, &winW, &winH);
+				float wx = (float)ix * ((float)winW / (float)TheDisplay->getWidth());
+				float wy = (float)iy * ((float)winH / (float)TheDisplay->getHeight());
+				SDL_Event ev;
+				memset(&ev, 0, sizeof(ev));
+				ev.type = down ? SDL_EVENT_MOUSE_BUTTON_DOWN : SDL_EVENT_MOUSE_BUTTON_UP;
+				ev.button.timestamp = SDL_GetTicksNS();
+				ev.button.windowID = SDL_GetWindowID(m_SDLWindow);
+				ev.button.button = SDL_BUTTON_LEFT;
+				ev.button.down = down;
+				ev.button.clicks = 1;
+				ev.button.x = wx;
+				ev.button.y = wy;
+				wp_mouse->addSDLEvent(&ev);
+				fprintf(stderr, "[WP_CLICK] f=%u %s at internal (%d,%d) window (%.0f,%.0f)\n",
+					wp_f, down ? "DOWN" : "UP", ix, iy, wx, wy);
+				fflush(stderr);
+			};
+
+			static ICoord2D wp_pt = {0,0};
+			if (wp_mouse)
+			{
+				if (wp_stage == 0 && wp_f >= 450)
+				{
+					// find the tank, click its screen position
+					for (Object* o = TheGameLogic->getFirstObject(); o; o = o->getNextObject())
+					{
+						if (o->getTemplate()->getName() == "WP_Tank") { wp_tankPos = *o->getPosition(); break; }
+					}
+					if (wp_tankPos.x != 0.0f && TheTacticalView->worldToScreen(&wp_tankPos, &wp_pt))
+					{
+						fprintf(stderr, "[WP_CLICK] f=%u tank world (%.0f,%.0f,%.0f) -> screen (%d,%d)\n",
+							wp_f, wp_tankPos.x, wp_tankPos.y, wp_tankPos.z, wp_pt.x, wp_pt.y);
+						wp_sendClick(wp_pt.x, wp_pt.y, TRUE);
+						wp_stage = 1;
+					}
+					else if (wp_f >= 500)
+					{
+						fprintf(stderr, "[WP_CLICK] f=%u FAIL: no tank or off-screen\n", wp_f);
+						wp_stage = 99;
+					}
+				}
+				else if (wp_stage == 1) { wp_sendClick(wp_pt.x, wp_pt.y, FALSE); wp_pickTraceFrames = 6; wp_stage = 2; }
+				else if (wp_stage == 2 && wp_f >= 510)
+				{
+					fprintf(stderr, "[WP_CLICK] f=%u selectCount=%d\n", wp_f, (int)TheInGameUI->getSelectCount());
+					// click a ground point 100 world units east of the tank
+					Coord3D dest = wp_tankPos; dest.x += 100.0f;
+					if (TheTacticalView->worldToScreen(&dest, &wp_pt))
+					{
+						wp_sendClick(wp_pt.x, wp_pt.y, TRUE);
+						wp_stage = 3;
+					}
+					else wp_stage = 99;
+				}
+				else if (wp_stage == 3) { wp_sendClick(wp_pt.x, wp_pt.y, FALSE); wp_stage = 4; }
+				else if (wp_stage == 4 && wp_f >= 900)
+				{
+					for (Object* o = TheGameLogic->getFirstObject(); o; o = o->getNextObject())
+					{
+						if (o->getTemplate()->getName() == "WP_Tank")
+						{
+							fprintf(stderr, "[WP_CLICK] f=%u RESULT tank at (%.0f,%.0f) (started (%.0f,%.0f), move target x+100)\n",
+								wp_f, o->getPosition()->x, o->getPosition()->y, wp_tankPos.x, wp_tankPos.y);
+							break;
+						}
+					}
+					wp_stage = 5;
+				}
+			}
+		}
+	}
+
 	GameEngine::update();
 }
 

@@ -740,6 +740,18 @@ GameMessageDisposition SelectionTranslator::onMouseLeftClick(MAYBE_UNUSED const 
 	pds.isPointSelection = isPoint;
 	TheTacticalView->iterateDrawablesInRegion(&selectionRegion, addDrawableToList, &pds);
 
+	// WarPowers @debug WP_INPUT_TRACE
+	{
+		static const Bool wp_trace = getenv("WP_INPUT_TRACE") != nullptr;
+		if (wp_trace)
+		{
+			fprintf(stderr, "[WP_XLAT] leftClick region=(%d,%d)-(%d,%d) point=%d picked=%d\n",
+				selectionRegion.lo.x, selectionRegion.lo.y, selectionRegion.hi.x, selectionRegion.hi.y,
+				(int)isPoint, (int)drawablesThatWillSelect.size());
+			fflush(stderr);
+		}
+	}
+
 	if (drawablesThatWillSelect.empty())
 	{
 		return KEEP_MESSAGE;
