@@ -1023,6 +1023,10 @@ void GameEngine::update()
 				// WP_AUTOTEST=build stops after the tank spawns (stages 0-2),
 				// leaving move/attack to a human at the mouse.
 				static const Bool wp_buildOnly = wp_autoEnv && strcmp(wp_autoEnv, "build") == 0;
+				// WP_AUTOTEST=base drives the dozer loop instead: CC -> Surveyor ->
+				// construct Power Station -> construct Vehicle Works -> build a tank
+				// from the factory. Verifies D016 construction end to end.
+				static const Bool wp_baseMode = wp_autoEnv && strcmp(wp_autoEnv, "base") == 0;
 				if (wp_auto && TheGameLogic && TheGameLogic->isInGame() && ThePlayerList)
 				{
 					const UnsignedInt wp_f = TheGameLogic->getFrame();
@@ -1031,7 +1035,145 @@ void GameEngine::update()
 					static Coord3D wp_ccPos = {0,0,0};
 					const Int wp_localIdx = ThePlayerList->getLocalPlayer() ? ThePlayerList->getLocalPlayer()->getPlayerIndex() : -1;
 
-					if (wp_stage == 0 && wp_f >= 90)
+					if (wp_baseMode)
+					{
+						// --- D016 base-loop machine (stages 10..16) ---
+						static ObjectID wp_dozerId = INVALID_ID;
+						static ObjectID wp_ppId = INVALID_ID, wp_wfId = INVALID_ID;
+						auto wp_select = [](ObjectID id) {
+							GameMessage* s = TheMessageStream->appendMessage(GameMessage::MSG_CREATE_SELECTED_GROUP);
+							s->appendBooleanArgument(TRUE);
+							s->appendObjectIDArgument(id);
+						};
+						auto wp_findOurs = [&](const char* tmpl) -> Object* {
+							for (Object* o = TheGameLogic->getFirstObject(); o; o = o->getNextObject())
+								if (o->getTemplate()->getName() == tmpl && !o->isEffectivelyDead() &&
+									o->getControllingPlayer() &&
+									o->getControllingPlayer()->getPlayerIndex() == wp_localIdx)
+									return o;
+							return nullptr;
+						};
+						if (wp_stage == 0 && wp_f >= 90)
+						{
+							for (Object* o = TheGameLogic->getFirstObject(); o; o = o->getNextObject())
+							{
+								if (!o->getTemplate()->isKindOf(KINDOF_COMMANDCENTER))
+									continue;
+								Int idx = o->getControllingPlayer() ? o->getControllingPlayer()->getPlayerIndex() : -1;
+								if (idx == wp_localIdx) { wp_ccId = o->getID(); wp_ccPos = *o->getPosition(); }
+							}
+							if (wp_ccId != INVALID_ID)
+							{
+								wp_select(wp_ccId);
+								const ThingTemplate* tt = TheThingFactory->findTemplate("WP_Surveyor");
+								if (tt)
+								{
+									GameMessage* m = TheMessageStream->appendMessage(GameMessage::MSG_QUEUE_UNIT_CREATE);
+									m->appendIntegerArgument(tt->getTemplateID());
+									m->appendIntegerArgument(1);
+									fprintf(stderr, "[WP_AUTO] f=%u BASE: queued WP_Surveyor\n", wp_f);
+								}
+								wp_stage = 10;
+							}
+						}
+						else if (wp_stage == 10 && wp_f >= 300)
+						{
+							Object* dz = wp_findOurs("WP_Surveyor");
+							if (dz)
+							{
+								wp_dozerId = dz->getID();
+								wp_select(wp_dozerId);
+								const ThingTemplate* tt = TheThingFactory->findTemplate("WP_PowerPlant");
+								GameMessage* m = TheMessageStream->appendMessage(GameMessage::MSG_DOZER_CONSTRUCT);
+								m->appendIntegerArgument(tt->getTemplateID());
+								Coord3D loc = wp_ccPos; loc.x -= 75.0f; loc.y += 65.0f;
+								m->appendLocationArgument(loc);
+								m->appendRealArgument(0.0f);
+								fprintf(stderr, "[WP_AUTO] f=%u BASE: dozer id=%u -> construct PowerPlant at (%.0f,%.0f)\n",
+									wp_f, (unsigned)wp_dozerId, loc.x, loc.y);
+								wp_stage = 11;
+							}
+							else if (wp_f >= 900)
+							{
+								fprintf(stderr, "[WP_AUTO] f=%u BASE FAIL: no Surveyor spawned\n", wp_f);
+								wp_stage = 99;
+							}
+						}
+						else if (wp_stage == 11 && (wp_f % 30) == 0)
+						{
+							Object* pp = wp_findOurs("WP_PowerPlant");
+							if (pp)
+							{
+								if (wp_ppId == INVALID_ID)
+								{
+									wp_ppId = pp->getID();
+									fprintf(stderr, "[WP_AUTO] f=%u BASE: PowerPlant placed id=%u\n", wp_f, (unsigned)wp_ppId);
+								}
+								if (!pp->getStatusBits().test(OBJECT_STATUS_UNDER_CONSTRUCTION))
+								{
+									fprintf(stderr, "[WP_AUTO] f=%u BASE: PowerPlant CONSTRUCTED\n", wp_f);
+									wp_select(wp_dozerId);
+									const ThingTemplate* tt = TheThingFactory->findTemplate("WP_WarFactory");
+									GameMessage* m = TheMessageStream->appendMessage(GameMessage::MSG_DOZER_CONSTRUCT);
+									m->appendIntegerArgument(tt->getTemplateID());
+									Coord3D loc = wp_ccPos; loc.x += 80.0f; loc.y += 70.0f;
+									m->appendLocationArgument(loc);
+									m->appendRealArgument(0.0f);
+									fprintf(stderr, "[WP_AUTO] f=%u BASE: construct WarFactory at (%.0f,%.0f)\n", wp_f, loc.x, loc.y);
+									wp_stage = 12;
+								}
+							}
+							else if (wp_f >= 3000)
+							{
+								fprintf(stderr, "[WP_AUTO] f=%u BASE FAIL: PowerPlant never appeared\n", wp_f);
+								wp_stage = 99;
+							}
+						}
+						else if (wp_stage == 12 && (wp_f % 30) == 0)
+						{
+							Object* wf = wp_findOurs("WP_WarFactory");
+							if (wf)
+							{
+								if (wp_wfId == INVALID_ID)
+								{
+									wp_wfId = wf->getID();
+									fprintf(stderr, "[WP_AUTO] f=%u BASE: WarFactory placed id=%u\n", wp_f, (unsigned)wp_wfId);
+								}
+								if (!wf->getStatusBits().test(OBJECT_STATUS_UNDER_CONSTRUCTION))
+								{
+									fprintf(stderr, "[WP_AUTO] f=%u BASE: WarFactory CONSTRUCTED\n", wp_f);
+									wp_select(wp_wfId);
+									const ThingTemplate* tt = TheThingFactory->findTemplate("WP_Tank");
+									GameMessage* m = TheMessageStream->appendMessage(GameMessage::MSG_QUEUE_UNIT_CREATE);
+									m->appendIntegerArgument(tt->getTemplateID());
+									m->appendIntegerArgument(1);
+									fprintf(stderr, "[WP_AUTO] f=%u BASE: queued WP_Tank from factory\n", wp_f);
+									wp_stage = 13;
+								}
+							}
+							else if (wp_f >= 6000)
+							{
+								fprintf(stderr, "[WP_AUTO] f=%u BASE FAIL: WarFactory never appeared\n", wp_f);
+								wp_stage = 99;
+							}
+						}
+						else if (wp_stage == 13 && (wp_f % 30) == 0)
+						{
+							Object* tank = wp_findOurs("WP_Tank");
+							if (tank)
+							{
+								fprintf(stderr, "[WP_AUTO] f=%u BASE: tank id=%u rolled out of the factory — BASE_LOOP_OK\n",
+									wp_f, (unsigned)tank->getID());
+								wp_stage = 14;
+							}
+							else if (wp_f >= 7500)
+							{
+								fprintf(stderr, "[WP_AUTO] f=%u BASE FAIL: no tank from factory\n", wp_f);
+								wp_stage = 99;
+							}
+						}
+					}
+					else if (wp_stage == 0 && wp_f >= 90)
 					{
 						for (Object* o = TheGameLogic->getFirstObject(); o; o = o->getNextObject())
 						{
