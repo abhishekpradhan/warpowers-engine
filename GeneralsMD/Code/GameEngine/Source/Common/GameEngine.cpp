@@ -1112,16 +1112,59 @@ void GameEngine::update()
 					}
 					else if (wp_stage == 4 && wp_f >= 700)
 					{
-						if (wp_enemyCcId != INVALID_ID)
+						// clear enemy combat vehicles (they guard the CC path) before the push
+						static ObjectID wp_foeId = INVALID_ID;
+						Object* wp_tank = TheGameLogic->findObjectByID(wp_tankId);
+						if (!wp_tank || wp_tank->isEffectivelyDead())
 						{
-							GameMessage* s2 = TheMessageStream->appendMessage(GameMessage::MSG_CREATE_SELECTED_GROUP);
-							s2->appendBooleanArgument(TRUE);
-							s2->appendObjectIDArgument(wp_tankId);
-							GameMessage* m = TheMessageStream->appendMessage(GameMessage::MSG_DO_ATTACK_OBJECT);
-							m->appendObjectIDArgument(wp_enemyCcId);
-							fprintf(stderr, "[WP_AUTO] f=%u attack order on enemy CC id=%u\n", wp_f, (unsigned)wp_enemyCcId);
+							fprintf(stderr, "[WP_AUTO] f=%u FAIL: our tank died before the CC push\n", wp_f);
+							wp_stage = 99;
 						}
-						wp_stage = 5;
+						else
+						{
+							Object* foe = nullptr;
+							Real bestSq = 1e30f;
+							for (Object* o = TheGameLogic->getFirstObject(); o; o = o->getNextObject())
+							{
+								if (!o->getTemplate()->isKindOf(KINDOF_VEHICLE) || o->isEffectivelyDead())
+									continue;
+								Int idx = o->getControllingPlayer() ? o->getControllingPlayer()->getPlayerIndex() : -1;
+								if (idx == wp_localIdx || idx < 0)
+									continue;
+								Real dx = o->getPosition()->x - wp_tank->getPosition()->x;
+								Real dy = o->getPosition()->y - wp_tank->getPosition()->y;
+								if (dx*dx + dy*dy < bestSq) { bestSq = dx*dx + dy*dy; foe = o; }
+							}
+							if (foe && wp_foeId == INVALID_ID)
+							{
+								wp_foeId = foe->getID();
+								GameMessage* s2 = TheMessageStream->appendMessage(GameMessage::MSG_CREATE_SELECTED_GROUP);
+								s2->appendBooleanArgument(TRUE);
+								s2->appendObjectIDArgument(wp_tankId);
+								GameMessage* m = TheMessageStream->appendMessage(GameMessage::MSG_DO_ATTACK_OBJECT);
+								m->appendObjectIDArgument(wp_foeId);
+								fprintf(stderr, "[WP_AUTO] f=%u duel: attack enemy vehicle id=%u\n", wp_f, (unsigned)wp_foeId);
+							}
+							else if (wp_foeId != INVALID_ID)
+							{
+								Object* prev = TheGameLogic->findObjectByID(wp_foeId);
+								if (!prev || prev->isEffectivelyDead())
+								{
+									fprintf(stderr, "[WP_AUTO] f=%u duel won (vehicle id=%u down)\n", wp_f, (unsigned)wp_foeId);
+									wp_foeId = INVALID_ID;   // rescan for the next guard
+								}
+							}
+							else if (wp_enemyCcId != INVALID_ID)
+							{
+								GameMessage* s2 = TheMessageStream->appendMessage(GameMessage::MSG_CREATE_SELECTED_GROUP);
+								s2->appendBooleanArgument(TRUE);
+								s2->appendObjectIDArgument(wp_tankId);
+								GameMessage* m = TheMessageStream->appendMessage(GameMessage::MSG_DO_ATTACK_OBJECT);
+								m->appendObjectIDArgument(wp_enemyCcId);
+								fprintf(stderr, "[WP_AUTO] f=%u attack order on enemy CC id=%u\n", wp_f, (unsigned)wp_enemyCcId);
+								wp_stage = 5;
+							}
+						}
 					}
 
 					static UnsignedInt wp_lastStatus = 0;
