@@ -1254,7 +1254,13 @@ static void drawablePostDraw( Drawable *draw, void *userData )
 #else
 	ObjectShroudStatus ss = (!obj) ? OBJECTSHROUD_CLEAR : obj->getShroudedStatus(localPlayerIndex);
 #endif
-	if (ss > OBJECTSHROUD_PARTIAL_CLEAR)
+	// GeneralsX(WarPowers): never fog-cull the icon UI of the local player's own
+	// objects — an abandoned construction site outside friendly vision otherwise
+	// renders translucent with NO "Constructing... N%" label and reads as a
+	// mystery ghost husk. Own-object overlays leak no intel.
+	const Bool ownObject = obj && obj->getControllingPlayer() &&
+		obj->getControllingPlayer()->getPlayerIndex() == localPlayerIndex;
+	if (ss > OBJECTSHROUD_PARTIAL_CLEAR && !ownObject)
 		return;
 
 	// draw the any "icon" UI for a drawable (health bars, veterency, etc);

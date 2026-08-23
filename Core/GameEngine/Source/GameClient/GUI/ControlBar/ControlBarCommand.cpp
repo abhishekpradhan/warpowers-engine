@@ -731,8 +731,10 @@ void ControlBar::updateContextCommand()
 		if( pu && pu->firstProduction() != nullptr )
 		{
 
-			// don't show the portrait image
-			setPortraitByObject( nullptr );
+			// GeneralsX(WarPowers): keep the selected object's portrait while producing —
+			// our layout puts the queue strip in its own screen area, so blanking the
+			// cameo just reads as the HUD going black
+			setPortraitByObject( obj );
 
 			// show the build queue
 			m_contextParent[ CP_BUILD_QUEUE ]->winHide( FALSE );
@@ -761,8 +763,8 @@ void ControlBar::updateContextCommand()
 	if( m_contextParent[ CP_BUILD_QUEUE ]->winIsHidden() == FALSE )
 	{
 
-		// when the build queue is enabled, the selected portrait cannot be shown
-		setPortraitByObject( nullptr );
+		// GeneralsX(WarPowers): portrait stays up alongside the queue (see above)
+		setPortraitByObject( obj );
 
 		//
 		// when showing a production queue, when the production count changes of the producer

@@ -36,6 +36,7 @@
 #include "Common/Debug.h"
 #include "Common/Language.h"
 #include "GameClient/Display.h"
+#include "GameClient/GameText.h"
 #include "GameClient/GameWindowManager.h"
 #include "GameClient/GameWindow.h"
 #include "GameClient/Mouse.h"
@@ -3533,7 +3534,12 @@ UnicodeString GameWindowManager::winTextLabelToText( AsciiString label )
 	if( label.isEmpty() )
 		return UnicodeString::TheEmptyString;
 
-	/// @todo we need to write the string manager here, this is TEMPORARY!!!
+	// GeneralsX(WarPowers): labels that look like string-manager keys ("WP:Cancel",
+	// "GUI:Options") resolve through TheGameText — the original left this as a
+	// raw-copy stub, so WND TEXT fields rendered their key names verbatim
+	if( TheGameText && strchr( label.str(), ':' ) != nullptr )
+		return TheGameText->fetch( label );
+
 	UnicodeString tmp;
 	tmp.translate(label);
 	return tmp;
