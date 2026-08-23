@@ -54,8 +54,17 @@ void INI::parseAnim2DDefinition( INI* ini )
 	{
 
 		//We don't need it if we're in the builder... which doesn't have this.
+		// WarPowers: data can also load before the collection exists (the generic
+		// Data/INI sweep runs pre-GameClient). Consume the block so the reader
+		// stays in sync instead of desyncing into a fatal on the next field line.
+		while( !ini->isEOF() )
+		{
+			ini->readLine();
+			const char *field = strtok( ini->m_buffer, INI::getSeps() );
+			if( field && stricmp( field, ini->getEndToken() ) == 0 )
+				break;
+		}
 		return;
-
 	}
 
 	// find existing animation template if present

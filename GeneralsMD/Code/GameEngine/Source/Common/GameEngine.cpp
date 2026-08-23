@@ -867,6 +867,10 @@ void GameEngine::init()
 	}
 	catch (...)
 	{
+		// WarPowers: the INI layer prints file/line before bare-int throws;
+		// see INI::load's unknown-block path.
+		fprintf(stderr, "FATAL: uncaught exception during initialization (see INI error above)\n");
+		fflush(stderr);
 		RELEASE_CRASH(("Uncaught Exception during initialization."));
 	}
 

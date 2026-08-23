@@ -3012,7 +3012,7 @@ void Drawable::drawBattlePlans( const IRegion2D *healthBarRegion )
 		{
 			if( !getIconInfo()->m_icon[ ICON_BATTLEPLAN_BOMBARD ] )
 			{
-				getIconInfo()->m_icon[ ICON_BATTLEPLAN_BOMBARD ] = newInstance(Anim2D)( s_animationTemplates[ ICON_BATTLEPLAN_BOMBARD ], TheAnim2DCollection );
+				getIconInfo()->m_icon[ ICON_BATTLEPLAN_BOMBARD ] = s_animationTemplates[ ICON_BATTLEPLAN_BOMBARD ] ? newInstance(Anim2D)( s_animationTemplates[ ICON_BATTLEPLAN_BOMBARD ], TheAnim2DCollection ) : nullptr;
 			}
 			//Int barHeight = healthBarRegion.hi.y - healthBarRegion.lo.y;
 			Int frameWidth = getIconInfo()->m_icon[ ICON_BATTLEPLAN_BOMBARD ]->getCurrentFrameWidth();
@@ -3040,7 +3040,7 @@ void Drawable::drawBattlePlans( const IRegion2D *healthBarRegion )
 		{
 			if( !getIconInfo()->m_icon[ ICON_BATTLEPLAN_HOLDTHELINE ] )
 			{
-				getIconInfo()->m_icon[ ICON_BATTLEPLAN_HOLDTHELINE ] = newInstance(Anim2D)( s_animationTemplates[ ICON_BATTLEPLAN_HOLDTHELINE ], TheAnim2DCollection );
+				getIconInfo()->m_icon[ ICON_BATTLEPLAN_HOLDTHELINE ] = s_animationTemplates[ ICON_BATTLEPLAN_HOLDTHELINE ] ? newInstance(Anim2D)( s_animationTemplates[ ICON_BATTLEPLAN_HOLDTHELINE ], TheAnim2DCollection ) : nullptr;
 			}
 			// draw the icon
 			Int frameWidth = getIconInfo()->m_icon[ ICON_BATTLEPLAN_HOLDTHELINE ]->getCurrentFrameWidth();
@@ -3068,7 +3068,7 @@ void Drawable::drawBattlePlans( const IRegion2D *healthBarRegion )
 		{
 			if( !getIconInfo()->m_icon[ ICON_BATTLEPLAN_SEARCHANDDESTROY ] )
 			{
-				getIconInfo()->m_icon[ ICON_BATTLEPLAN_SEARCHANDDESTROY ] = newInstance(Anim2D)( s_animationTemplates[ ICON_BATTLEPLAN_SEARCHANDDESTROY ], TheAnim2DCollection );
+				getIconInfo()->m_icon[ ICON_BATTLEPLAN_SEARCHANDDESTROY ] = s_animationTemplates[ ICON_BATTLEPLAN_SEARCHANDDESTROY ] ? newInstance(Anim2D)( s_animationTemplates[ ICON_BATTLEPLAN_SEARCHANDDESTROY ], TheAnim2DCollection ) : nullptr;
 			}
 			// draw the icon
 			Int frameWidth = getIconInfo()->m_icon[ ICON_BATTLEPLAN_SEARCHANDDESTROY ]->getCurrentFrameWidth();
@@ -3231,7 +3231,7 @@ void Drawable::drawHealing(const IRegion2D* healthBarRegion)
 		{
 
 			if( getIconInfo()->m_icon[ typeIndex ] == nullptr )
-				getIconInfo()->m_icon[ typeIndex ] = newInstance(Anim2D)( s_animationTemplates[ typeIndex ], TheAnim2DCollection );
+				getIconInfo()->m_icon[ typeIndex ] = s_animationTemplates[ typeIndex ] ? newInstance(Anim2D)( s_animationTemplates[ typeIndex ], TheAnim2DCollection ) : nullptr;
 
 			// draw the animation if present
 			if( getIconInfo()->m_icon[ typeIndex ] != nullptr)
@@ -3294,7 +3294,7 @@ void Drawable::drawEnthusiastic(const IRegion2D* healthBarRegion)
 
 
 		if( getIconInfo()->m_icon[ iconIndex ] == nullptr )
-			getIconInfo()->m_icon[ iconIndex ] = newInstance(Anim2D)( s_animationTemplates[ iconIndex ], TheAnim2DCollection );
+			getIconInfo()->m_icon[ iconIndex ] = s_animationTemplates[ iconIndex ] ? newInstance(Anim2D)( s_animationTemplates[ iconIndex ], TheAnim2DCollection ) : nullptr;
 
 		// draw the animation if present
 		if( getIconInfo()->m_icon[ iconIndex ] != nullptr)
@@ -3363,7 +3363,7 @@ void Drawable::drawDemoralized(const IRegion2D* healthBarRegion)
 		{
 			// create icon if necessary
 			if( getIconInfo()->m_icon[ ICON_DEMORALIZED ] == nullptr )
-				getIconInfo()->m_icon[ ICON_DEMORALIZED ] = newInstance(Anim2D)( s_animationTemplates[ ICON_DEMORALIZED ], TheAnim2DCollection );
+				getIconInfo()->m_icon[ ICON_DEMORALIZED ] = s_animationTemplates[ ICON_DEMORALIZED ] ? newInstance(Anim2D)( s_animationTemplates[ ICON_DEMORALIZED ], TheAnim2DCollection ) : nullptr;
 
 			if (getIconInfo()->m_icon[ ICON_DEMORALIZED ])
 			{
@@ -3412,7 +3412,7 @@ void Drawable::drawBombed(const IRegion2D* healthBarRegion)
 				obj->getControllingPlayer() == rts::getObservedOrLocalPlayer())
 	{
 		if( !getIconInfo()->m_icon[ ICON_CARBOMB ] )
-			getIconInfo()->m_icon[ ICON_CARBOMB ] = newInstance(Anim2D)( s_animationTemplates[ ICON_CARBOMB ], TheAnim2DCollection );
+			getIconInfo()->m_icon[ ICON_CARBOMB ] = s_animationTemplates[ ICON_CARBOMB ] ? newInstance(Anim2D)( s_animationTemplates[ ICON_CARBOMB ], TheAnim2DCollection ) : nullptr;
 
 		if( getIconInfo()->m_icon[ ICON_CARBOMB ] )
 		{
@@ -3453,6 +3453,9 @@ void Drawable::drawBombed(const IRegion2D* healthBarRegion)
 	//
 	static NameKeyType key_StickyBombUpdate = NAMEKEY( "StickyBombUpdate" );
 	StickyBombUpdate *update = (StickyBombUpdate*)obj->findUpdateModule( key_StickyBombUpdate );
+	// WarPowers: icon templates are data-optional; without them there is nothing to draw
+	if( update && s_animationTemplates[ ICON_BOMB_TIMED ] == nullptr )
+		update = nullptr;
 	if( update )
 	{
 		//This case is tricky. The object that is bombed doesn't know it... but the bomb itself does.
@@ -3465,8 +3468,8 @@ void Drawable::drawBombed(const IRegion2D* healthBarRegion)
 				//Timed bomb
 				if( !getIconInfo()->m_icon[ ICON_BOMB_TIMED ] )
 				{
-					getIconInfo()->m_icon[ ICON_BOMB_REMOTE ] = newInstance(Anim2D)( s_animationTemplates[ ICON_BOMB_REMOTE ], TheAnim2DCollection );
-					getIconInfo()->m_icon[ ICON_BOMB_TIMED ] = newInstance(Anim2D)( s_animationTemplates[ ICON_BOMB_TIMED ], TheAnim2DCollection );
+					getIconInfo()->m_icon[ ICON_BOMB_REMOTE ] = s_animationTemplates[ ICON_BOMB_REMOTE ] ? newInstance(Anim2D)( s_animationTemplates[ ICON_BOMB_REMOTE ], TheAnim2DCollection ) : nullptr;
+					getIconInfo()->m_icon[ ICON_BOMB_TIMED ] = s_animationTemplates[ ICON_BOMB_TIMED ] ? newInstance(Anim2D)( s_animationTemplates[ ICON_BOMB_TIMED ], TheAnim2DCollection ) : nullptr;
 
 					//Because this is a counter icon that ranges from 0-60 seconds, we need to calculate which frame to
 					//start the animation from. Because timers are second based -- 1000 ms equal 1 frame. So we simply
@@ -3528,7 +3531,7 @@ void Drawable::drawBombed(const IRegion2D* healthBarRegion)
 				//Timed bomb
 				if( !getIconInfo()->m_icon[ ICON_BOMB_REMOTE ] )
 				{
-					getIconInfo()->m_icon[ ICON_BOMB_REMOTE ] = newInstance(Anim2D)( s_animationTemplates[ ICON_BOMB_REMOTE ], TheAnim2DCollection );
+					getIconInfo()->m_icon[ ICON_BOMB_REMOTE ] = s_animationTemplates[ ICON_BOMB_REMOTE ] ? newInstance(Anim2D)( s_animationTemplates[ ICON_BOMB_REMOTE ], TheAnim2DCollection ) : nullptr;
 				}
 				if( getIconInfo()->m_icon[ ICON_BOMB_REMOTE ] )
 				{

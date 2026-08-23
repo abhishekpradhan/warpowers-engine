@@ -475,6 +475,11 @@ UnsignedInt INI::load( AsciiString filename, INILoadType loadType, Xfer *pXfer )
 				}
 				else
 				{
+					// WarPowers: always name the offender — in release builds the bare
+					// int throw otherwise dies as a silent "Uncaught Exception".
+					fprintf(stderr, "FATAL INI: [LINE: %d - FILE: '%s'] Unknown block '%s'\n",
+						getLineNum(), getFilename().str(), token);
+					fflush(stderr);
 					DEBUG_CRASH( ("[LINE: %d - FILE: '%s'] Unknown block '%s'",
 														 getLineNum(), getFilename().str(), token ) );
 					throw INI_UNKNOWN_TOKEN;
