@@ -30,6 +30,8 @@
 // Author: Mark Wilczynski, August 2002
 ///////////////////////////////////////////////////////////////////////////////
 
+#include <stdio.h>
+#include <stdlib.h>
 #include "Common/Debug.h"
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
@@ -328,6 +330,18 @@ W3DGhostObject::~W3DGhostObject()
 #endif
 }
 
+// WarPowers @debug IG_TRACE-gated ghost lifecycle breadcrumbs (fog-memory husks)
+static bool wpGhostTrace()
+{
+	static int t = -1;
+	if (t < 0)
+	{
+		const char* e = getenv("IG_TRACE");
+		t = (e && *e && *e != '0') ? 1 : 0;
+	}
+	return t == 1;
+}
+
 // ------------------------------------------------------------------------------------------------
 /** Record the current state of the render objects used by this parent object
 so we can display cached state when player is looking at fogged object.
@@ -337,6 +351,10 @@ void W3DGhostObject::snapShot(int playerIndex)
 {
 	DEBUG_ASSERTCRASH(TheGhostObjectManager->trackAllPlayers() || playerIndex == TheGhostObjectManager->getLocalPlayerIndex(),
 		("We are supposed to only snapshot things for the initial local player because local player can't change in non-debug game."));
+
+	if (wpGhostTrace())
+		fprintf(stderr, "[GHOST] snapShot player=%d obj=%s\n", playerIndex,
+			m_parentObject ? m_parentObject->getTemplate()->getName().str() : "?");
 
 	Drawable *draw = m_parentObject->getDrawable();
 
@@ -512,6 +530,9 @@ void W3DGhostObject::freeSnapShot(int playerIndex)
 {
 	if (m_parentSnapshots[playerIndex])
 	{
+		if (wpGhostTrace())
+			fprintf(stderr, "[GHOST] freeSnapShot player=%d parent=%s\n", playerIndex,
+				m_parentObject ? m_parentObject->getTemplate()->getName().str() : "(orphan)");
 		//if we have a snapshot for this object, remove it from
 		//scene and put back the original object if it still exists.
 		if (playerIndex == TheGhostObjectManager->getLocalPlayerIndex())
@@ -1048,6 +1069,8 @@ void W3DGhostObjectManager::updateOrphanedObjects(int *playerIndexList, int play
 
 			if (!numStoredSnapshots)
 			{
+				if (wpGhostTrace())
+					fprintf(stderr, "[GHOST] orphan fully freed, ghost removed\n");
 				ThePartitionManager->unRegisterGhostObject(mod);
 				mod->m_partitionData = nullptr;
 				removeGhostObject(mod);

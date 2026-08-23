@@ -1633,6 +1633,23 @@ void InGameUI::evaluateSoloNexus( Drawable *newlyAddedDrawable )
 void InGameUI::handleBuildPlacements()
 {
 
+	// GeneralsX(WarPowers): placement-mode safety nets.
+	// (1) If the source dozer died while the player was still aiming, cancel the
+	//     mode immediately instead of waiting for the next terrain click.
+	// (2) If a preview drawable ever outlives the mode (any missed exit path),
+	//     destroy it — a leaked preview renders as an immortal translucent
+	//     building that reads as a ghost husk.
+	if( m_pendingPlaceType )
+	{
+		Object *placeSource = TheGameLogic->findObjectByID( getPendingPlaceSourceObjectID() );
+		if( placeSource == nullptr || placeSource->isEffectivelyDead() )
+			placeBuildAvailable( nullptr, nullptr );
+	}
+	else if( m_placeIcon[ 0 ] != nullptr )
+	{
+		destroyPlacementIcons();
+	}
+
 	//
 	// if we're in the process of placing something we need up update one or more drawables
 	// based on the position of the mouse

@@ -43,6 +43,8 @@
 #include "GameLogic/Module/BodyModule.h"  // WarPowers @debug WP_AUTOTEST
 #include "GameClient/ControlBar.h"  // WarPowers @debug WP_AUTOTEST
 #include "GameLogic/Module/ProductionUpdate.h"  // WarPowers @debug WP_AUTOTEST
+#include "GameLogic/TerrainLogic.h"  // WarPowers @debug WP_AUTOTEST=ghost
+#include "GameLogic/AIPathfind.h"  // WarPowers @debug WP_AUTOTEST=ghost
 #include "Common/GameAudio.h"
 #include "Common/GameEngine.h"
 #include "Common/INI.h"
@@ -1031,6 +1033,11 @@ void GameEngine::update()
 				// construct Power Station -> construct Vehicle Works -> build a tank
 				// from the factory. Verifies D016 construction end to end.
 				static const Bool wp_baseMode = wp_autoEnv && strcmp(wp_autoEnv, "base") == 0;
+				// WP_AUTOTEST=ghost verifies the fog-memory lifecycle: spawn a neutral
+				// structure out of base vision, scout it with a tank, retreat (fog ->
+				// snapshot), kill it while fogged (orphan ghost), re-scout (ghost must
+				// free). Read the IG_TRACE [GHOST] breadcrumbs in the log.
+				static const Bool wp_ghostMode = wp_autoEnv && strcmp(wp_autoEnv, "ghost") == 0;
 				if (wp_auto && TheGameLogic && TheGameLogic->isInGame() && ThePlayerList)
 				{
 					const UnsignedInt wp_f = TheGameLogic->getFrame();
@@ -1040,7 +1047,104 @@ void GameEngine::update()
 					static Coord3D wp_ccPos = {0,0,0};
 					const Int wp_localIdx = ThePlayerList->getLocalPlayer() ? ThePlayerList->getLocalPlayer()->getPlayerIndex() : -1;
 
-					if (wp_baseMode)
+					if (wp_ghostMode)
+					{
+						static ObjectID wp_gTankId = INVALID_ID, wp_gTargetId = INVALID_ID;
+						auto wp_gSelect = [](ObjectID id) {
+							GameMessage* s = TheMessageStream->appendMessage(GameMessage::MSG_CREATE_SELECTED_GROUP);
+							s->appendBooleanArgument(TRUE);
+							s->appendObjectIDArgument(id);
+						};
+						auto wp_gMove = [&](ObjectID id, Real x, Real y) {
+							wp_gSelect(id);
+							GameMessage* m = TheMessageStream->appendMessage(GameMessage::MSG_DO_MOVETO);
+							Coord3D dest = { x, y, 0.0f };
+							dest.z = TheTerrainLogic->getGroundHeight(x, y);
+							m->appendLocationArgument(dest);
+						};
+						if (wp_stage == 0 && wp_f >= 90)
+						{
+							for (Object* o = TheGameLogic->getFirstObject(); o; o = o->getNextObject())
+								if (o->getTemplate()->isKindOf(KINDOF_COMMANDCENTER) &&
+									o->getControllingPlayer() &&
+									o->getControllingPlayer()->getPlayerIndex() == wp_localIdx)
+								{ wp_ccId = o->getID(); wp_ccPos = *o->getPosition(); }
+							if (wp_ccId == INVALID_ID)
+							{
+								// keep waiting next frame
+							}
+							else
+							{
+							// neutral structure well outside CC shroud-clear (300)
+							const ThingTemplate* tt = TheThingFactory->findTemplate("WPJ_ChopShop");
+							Object* target = tt ? TheThingFactory->newObject(tt, ThePlayerList->getNeutralPlayer()->getDefaultTeam()) : nullptr;
+							// own scout tank at the CC
+							const ThingTemplate* tankT = TheThingFactory->findTemplate("WP_Tank");
+							Object* tank = tankT ? TheThingFactory->newObject(tankT, ThePlayerList->getLocalPlayer()->getDefaultTeam()) : nullptr;
+							if (!target || !tank)
+							{
+								fprintf(stderr, "[WP_AUTO] GHOST: spawn failed\n");
+								TheGameEngine->setQuitting(TRUE);
+								wp_stage = 99;
+							}
+							else
+							{
+							Coord3D p = wp_ccPos; p.x -= 370.0f;
+							p.z = TheTerrainLogic->getGroundHeight(p.x, p.y);
+							target->setPosition(&p);
+							TheAI->pathfinder()->addObjectToPathfindMap(target);
+							target->handlePartitionCellMaintenance();
+							wp_gTargetId = target->getID();
+							Coord3D tp = wp_ccPos; tp.y += 60.0f;
+							tp.z = TheTerrainLogic->getGroundHeight(tp.x, tp.y);
+							tank->setPosition(&tp);
+							TheAI->pathfinder()->addObjectToPathfindMap(tank);
+							wp_gTankId = tank->getID();
+							fprintf(stderr, "[WP_AUTO] f=%u GHOST: spawned target id=%u at -370, tank id=%u\n",
+								wp_f, (UnsignedInt)wp_gTargetId, (UnsignedInt)wp_gTankId);
+							wp_stage = 1;
+							}
+							}
+						}
+						else if (wp_stage == 1 && wp_f >= 150)
+						{
+							// scout: park 120 short of the target (vision 150 covers it)
+							wp_gMove(wp_gTankId, wp_ccPos.x - 300.0f, wp_ccPos.y);
+							Coord3D look = wp_ccPos; look.x -= 370.0f;
+							TheTacticalView->lookAt(&look);
+							fprintf(stderr, "[WP_AUTO] f=%u GHOST: tank scouting target\n", wp_f);
+							wp_stage = 2;
+						}
+						else if (wp_stage == 2 && wp_f >= 500)
+						{
+							// retreat home -> target cell fogs -> expect [GHOST] snapShot
+							wp_gMove(wp_gTankId, wp_ccPos.x + 60.0f, wp_ccPos.y);
+							fprintf(stderr, "[WP_AUTO] f=%u GHOST: tank retreating (expect snapShot)\n", wp_f);
+							wp_stage = 3;
+						}
+						else if (wp_stage == 3 && wp_f >= 950)
+						{
+							Object* target = TheGameLogic->findObjectByID(wp_gTargetId);
+							if (target)
+								target->kill();
+							fprintf(stderr, "[WP_AUTO] f=%u GHOST: killed fogged target (orphan ghost expected)\n", wp_f);
+							wp_stage = 4;
+						}
+						else if (wp_stage == 4 && wp_f >= 1050)
+						{
+							// re-scout -> expect [GHOST] freeSnapShot + orphan removed
+							wp_gMove(wp_gTankId, wp_ccPos.x - 300.0f, wp_ccPos.y);
+							fprintf(stderr, "[WP_AUTO] f=%u GHOST: tank re-scouting (expect freeSnapShot + orphan removal)\n", wp_f);
+							wp_stage = 5;
+						}
+						else if (wp_stage == 5 && wp_f >= 1500)
+						{
+							fprintf(stderr, "[WP_AUTO] f=%u GHOST: sequence complete - check [GHOST] traces above\n", wp_f);
+							TheGameEngine->setQuitting(TRUE);
+							wp_stage = 6;
+						}
+					}
+					else if (wp_baseMode)
 					{
 						// --- D016 base-loop machine (stages 10..16) ---
 						static ObjectID wp_dozerId = INVALID_ID;
