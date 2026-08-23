@@ -808,16 +808,24 @@ void RTS3DScene::renderOneObject(RenderInfoClass &rinfo, RenderObjClass *robj, I
 
 			if (m_customPassMode == SCENE_PASS_DEFAULT)
 			{
-				if (ss <= OBJECTSHROUD_CLEAR)
+				if (ss <= OBJECTSHROUD_PARTIAL_CLEAR)
 				{
 					robj->Render(rinfo);
 				}
-				else
+				else if (ss == OBJECTSHROUD_FOGGED)
 				{
-					rinfo.Push_Material_Pass(m_shroudMaterialPass);
+					// GeneralsX(WarPowers): the projected-shroud material pass needs
+					// CAMERASPACEPOSITION texgen + texture matrices, which our d3d8
+					// translation layers don't implement — fogged objects rendered
+					// fully lit and never-seen enemies were plainly visible.
+					// Approximate ZH: fogged objects render in the dimmed fog light
+					// environment (the same one ghost snapshots use)...
+					rinfo.light_environment = &m_foggedLightEnv;
 					robj->Render(rinfo);
-					rinfo.Pop_Material_Pass();
+					rinfo.light_environment = &lightEnv;
 				}
+				// ...and OBJECTSHROUD_SHROUDED (never seen by this player) does not
+				// render at all.
 			}
 			else if (m_maskMaterialPass)
 			{

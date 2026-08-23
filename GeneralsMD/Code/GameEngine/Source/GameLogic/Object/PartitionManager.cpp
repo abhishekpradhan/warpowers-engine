@@ -2946,7 +2946,12 @@ void PartitionManager::unRegisterObject( Object* object )
 
 	// need to figure out if any players have a fogged memory of this object.
 	// if so, we can't remove it from the shroud system just yet.
-	if ((ghost=mod->getGhostObject()) != nullptr && mod->wasSeenByAnyPlayers() < MAX_PLAYER_COUNT)
+	// GeneralsX(WarPowers): under-construction sites leave no fog memory — a
+	// translucent 1HP scaffold ghost reads as a rendering bug, not as intel
+	// (user repro: place next to an enemy, it gets shot before the dozer
+	// arrives, and the "ghost building" stood there forever).
+	if ((ghost=mod->getGhostObject()) != nullptr && mod->wasSeenByAnyPlayers() < MAX_PLAYER_COUNT &&
+			!object->getStatusBits().test( OBJECT_STATUS_UNDER_CONSTRUCTION ))
 	{
 		if (TheContactList)
 			TheContactList->removeSpecificPartitionData(mod);
