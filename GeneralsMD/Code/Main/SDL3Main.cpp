@@ -242,7 +242,7 @@ int main(int argc, char* argv[])
 	__argv = argv;
 
 	fprintf(stderr, "=================================================\n");
-	fprintf(stderr, " Command & Conquer Generals: Zero Hour (Linux)\n");
+	fprintf(stderr, " War Powers (GeneralsX engine)\n");
 	fprintf(stderr, " SDL3 + DXVK Build\n");
 	fprintf(stderr, "=================================================\n\n");
 
