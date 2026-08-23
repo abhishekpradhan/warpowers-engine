@@ -381,6 +381,24 @@ void AudioManager::getInfoForAudioEvent( const AudioEventRTS *eventToFindAndFill
 }
 
 //-------------------------------------------------------------------------------------------------
+
+// WarPowers: IG_TRACE-gated audio request tracing (same idiom as INI.cpp).
+#ifdef __EMSCRIPTEN__
+#include <emscripten/emscripten.h>
+static bool wpAudioReqTrace() {
+    static const bool on = EM_ASM_INT({
+        return (typeof window !== 'undefined' && window.IG_TRACE) ? 1 : 0;
+    }) != 0;
+    return on;
+}
+#else
+#include <cstdlib>
+static bool wpAudioReqTrace() {
+    static const bool on = std::getenv("IG_TRACE") != nullptr;
+    return on;
+}
+#endif
+
 AudioHandle AudioManager::addAudioEvent(const AudioEventRTS *eventToAdd)
 {
 	if (eventToAdd->getEventName().isEmpty() || eventToAdd->getEventName() == "NoSound") {
@@ -399,6 +417,10 @@ AudioHandle AudioManager::addAudioEvent(const AudioEventRTS *eventToAdd)
 	}
 
 	const AudioType soundType = eventToAdd->getAudioEventInfo()->m_soundType;
+	if (wpAudioReqTrace())
+		fprintf(stderr, "[AUDIOREQ] add '%s' type=%d on=%d/%d/%d\n",
+			eventToAdd->getEventName().str(), (int)soundType,
+			(int)isOn(AudioAffect_Sound), (int)isOn(AudioAffect_Sound3D), (int)isOn(AudioAffect_Speech));
 
 	// Check if audio type is on
 	// TheSuperHackers @info Zero audio volume is not a fail condition, because music, speech and sounds
@@ -410,8 +432,10 @@ AudioHandle AudioManager::addAudioEvent(const AudioEventRTS *eventToAdd)
 				return AHSV_NoSound;
 			break;
 		case AT_SoundEffect:
-			if (!isOn(AudioAffect_Sound) || !isOn(AudioAffect_Sound3D))
+			if (!isOn(AudioAffect_Sound) || !isOn(AudioAffect_Sound3D)) {
+				if (wpAudioReqTrace()) fprintf(stderr, "[AUDIOREQ] bail: sound off\n");
 				return AHSV_NoSound;
+			}
 			break;
 		case AT_Streaming:
 			// if we're currently playing uninterruptable speech, then disallow the addition of this sample
@@ -434,6 +458,7 @@ AudioHandle AudioManager::addAudioEvent(const AudioEventRTS *eventToAdd)
 
 	if (!logicalAudio && notForLocal)
 	{
+		if (wpAudioReqTrace()) fprintf(stderr, "[AUDIOREQ] bail: not-for-local '%s'\n", eventToAdd->getEventName().str());
 		return AHSV_NotForLocal;
 	}
 
@@ -464,6 +489,9 @@ AudioHandle AudioManager::addAudioEvent(const AudioEventRTS *eventToAdd)
 #ifdef INTENSIVE_AUDIO_DEBUG
 		DEBUG_LOG((" - culled due to muting (%d).", audioEvent->getVolume()));
 #endif
+		if (wpAudioReqTrace())
+			fprintf(stderr, "[AUDIOREQ] bail: muted '%s' vol=%.3f min=%.3f\n",
+				audioEvent->getEventName().str(), audioEvent->getVolume(), m_audioSettings->m_minVolume);
 		return AHSV_Muted;
 	}
 
@@ -475,12 +503,18 @@ AudioHandle AudioManager::addAudioEvent(const AudioEventRTS *eventToAdd)
 	{
 		if (!m_sound->addAudioEvent(audioEvent.Peek()))
 		{
+			if (wpAudioReqTrace())
+				fprintf(stderr, "[AUDIOREQ] bail: GameSounds rejected '%s'\n", audioEvent->getEventName().str());
 			audioEvent.Clear();
 		}
 	}
 
 	if( audioEvent != nullptr )
 	{
+		if (wpAudioReqTrace())
+			fprintf(stderr, "[AUDIOREQ] queued '%s' vol=%.3f handle=%u\n",
+				audioEvent->getEventName().str(), audioEvent->getVolume(),
+				(unsigned)audioEvent->getPlayingHandle());
 		return audioEvent->getPlayingHandle();
 	}
 	return AHSV_NoSound;

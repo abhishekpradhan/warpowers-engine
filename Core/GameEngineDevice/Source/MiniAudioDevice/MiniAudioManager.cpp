@@ -66,6 +66,23 @@
 
 #include <vector>
 
+// WarPowers: env/window-gated audio trace (IG_TRACE), same idiom as INI.cpp.
+#ifdef __EMSCRIPTEN__
+#include <emscripten/emscripten.h>
+static bool wpAudioTrace() {
+    static const bool on = EM_ASM_INT({
+        return (typeof window !== 'undefined' && window.IG_TRACE) ? 1 : 0;
+    }) != 0;
+    return on;
+}
+#else
+#include <cstdlib>
+static bool wpAudioTrace() {
+    static const bool on = std::getenv("IG_TRACE") != nullptr;
+    return on;
+}
+#endif
+
 #ifdef RTS_HAS_FFMPEG
 #include "VideoDevice/FFmpeg/FFmpegFile.h"
 #endif
@@ -73,6 +90,8 @@
 #ifdef RTS_HAS_FFMPEG
 extern "C" {
 #include <libavcodec/avcodec.h>
+
+
 }
 #endif
 
@@ -230,6 +249,47 @@ void MiniAudioManager::update()
 {
 	ScopedFPUGuard fpuGuard;
 
+#ifdef __EMSCRIPTEN__
+	// The wasm resource manager runs MA_RESOURCE_MANAGER_FLAG_NO_THREADING
+	// (no pthreads) — miniaudio then REQUIRES the host to drain the job queue:
+	// even non-async file sounds enqueue their init/decode work as jobs.
+	// Without this pump every sound starts with a forever-empty data source
+	// (cursor pinned at 0, pure silence). Drain a bounded batch per frame.
+	for (int wp_j = 0; wp_j < 16; ++wp_j) {
+		if (ma_resource_manager_process_next_job(&m_resourceManager) != MA_SUCCESS)
+			break;
+	}
+#endif
+
+	// WarPowers: trace heartbeat — engine clock advancing proves the live
+	// output device is pulling from THIS ma_engine instance.
+	if (wpAudioTrace()) {
+		static int wp_hb = 0;
+		if ((++wp_hb % 150) == 0) {
+			fprintf(stderr, "[AUDIOHB] engineTime=%llu playing=%d device=%p started=%d\n",
+				(unsigned long long)ma_engine_get_time_in_pcm_frames(&m_engine),
+				(int)m_playingSounds.size(), (void*)ma_engine_get_device(&m_engine),
+				(int)ma_device_is_started(ma_engine_get_device(&m_engine)));
+		}
+		static int wp_snd = 0;
+		if ((++wp_snd % 45) == 0) {
+			for (std::list<PlayingAudio *>::iterator wit = m_playingSounds.begin();
+				wit != m_playingSounds.end(); ++wit) {
+				PlayingAudio *pa = *wit;
+				if (!pa || !pa->m_sound) continue;
+				ma_uint64 cur = 0;
+				ma_sound_get_cursor_in_pcm_frames(pa->m_sound, &cur);
+				fprintf(stderr, "[AUDIOSND] '%s' cursor=%llu playing=%d atEnd=%d vol=%.2f spatial=%d\n",
+					pa->m_audioEventRTS ? pa->m_audioEventRTS->getEventName().str() : "?",
+					(unsigned long long)cur,
+					(int)ma_sound_is_playing(pa->m_sound),
+					(int)ma_sound_at_end(pa->m_sound),
+					ma_sound_get_volume(pa->m_sound),
+					(int)ma_sound_is_spatialization_enabled(pa->m_sound));
+			}
+		}
+	}
+
 	AudioManager::update();
 	setDeviceListenerPosition();
 	processRequestList();
@@ -299,6 +359,8 @@ void MiniAudioManager::stopAllAmbientsBy(Drawable *draw)
 }
 
 //-------------------------------------------------------------------------------------------------
+
+
 void MiniAudioManager::playAudioEvent(AudioRequest *req)
 {
 	AudioEventRTS *event = req->m_pendingEvent.Peek();
@@ -314,6 +376,9 @@ void MiniAudioManager::playAudioEvent(AudioRequest *req)
 	AsciiString fileToPlay = event->getFilename();
 	DEBUG_LOG(("MINIAUDIO: playAudioEvent '%s' type=%d file='%s'\n",
 		event->getEventName().str(), info->m_soundType, fileToPlay.str()));
+	if (wpAudioTrace())
+		fprintf(stderr, "[AUDIO] play '%s' type=%d file='%s'\n",
+			event->getEventName().str(), (int)info->m_soundType, fileToPlay.str());
 
 	std::list<PlayingAudio *>::iterator it;
 
@@ -559,6 +624,9 @@ void MiniAudioManager::playAudioEvent(AudioRequest *req)
 	adjustPlayingVolume(audio);
 
 	result = ma_sound_start(sound);
+	if (wpAudioTrace())
+		fprintf(stderr, "[AUDIO] start '%s' -> %d (vol=%.2f)\n",
+			event->getEventName().str(), (int)result, ma_sound_get_volume(sound));
 	if (result != MA_SUCCESS) {
 		DEBUG_LOG(("MiniAudio: Failed to start sound: %d for '%s'\n", result, fileToPlay.str()));
 		releasePlayingAudio(audio);
