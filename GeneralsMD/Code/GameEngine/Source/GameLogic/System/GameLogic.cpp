@@ -4724,6 +4724,14 @@ void GameLogic::sendObjectDestroyed( Object *obj )
 
 	// destroy the drawable
 	Drawable *draw = obj->getDrawable();
+	{
+		// WarPowers @debug IG_TRACE death-path breadcrumb
+		static int wpT = -1;
+		if (wpT < 0) { const char* e = getenv("IG_TRACE"); wpT = (e && *e && *e != '0') ? 1 : 0; }
+		if (wpT)
+			fprintf(stderr, "[DEATH] sendObjectDestroyed obj=%s id=%u draw=%p\n",
+				obj->getTemplate()->getName().str(), (unsigned)obj->getID(), (void*)draw);
+	}
 	if(draw)
 	{
 		TheGameClient->destroyDrawable( draw );

@@ -42,6 +42,9 @@
 #include "GameLogic/Object.h"  // WarPowers @debug WP_AUTOTEST
 #include "GameLogic/Module/BodyModule.h"  // WarPowers @debug WP_AUTOTEST
 #include "GameClient/ControlBar.h"  // WarPowers @debug WP_AUTOTEST
+#include "GameClient/InGameUI.h"  // WarPowers @debug WP_AUTOTEST=husk
+#include "GameClient/Display.h"  // WarPowers @debug WP_AUTOTEST=husk
+#include "GameClient/View.h"  // WarPowers @debug WP_AUTOTEST
 #include "GameLogic/Module/ProductionUpdate.h"  // WarPowers @debug WP_AUTOTEST
 #include "GameLogic/TerrainLogic.h"  // WarPowers @debug WP_AUTOTEST=ghost
 #include "GameLogic/AIPathfind.h"  // WarPowers @debug WP_AUTOTEST=ghost
@@ -1038,6 +1041,11 @@ void GameEngine::update()
 				// snapshot), kill it while fogged (orphan ghost), re-scout (ghost must
 				// free). Read the IG_TRACE [GHOST] breadcrumbs in the log.
 				static const Bool wp_ghostMode = wp_autoEnv && strcmp(wp_autoEnv, "ghost") == 0;
+				// WP_AUTOTEST=husk reproduces the user's translucent-remnant repro:
+				// real dozer constructs a VehiclePlant site next to the enemy guard,
+				// dozer is recalled, guard kills the 1HP site. Pair with
+				// WP_SCENE_DUMP=<frame> to census the scene after the death.
+				static const Bool wp_huskMode = wp_autoEnv && strcmp(wp_autoEnv, "husk") == 0;
 				if (wp_auto && TheGameLogic && TheGameLogic->isInGame() && ThePlayerList)
 				{
 					const UnsignedInt wp_f = TheGameLogic->getFrame();
@@ -1047,7 +1055,111 @@ void GameEngine::update()
 					static Coord3D wp_ccPos = {0,0,0};
 					const Int wp_localIdx = ThePlayerList->getLocalPlayer() ? ThePlayerList->getLocalPlayer()->getPlayerIndex() : -1;
 
-					if (wp_ghostMode)
+					if (wp_huskMode)
+					{
+						static ObjectID wp_hDozerId = INVALID_ID;
+						auto wp_hSelect = [](ObjectID id) {
+							GameMessage* sm = TheMessageStream->appendMessage(GameMessage::MSG_CREATE_SELECTED_GROUP);
+							sm->appendBooleanArgument(TRUE);
+							sm->appendObjectIDArgument(id);
+						};
+						if (wp_stage == 0 && wp_f >= 90)
+						{
+							for (Object* o = TheGameLogic->getFirstObject(); o; o = o->getNextObject())
+								if (o->getTemplate()->isKindOf(KINDOF_COMMANDCENTER) &&
+									o->getControllingPlayer() &&
+									o->getControllingPlayer()->getPlayerIndex() == wp_localIdx)
+								{ wp_ccId = o->getID(); wp_ccPos = *o->getPosition(); }
+							const ThingTemplate* dzT = TheThingFactory->findTemplate("WP_Fabricator");
+							Object* dz = (wp_ccId != INVALID_ID && dzT) ? TheThingFactory->newObject(dzT, ThePlayerList->getLocalPlayer()->getDefaultTeam()) : nullptr;
+							if (dz)
+							{
+								Coord3D tp = wp_ccPos; tp.y += 60.0f;
+								tp.z = TheTerrainLogic->getGroundHeight(tp.x, tp.y);
+								dz->setPosition(&tp);
+								TheAI->pathfinder()->addObjectToPathfindMap(dz);
+								wp_hDozerId = dz->getID();
+								fprintf(stderr, "[WP_AUTO] f=%u HUSK: dozer id=%u spawned\n", wp_f, (unsigned)wp_hDozerId);
+								wp_stage = 1;
+							}
+						}
+						else if (wp_stage == 1 && wp_f >= 600)
+						{
+							// arm placement through the REAL UI flow (preview drawable and all),
+							// exactly like clicking the build button does
+							wp_hSelect(wp_hDozerId);
+							Coord3D loc = { 678.0f, 533.0f, 0.0f };
+							loc.z = TheTerrainLogic->getGroundHeight(loc.x, loc.y);
+							TheTacticalView->lookAt(&loc);
+							const ThingTemplate* tt = TheThingFactory->findTemplate("WP_VehiclePlant");
+							Object* dz = TheGameLogic->findObjectByID(wp_hDozerId);
+							if (dz && dz->getDrawable())
+								TheInGameUI->placeBuildAvailable(tt, dz->getDrawable());
+							fprintf(stderr, "[WP_AUTO] f=%u HUSK: placement ARMED via UI (preview live), camera aimed\n", wp_f);
+							wp_stage = 20;
+						}
+						else if (wp_stage == 20 && wp_f >= 615)
+						{
+							// click the screen center (camera is on the site): raw mouse
+							// messages run the real PlaceEventTranslator placement path
+							ICoord2D px; px.x = TheDisplay->getWidth() / 2; px.y = TheDisplay->getHeight() / 2;
+							GameMessage* dn = TheMessageStream->appendMessage(GameMessage::MSG_RAW_MOUSE_LEFT_BUTTON_DOWN);
+							dn->appendPixelArgument(px);
+							dn->appendIntegerArgument(0);
+							dn->appendIntegerArgument(0);
+							fprintf(stderr, "[WP_AUTO] f=%u HUSK: raw mouse DOWN at (%d,%d)\n", wp_f, px.x, px.y);
+							wp_stage = 21;
+						}
+						else if (wp_stage == 21 && wp_f >= 617)
+						{
+							ICoord2D px; px.x = TheDisplay->getWidth() / 2; px.y = TheDisplay->getHeight() / 2;
+							GameMessage* up = TheMessageStream->appendMessage(GameMessage::MSG_RAW_MOUSE_LEFT_BUTTON_UP);
+							up->appendPixelArgument(px);
+							up->appendIntegerArgument(0);
+							up->appendIntegerArgument(50);
+							fprintf(stderr, "[WP_AUTO] f=%u HUSK: raw mouse UP - placement should commit\n", wp_f);
+							wp_stage = 2;
+						}
+						else if (wp_stage == 2 && wp_f >= 660)
+						{
+							wp_hSelect(wp_hDozerId);
+							GameMessage* m = TheMessageStream->appendMessage(GameMessage::MSG_DO_MOVETO);
+							Coord3D dest = wp_ccPos; dest.x -= 60.0f;
+							dest.z = TheTerrainLogic->getGroundHeight(dest.x, dest.y);
+							m->appendLocationArgument(dest);
+							fprintf(stderr, "[WP_AUTO] f=%u HUSK: dozer recalled; awaiting guard kill\n", wp_f);
+							wp_stage = 3;
+						}
+						else if (wp_stage == 3 && wp_f >= 900)
+						{
+							Object* site = nullptr;
+							for (Object* o = TheGameLogic->getFirstObject(); o; o = o->getNextObject())
+								if (o->getTemplate()->getName() == "WP_VehiclePlant") site = o;
+							fprintf(stderr, "[WP_AUTO] f=%u HUSK: site %s\n", wp_f,
+								site ? "EXISTS (will kill at f=1100 if guard has not)" : "already dead or never placed - continuing to dump");
+							wp_stage = 4;
+						}
+						else if (wp_stage == 4 && wp_f >= 1100)
+						{
+							for (Object* o = TheGameLogic->getFirstObject(); o; o = o->getNextObject())
+								if (o->getTemplate()->getName() == "WP_VehiclePlant") { o->kill(); break; }
+							fprintf(stderr, "[WP_AUTO] f=%u HUSK: killed fogged site\n", wp_f);
+							wp_stage = 5;
+						}
+						else if (wp_stage == 5 && wp_f >= 1550)
+						{
+							// object census: is the site object still alive/present?
+							for (Object* o = TheGameLogic->getFirstObject(); o; o = o->getNextObject())
+								if (o->getTemplate()->getName() == "WP_VehiclePlant")
+									fprintf(stderr, "[WP_AUTO] HUSK census: WP_VehiclePlant id=%u dead=%d destroyed=%d draw=%p\n",
+										(unsigned)o->getID(), (int)o->isEffectivelyDead(),
+										(int)o->isDestroyed(), (void*)o->getDrawable());
+							fprintf(stderr, "[WP_AUTO] f=%u HUSK: done (scene dump should have fired)\n", wp_f);
+							TheGameEngine->setQuitting(TRUE);
+							wp_stage = 6;
+						}
+					}
+					else if (wp_ghostMode)
 					{
 						static ObjectID wp_gTankId = INVALID_ID, wp_gTargetId = INVALID_ID;
 						auto wp_gSelect = [](ObjectID id) {

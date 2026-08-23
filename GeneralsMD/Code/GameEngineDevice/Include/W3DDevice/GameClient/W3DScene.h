@@ -67,6 +67,10 @@ public:
 	/// ray picking against objects in scene
 	Bool castRay(RayCollisionTestClass & raytest, Bool testAll, Int collisionType);
 
+	/// WarPowers @debug IG_TRACE scene census: print every render object (name,
+	/// class, position) to stderr — for hunting orphaned render objects
+	void wpDumpRenderObjects();
+
 	/// customizable renderer for the RTS3DScene
 	virtual void	Customized_Render( RenderInfoClass &rinfo ) override;
 	virtual void	Visibility_Check(CameraClass * camera) override;

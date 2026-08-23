@@ -2003,6 +2003,20 @@ void W3DDisplay::draw()
 {
 	//USE_PERF_TIMER(W3DDisplay_draw)
 
+	// WarPowers @debug WP_SCENE_DUMP=<frame>: one-shot scene census at (or after)
+	// that logic frame — for hunting orphaned render objects
+	{
+		static const char* wpDumpEnv = getenv("WP_SCENE_DUMP");
+		static Bool wpDumped = FALSE;
+		if (wpDumpEnv && !wpDumped && TheGameLogic &&
+				TheGameLogic->getFrame() >= (UnsignedInt)atoi(wpDumpEnv))
+		{
+			wpDumped = TRUE;
+			if (m_3DScene)
+				m_3DScene->wpDumpRenderObjects();
+		}
+	}
+
 	// GeneralsX @feature xxorza 15/04/2026 Process deferred window resize for pillarbox
 	DX8Wrapper::Pillarbox_Process_Resize();
 

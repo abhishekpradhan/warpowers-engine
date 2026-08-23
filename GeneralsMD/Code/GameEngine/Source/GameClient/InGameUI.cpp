@@ -1127,6 +1127,12 @@ InGameUI::InGameUI()
 	m_pendingGUICommand = nullptr;
 
 	// allocate an array for the placement icons
+	// GeneralsX(WarPowers): m_maxLineBuildObjects is zero-default; a zero-length
+	// array here makes every placement preview an out-of-bounds store that
+	// destroyPlacementIcons (loop bound 0) can never free — an immortal ghost
+	// building under every placed structure. Guarantee at least one slot.
+	if( TheWritableGlobalData->m_maxLineBuildObjects < 1 )
+		TheWritableGlobalData->m_maxLineBuildObjects = 1;
 	m_placeIcon = NEW Drawable* [ TheGlobalData->m_maxLineBuildObjects ];
 	for( i = 0; i < TheGlobalData->m_maxLineBuildObjects; i++ )
 		m_placeIcon[ i ] = nullptr;

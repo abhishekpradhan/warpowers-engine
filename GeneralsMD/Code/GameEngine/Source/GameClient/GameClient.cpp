@@ -852,6 +852,14 @@ void GameClient::updateFakeDrawables()
  */
 void GameClient::destroyDrawable( Drawable *draw )
 {
+	{
+		// WarPowers @debug IG_TRACE death-path breadcrumb
+		static int wpT = -1;
+		if (wpT < 0) { const char* e = getenv("IG_TRACE"); wpT = (e && *e && *e != '0') ? 1 : 0; }
+		if (wpT)
+			fprintf(stderr, "[DEATH] destroyDrawable tmpl=%s\n",
+				draw->getTemplate() ? draw->getTemplate()->getName().str() : "?");
+	}
 
 	// remove any notion of the Drawable in the in-game user interface
 	TheInGameUI->disregardDrawable( draw );

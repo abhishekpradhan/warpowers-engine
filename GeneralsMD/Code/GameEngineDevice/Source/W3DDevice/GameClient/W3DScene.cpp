@@ -320,6 +320,27 @@ void RTS3DScene::flagOccludedObjects(CameraClass * camera)
 	CollisionType is used as a mask to ignore certain types of objects.
  */
 //=============================================================================
+// ------------------------------------------------------------------------------------------------
+/** WarPowers @debug scene census — every render object with name/class/position */
+// ------------------------------------------------------------------------------------------------
+void RTS3DScene::wpDumpRenderObjects()
+{
+	Int count = 0;
+	RefRenderObjListIterator it(&RenderList);
+	for (it.First(); !it.Is_Done(); it.Next())
+	{
+		RenderObjClass *robj = it.Peek_Obj();
+		Vector3 p = robj->Get_Position();
+		DrawableInfo *di = (DrawableInfo *)robj->Get_User_Data();
+		fprintf(stderr, "[SCENE] %3d cls=%d name='%s' pos=(%.0f,%.0f,%.0f) vis=%d hidden=%d drawinfo=%p draw=%p ghost=%p\n",
+			count++, robj->Class_ID(), robj->Get_Name() ? robj->Get_Name() : "?",
+			p.X, p.Y, p.Z, (int)robj->Is_Really_Visible(), (int)robj->Is_Hidden(),
+			(void*)di, di ? (void*)di->m_drawable : nullptr, di ? (void*)di->m_ghostObject : nullptr);
+	}
+	fprintf(stderr, "[SCENE] total %d render objects\n", count);
+	fflush(stderr);
+}
+
 Bool RTS3DScene::castRay(RayCollisionTestClass & raytest, Bool testAll, Int collisionType)
 {
 // this shouldn't be necessary here, and would be an undesirable performance hit.
