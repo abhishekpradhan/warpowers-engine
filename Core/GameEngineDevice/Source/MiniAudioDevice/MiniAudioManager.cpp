@@ -249,18 +249,6 @@ void MiniAudioManager::update()
 {
 	ScopedFPUGuard fpuGuard;
 
-#ifdef __EMSCRIPTEN__
-	// The wasm resource manager runs MA_RESOURCE_MANAGER_FLAG_NO_THREADING
-	// (no pthreads) — miniaudio then REQUIRES the host to drain the job queue:
-	// even non-async file sounds enqueue their init/decode work as jobs.
-	// Without this pump every sound starts with a forever-empty data source
-	// (cursor pinned at 0, pure silence). Drain a bounded batch per frame.
-	for (int wp_j = 0; wp_j < 16; ++wp_j) {
-		if (ma_resource_manager_process_next_job(&m_resourceManager) != MA_SUCCESS)
-			break;
-	}
-#endif
-
 	// WarPowers: trace heartbeat — engine clock advancing proves the live
 	// output device is pulling from THIS ma_engine instance.
 	if (wpAudioTrace()) {
@@ -450,13 +438,22 @@ void MiniAudioManager::playAudioEvent(AudioRequest *req)
 
 	ma_uint64 frameCount = 0;
 	void *pcmFrames = NULL;
-	ma_decoder_config decCfg = ma_decoder_config_init(ma_format_s16, 0, 0);
+	// WarPowers: request a CONCRETE output format. With channels/rate 0
+	// ("native"), ma_decode_memory decodes fine but does NOT write the real
+	// format back into the config — the audio buffer below was then created
+	// with 0 channels: zero-byte frames, cursor pinned at 0, total silence
+	// on every wasm sound while ma_sound_start still reported success.
+	ma_decoder_config decCfg = ma_decoder_config_init(ma_format_s16, 2, 44100);
 	ma_result result = ma_decode_memory(fileData.data(), (size_t)bytesRead, &decCfg, &frameCount, &pcmFrames);
 	if (result != MA_SUCCESS || frameCount == 0 || pcmFrames == NULL) {
 		fprintf(stderr, "AUDIO: decode failed (%d) for '%s'\n", result, fileToPlay.str());
 		releasePlayingAudio(audio);
 		return;
 	}
+	if (wpAudioTrace())
+		fprintf(stderr, "[AUDIODEC] '%s' frames=%llu fmt=%d ch=%u rate=%u\n",
+			fileToPlay.str(), (unsigned long long)frameCount,
+			(int)decCfg.format, decCfg.channels, decCfg.sampleRate);
 
 	// Same ownership contract as the FFmpeg path below: init_copy owns a
 	// copy, the decode allocation is freed here.
@@ -983,6 +980,19 @@ void MiniAudioManager::openDevice(void)
 	ma_sound_group_init(&m_engine, 0, NULL, &m_soundGroup);
 	ma_sound_group_init(&m_engine, 0, NULL, &m_sound3DGroup);
 	ma_sound_group_init(&m_engine, 0, NULL, &m_speechGroup);
+	// WarPowers: be explicit — a group whose node is not started never has its
+	// inputs read, which silences every sound routed through it.
+	ma_sound_group_start(&m_musicGroup);
+	ma_sound_group_start(&m_soundGroup);
+	ma_sound_group_start(&m_sound3DGroup);
+	ma_sound_group_start(&m_speechGroup);
+	if (wpAudioTrace())
+		fprintf(stderr, "[AUDIOGRP] groups playing: music=%d sound=%d s3d=%d speech=%d engineNode=%p\n",
+			(int)ma_sound_group_is_playing(&m_musicGroup),
+			(int)ma_sound_group_is_playing(&m_soundGroup),
+			(int)ma_sound_group_is_playing(&m_sound3DGroup),
+			(int)ma_sound_group_is_playing(&m_speechGroup),
+			(void*)ma_engine_get_endpoint(&m_engine));
 
 	fprintf(stderr, "AUDIO: MiniAudio backend loaded - version %s, device: %s, playback devices: %d\n",
 		ma_version_string(),
