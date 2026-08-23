@@ -936,6 +936,52 @@ static Object *findObjectToRepair( Object *dozer )
 }
 
 //-------------------------------------------------------------------------------------------------
+// GeneralsX(WarPowers): a player command to a dozer cancels its build task, leaving the
+// construction site abandoned with no visible way to continue it. Idle dozers now pick up
+// nearby abandoned sites on their own (also gives "place several, dozer builds them in turn").
+//-------------------------------------------------------------------------------------------------
+static const Real DOZER_AUTO_RESUME_RANGE = 600.0f;		// roughly a base footprint
+static Object *findAbandonedConstructionSite( Object *dozer )
+{
+
+	// sanity
+	if( dozer == nullptr )
+		return nullptr;
+
+	PartitionFilterSamePlayer filter1( dozer->getControllingPlayer() );
+	PartitionFilterAcceptByKindOf filter2( MAKE_KINDOF_MASK( KINDOF_STRUCTURE ),
+																				 KINDOFMASK_NONE );
+	PartitionFilterSameMapStatus filterMapStatus(dozer);
+	PartitionFilter *filters[] = { &filter1, &filter2, &filterMapStatus, nullptr };
+	ObjectIterator *iter = ThePartitionManager->iterateObjectsInRange( dozer->getPosition(),
+																																		 DOZER_AUTO_RESUME_RANGE,
+																																		 FROM_CENTER_2D,
+																																		 filters );
+
+	MemoryPoolObjectHolder hold( iter );
+	Object *obj;
+	Object *closestSite = nullptr;
+	Real closestSiteDistSqr = 0.0f;
+	for( obj = iter->first(); obj; obj = iter->next() )
+	{
+
+		if( TheActionManager->canResumeConstructionOf( dozer, obj, CMD_FROM_AI ) == FALSE )
+			continue;
+
+		Real distSqr = ThePartitionManager->getDistanceSquared( dozer, obj, FROM_CENTER_2D );
+		if( closestSite == nullptr || distSqr < closestSiteDistSqr )
+		{
+			closestSite = obj;
+			closestSiteDistSqr = distSqr;
+		}
+
+	}
+
+	return closestSite;
+
+}
+
+//-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
 static Object *findMine( Object *dozer )
 {
@@ -1127,9 +1173,17 @@ StateReturnType DozerPrimaryIdleState::update()
 		//
 		m_idleTooLongTimestamp = TheGameLogic->getFrame();
 
+		// GeneralsX(WarPowers): abandoned construction sites come first — a build the player
+		// paid for beats housekeeping
+		Object *abandonedSite = findAbandonedConstructionSite( dozer );
+		if( abandonedSite )
+		{
+
+			ai->aiResumeConstruction( abandonedSite, CMD_FROM_AI );
+
+		}
 		// try to find something around us that we can repair
-		Object *repairTarget = findObjectToRepair( dozer );
-		if( repairTarget )
+		else if( Object *repairTarget = findObjectToRepair( dozer ) )
 		{
 
 			// issue the command
