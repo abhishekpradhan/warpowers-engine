@@ -1069,83 +1069,83 @@ void GameEngine::update()
 							if (wp_ccId != INVALID_ID)
 							{
 								wp_select(wp_ccId);
-								const ThingTemplate* tt = TheThingFactory->findTemplate("WP_Surveyor");
+								const ThingTemplate* tt = TheThingFactory->findTemplate("WP_Fabricator");
 								if (tt)
 								{
 									GameMessage* m = TheMessageStream->appendMessage(GameMessage::MSG_QUEUE_UNIT_CREATE);
 									m->appendIntegerArgument(tt->getTemplateID());
 									m->appendIntegerArgument(1);
-									fprintf(stderr, "[WP_AUTO] f=%u BASE: queued WP_Surveyor\n", wp_f);
+									fprintf(stderr, "[WP_AUTO] f=%u BASE: queued WP_Fabricator\n", wp_f);
 								}
 								wp_stage = 10;
 							}
 						}
 						else if (wp_stage == 10 && wp_f >= 300)
 						{
-							Object* dz = wp_findOurs("WP_Surveyor");
+							Object* dz = wp_findOurs("WP_Fabricator");
 							if (dz)
 							{
 								wp_dozerId = dz->getID();
 								wp_select(wp_dozerId);
-								const ThingTemplate* tt = TheThingFactory->findTemplate("WP_PowerPlant");
+								const ThingTemplate* tt = TheThingFactory->findTemplate("WP_PowerArray");
 								GameMessage* m = TheMessageStream->appendMessage(GameMessage::MSG_DOZER_CONSTRUCT);
 								m->appendIntegerArgument(tt->getTemplateID());
 								Coord3D loc = wp_ccPos; loc.x -= 75.0f; loc.y += 65.0f;
 								m->appendLocationArgument(loc);
 								m->appendRealArgument(0.0f);
-								fprintf(stderr, "[WP_AUTO] f=%u BASE: dozer id=%u -> construct PowerPlant at (%.0f,%.0f)\n",
+								fprintf(stderr, "[WP_AUTO] f=%u BASE: dozer id=%u -> construct PowerArray at (%.0f,%.0f)\n",
 									wp_f, (unsigned)wp_dozerId, loc.x, loc.y);
 								wp_stage = 11;
 							}
 							else if (wp_f >= 900)
 							{
-								fprintf(stderr, "[WP_AUTO] f=%u BASE FAIL: no Surveyor spawned\n", wp_f);
+								fprintf(stderr, "[WP_AUTO] f=%u BASE FAIL: no Fabricator spawned\n", wp_f);
 								wp_stage = 99;
 							}
 						}
 						else if (wp_stage == 11 && (wp_f % 30) == 0)
 						{
-							Object* pp = wp_findOurs("WP_PowerPlant");
+							Object* pp = wp_findOurs("WP_PowerArray");
 							if (pp)
 							{
 								if (wp_ppId == INVALID_ID)
 								{
 									wp_ppId = pp->getID();
-									fprintf(stderr, "[WP_AUTO] f=%u BASE: PowerPlant placed id=%u\n", wp_f, (unsigned)wp_ppId);
+									fprintf(stderr, "[WP_AUTO] f=%u BASE: PowerArray placed id=%u\n", wp_f, (unsigned)wp_ppId);
 								}
 								if (!pp->getStatusBits().test(OBJECT_STATUS_UNDER_CONSTRUCTION))
 								{
-									fprintf(stderr, "[WP_AUTO] f=%u BASE: PowerPlant CONSTRUCTED\n", wp_f);
+									fprintf(stderr, "[WP_AUTO] f=%u BASE: PowerArray CONSTRUCTED\n", wp_f);
 									wp_select(wp_dozerId);
-									const ThingTemplate* tt = TheThingFactory->findTemplate("WP_WarFactory");
+									const ThingTemplate* tt = TheThingFactory->findTemplate("WP_VehiclePlant");
 									GameMessage* m = TheMessageStream->appendMessage(GameMessage::MSG_DOZER_CONSTRUCT);
 									m->appendIntegerArgument(tt->getTemplateID());
 									Coord3D loc = wp_ccPos; loc.x += 80.0f; loc.y += 70.0f;
 									m->appendLocationArgument(loc);
 									m->appendRealArgument(0.0f);
-									fprintf(stderr, "[WP_AUTO] f=%u BASE: construct WarFactory at (%.0f,%.0f)\n", wp_f, loc.x, loc.y);
+									fprintf(stderr, "[WP_AUTO] f=%u BASE: construct VehiclePlant at (%.0f,%.0f)\n", wp_f, loc.x, loc.y);
 									wp_stage = 12;
 								}
 							}
 							else if (wp_f >= 3000)
 							{
-								fprintf(stderr, "[WP_AUTO] f=%u BASE FAIL: PowerPlant never appeared\n", wp_f);
+								fprintf(stderr, "[WP_AUTO] f=%u BASE FAIL: PowerArray never appeared\n", wp_f);
 								wp_stage = 99;
 							}
 						}
 						else if (wp_stage == 12 && (wp_f % 30) == 0)
 						{
-							Object* wf = wp_findOurs("WP_WarFactory");
+							Object* wf = wp_findOurs("WP_VehiclePlant");
 							if (wf)
 							{
 								if (wp_wfId == INVALID_ID)
 								{
 									wp_wfId = wf->getID();
-									fprintf(stderr, "[WP_AUTO] f=%u BASE: WarFactory placed id=%u\n", wp_f, (unsigned)wp_wfId);
+									fprintf(stderr, "[WP_AUTO] f=%u BASE: VehiclePlant placed id=%u\n", wp_f, (unsigned)wp_wfId);
 								}
 								if (!wf->getStatusBits().test(OBJECT_STATUS_UNDER_CONSTRUCTION))
 								{
-									fprintf(stderr, "[WP_AUTO] f=%u BASE: WarFactory CONSTRUCTED\n", wp_f);
+									fprintf(stderr, "[WP_AUTO] f=%u BASE: VehiclePlant CONSTRUCTED\n", wp_f);
 									wp_select(wp_wfId);
 									const ThingTemplate* tt = TheThingFactory->findTemplate("WP_Tank");
 									GameMessage* m = TheMessageStream->appendMessage(GameMessage::MSG_QUEUE_UNIT_CREATE);
@@ -1157,7 +1157,7 @@ void GameEngine::update()
 							}
 							else if (wp_f >= 6000)
 							{
-								fprintf(stderr, "[WP_AUTO] f=%u BASE FAIL: WarFactory never appeared\n", wp_f);
+								fprintf(stderr, "[WP_AUTO] f=%u BASE FAIL: VehiclePlant never appeared\n", wp_f);
 								wp_stage = 99;
 							}
 						}
