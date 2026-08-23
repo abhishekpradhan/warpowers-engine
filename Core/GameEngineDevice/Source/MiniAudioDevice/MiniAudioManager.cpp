@@ -562,6 +562,16 @@ void MiniAudioManager::playAudioEvent(AudioRequest *req)
 #endif // RTS_HAS_FFMPEG
 
 	ma_sound *sound = (ma_sound *)malloc(sizeof(ma_sound));
+#ifdef __EMSCRIPTEN__
+	// WarPowers wasm fix (2/2): sounds routed through ma_sound_group never
+	// enter the node graph on this emscripten build — the group's endpoint
+	// attachment is broken (explicit ma_sound_group_start does not help) and
+	// the sound-node processor is never invoked. Attaching sounds directly
+	// to the engine endpoint mixes correctly. Per-sound volumes are applied
+	// by this manager anyway; only group-level master faders are lost.
+	// Root-causing the group attachment is upstream-PR material.
+	groupToUse = NULL;
+#endif
 	result = ma_sound_init_from_data_source(&m_engine, audioBuffer, flags, groupToUse, sound);
 	if (result != MA_SUCCESS) {
 		DEBUG_LOG(("MiniAudio: Failed to init sound: %d for '%s'\n", result, fileToPlay.str()));
