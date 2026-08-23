@@ -1036,6 +1036,7 @@ void GameEngine::update()
 					const UnsignedInt wp_f = TheGameLogic->getFrame();
 					static UnsignedInt wp_stage = 0;
 					static ObjectID wp_ccId = INVALID_ID, wp_enemyCcId = INVALID_ID, wp_tankId = INVALID_ID;
+					static ObjectID wp_stageTank2 = INVALID_ID;
 					static Coord3D wp_ccPos = {0,0,0};
 					const Int wp_localIdx = ThePlayerList->getLocalPlayer() ? ThePlayerList->getLocalPlayer()->getPlayerIndex() : -1;
 
@@ -1213,27 +1214,41 @@ void GameEngine::update()
 						}
 						if (tt)
 						{
-							GameMessage* m = TheMessageStream->appendMessage(GameMessage::MSG_QUEUE_UNIT_CREATE);
-							m->appendIntegerArgument(tt->getTemplateID());
-							m->appendIntegerArgument(1);
-							fprintf(stderr, "[WP_AUTO] f=%u queued WP_Tank (templateID=%d)\n", wp_f, (int)tt->getTemplateID());
+							Int wp_count = wp_buildOnly ? 1 : 2;   // full mode fields a pair
+							for (Int q = 0; q < wp_count; ++q)
+							{
+								GameMessage* m = TheMessageStream->appendMessage(GameMessage::MSG_QUEUE_UNIT_CREATE);
+								m->appendIntegerArgument(tt->getTemplateID());
+								m->appendIntegerArgument(1);
+							}
+							fprintf(stderr, "[WP_AUTO] f=%u queued %dx WP_Tank (templateID=%d)\n", wp_f, wp_buildOnly ? 1 : 2, (int)tt->getTemplateID());
 						}
 						wp_stage = 2;
 					}
 					else if (wp_stage == 2 && wp_f >= 330)
 					{
+						static ObjectID wp_tankId2 = INVALID_ID;
+						Int found = 0;
 						for (Object* o = TheGameLogic->getFirstObject(); o; o = o->getNextObject())
 						{
 							if (o->getTemplate()->getName() == "WP_Tank" &&
 								o->getControllingPlayer() && o->getControllingPlayer()->getPlayerIndex() == wp_localIdx)
-							{ wp_tankId = o->getID(); break; }
+							{
+								if (found == 0) wp_tankId = o->getID();
+								else wp_tankId2 = o->getID();
+								if (++found >= 2) break;
+							}
 						}
-						if (wp_tankId != INVALID_ID)
+						Int need = wp_buildOnly ? 1 : 2;
+						if (found >= need)
 						{
 							GameMessage* m = TheMessageStream->appendMessage(GameMessage::MSG_CREATE_SELECTED_GROUP);
 							m->appendBooleanArgument(TRUE);
 							m->appendObjectIDArgument(wp_tankId);
-							fprintf(stderr, "[WP_AUTO] f=%u tank spawned id=%u, selected\n", wp_f, (unsigned)wp_tankId);
+							if (wp_tankId2 != INVALID_ID)
+								m->appendObjectIDArgument(wp_tankId2);
+							fprintf(stderr, "[WP_AUTO] f=%u fleet ready (%d tanks), selected\n", wp_f, found);
+							wp_stageTank2 = wp_tankId2;
 							wp_stage = 3;
 						}
 						else if (wp_f >= 600)
@@ -1249,21 +1264,34 @@ void GameEngine::update()
 					}
 					else if (wp_stage == 3 && wp_f >= 360)
 					{
+						// stay home: parking a lone tank inside enemy guard range is
+						// how the old smoke test started losing once return fire
+						// worked. The duel stage issues the real attack order.
 						GameMessage* m = TheMessageStream->appendMessage(GameMessage::MSG_DO_MOVETO);
 						Coord3D dest = wp_ccPos;
-						dest.x += 150.0f;
+						dest.x += 60.0f;
 						m->appendLocationArgument(dest);
 						fprintf(stderr, "[WP_AUTO] f=%u move order to (%.0f,%.0f)\n", wp_f, dest.x, dest.y);
 						wp_stage = 4;
 					}
-					else if (wp_stage == 4 && wp_f >= 700)
+					else if (wp_stage == 4 && wp_f >= 550)
 					{
 						// clear enemy combat vehicles (they guard the CC path) before the push
 						static ObjectID wp_foeId = INVALID_ID;
 						Object* wp_tank = TheGameLogic->findObjectByID(wp_tankId);
 						if (!wp_tank || wp_tank->isEffectivelyDead())
 						{
-							fprintf(stderr, "[WP_AUTO] f=%u FAIL: our tank died before the CC push\n", wp_f);
+							Object* second = TheGameLogic->findObjectByID(wp_stageTank2);
+							if (second && !second->isEffectivelyDead())
+							{
+								wp_tankId = wp_stageTank2;   // promote the survivor
+								wp_stageTank2 = INVALID_ID;
+								wp_tank = second;
+							}
+						}
+						if (!wp_tank || wp_tank->isEffectivelyDead())
+						{
+							fprintf(stderr, "[WP_AUTO] f=%u FAIL: our tanks died before the CC push\n", wp_f);
 							wp_stage = 99;
 						}
 						else
@@ -1287,6 +1315,8 @@ void GameEngine::update()
 								GameMessage* s2 = TheMessageStream->appendMessage(GameMessage::MSG_CREATE_SELECTED_GROUP);
 								s2->appendBooleanArgument(TRUE);
 								s2->appendObjectIDArgument(wp_tankId);
+								if (wp_stageTank2 != INVALID_ID)
+									s2->appendObjectIDArgument(wp_stageTank2);
 								GameMessage* m = TheMessageStream->appendMessage(GameMessage::MSG_DO_ATTACK_OBJECT);
 								m->appendObjectIDArgument(wp_foeId);
 								fprintf(stderr, "[WP_AUTO] f=%u duel: attack enemy vehicle id=%u\n", wp_f, (unsigned)wp_foeId);
@@ -1305,6 +1335,8 @@ void GameEngine::update()
 								GameMessage* s2 = TheMessageStream->appendMessage(GameMessage::MSG_CREATE_SELECTED_GROUP);
 								s2->appendBooleanArgument(TRUE);
 								s2->appendObjectIDArgument(wp_tankId);
+								if (wp_stageTank2 != INVALID_ID)
+									s2->appendObjectIDArgument(wp_stageTank2);
 								GameMessage* m = TheMessageStream->appendMessage(GameMessage::MSG_DO_ATTACK_OBJECT);
 								m->appendObjectIDArgument(wp_enemyCcId);
 								fprintf(stderr, "[WP_AUTO] f=%u attack order on enemy CC id=%u\n", wp_f, (unsigned)wp_enemyCcId);
