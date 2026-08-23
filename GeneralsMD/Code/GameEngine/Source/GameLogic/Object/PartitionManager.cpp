@@ -1627,6 +1627,22 @@ ObjectShroudStatus PartitionData::getShroudedStatus(Int playerIndex)
 		return m_shroudedness[playerIndex];
 	}
 
+	// GeneralsX(WarPowers): a player has perfect knowledge of their own objects —
+	// never fog-classify them for their owner. Without this, an own construction
+	// site outside friendly vision freezes into a ghost snapshot: a label-less
+	// translucent husk that ignores every icon-UI fix because snapshots have no
+	// drawable. Own objects render live (and labeled) everywhere.
+	if (m_object && m_object->getControllingPlayer() &&
+			m_object->getControllingPlayer()->getPlayerIndex() == playerIndex)
+	{
+		if (m_ghostObject && m_shroudednessPrevious[playerIndex] == OBJECTSHROUD_FOGGED)
+			m_ghostObject->freeSnapShot(playerIndex);
+		m_everSeenByPlayer[playerIndex] = true;
+		m_shroudedness[playerIndex] = OBJECTSHROUD_CLEAR;
+		m_shroudednessPrevious[playerIndex] = OBJECTSHROUD_CLEAR;
+		return OBJECTSHROUD_CLEAR;
+	}
+
 #ifndef DISABLE_INVALID_PREVENTION
 	if (m_shroudedness[playerIndex] == OBJECTSHROUD_INVALID || m_shroudedness[playerIndex] == OBJECTSHROUD_INVALID_BUT_PREVIOUS_VALID)
 	{

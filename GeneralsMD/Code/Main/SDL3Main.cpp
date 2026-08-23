@@ -243,6 +243,9 @@ int main(int argc, char* argv[])
 
 	fprintf(stderr, "=================================================\n");
 	fprintf(stderr, " War Powers (GeneralsX engine)\n");
+	// WarPowers @debug build stamp so "which build is this session running" is
+	// answerable from any log or console
+	fprintf(stderr, " build %s %s\n", __DATE__, __TIME__);
 	fprintf(stderr, " SDL3 + DXVK Build\n");
 	fprintf(stderr, "=================================================\n\n");
 
