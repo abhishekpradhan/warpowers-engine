@@ -138,6 +138,14 @@ void W3DPowerDraw( GameWindow *window, WinInstanceData *instData )
 	window->winGetScreenPosition( &pos.x, &pos.y );
 	window->winGetSize( &size.x, &size.y );
 
+	// WarPowers: the meter owns its whole look - trough fill + border here
+	// instead of a decorative sibling window (an overlapping sibling wins
+	// the input hit-test and eats the hover tooltip).
+	TheDisplay->drawFillRect( pos.x - 2, pos.y - 2, size.x + 4, size.y + 4,
+														GameMakeColor( 16, 20, 27, 255 ) );
+	TheDisplay->drawOpenRect( pos.x - 2, pos.y - 2, size.x + 4, size.y + 4,
+														1.0f, GameMakeColor( 120, 104, 60, 255 ) );
+
 	static Real pixelsPerInterval = size.x / TheGlobalData->m_powerBarIntervals;
 	Int delta = TheGlobalData->m_powerBarYellowRange;
 
