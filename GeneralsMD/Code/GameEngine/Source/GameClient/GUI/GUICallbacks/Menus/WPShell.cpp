@@ -172,8 +172,13 @@ extern Bool g_wpMenuCurtain;  // WarPowers @feature menu curtain
 
 void WPMainMenuInit( WindowLayout *layout, void *userData )
 {
-	// The menu is up — drop the exit curtain.
-	g_wpMenuCurtain = FALSE;
+	// The menu is up — drop the exit curtain. Exception: with a match result
+	// pending, the score screen is about to push over this menu; keep the
+	// curtain up through the 1-3 frame menu flash so the player sees
+	// banner -> black -> stats, not banner -> black -> menu blink -> stats.
+	// (WPScoreInit drops it; WPMainMenuUpdate carries a failsafe.)
+	if( !s_wpResult.valid )
+		g_wpMenuCurtain = FALSE;
 	// The intro render-freeze is normally cleared by the stock MainMenuInit;
 	// this layout owns that job now (see Intro::doPostIntro).
 	TheWritableGlobalData->m_breakTheMovie = FALSE;
@@ -214,6 +219,23 @@ void WPMainMenuUpdate( WindowLayout *layout, void *userData )
 		{
 			TheShell->push( "Menus/WPScore.wnd" );
 		}
+
+		// Failsafe: the curtain stays up while the result is pending (see
+		// WPMainMenuInit). If the score screen never arrives (missing
+		// layout, wedged push), don't hold a black screen forever — give
+		// up after ~2s of updates and show the menu.
+		static Int s_wpScoreWaitTicks = 0;
+		if( g_wpMenuCurtain )
+		{
+			if( ++s_wpScoreWaitTicks > 60 )
+			{
+				s_wpResult.valid = FALSE;
+				g_wpMenuCurtain = FALSE;
+				s_wpScoreWaitTicks = 0;
+			}
+		}
+		else
+			s_wpScoreWaitTicks = 0;
 	}
 }
 
@@ -420,6 +442,10 @@ static void wpSetScoreLine( const char *winName, const UnicodeString &text )
 
 void WPScoreInit( WindowLayout *layout, void *userData )
 {
+	// Stats are on screen — drop the match-exit curtain (kept up through the
+	// underlying menu's init when a result was pending).
+	g_wpMenuCurtain = FALSE;
+
 	wpScoreContinueID = TheNameKeyGenerator->nameToKey( "WPScore.wnd:ButtonContinue" );
 
 	GameWindow *banner = TheWindowManager->winGetWindowFromId( nullptr,
