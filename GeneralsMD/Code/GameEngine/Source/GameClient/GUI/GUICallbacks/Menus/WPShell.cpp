@@ -318,16 +318,7 @@ static void wpSkirmishRefreshMapButton( void )
 	w = TheWindowManager->winGetWindowFromId( nullptr,
 		TheNameKeyGenerator->nameToKey( "WPSkirmish.wnd:MapDesc" ) );
 	if (w)
-	{
-		// "n / N" tail makes the rotation explicit - the arrows alone don't
-		// say how many battlefields there are.
-		UnicodeString desc = TheGameText->fetch( s_wpMaps[s_wpMapIdx].desc );
-		UnicodeString tail;
-		tail.format( L"  \u2014  %d / %d", (int)(s_wpMapIdx + 1),
-			(int)ARRAY_SIZE(s_wpMaps) );
-		desc.concat( tail );
-		GadgetStaticTextSetText( w, desc );
-	}
+		GadgetStaticTextSetText( w, TheGameText->fetch( s_wpMaps[s_wpMapIdx].desc ) );
 }
 
 void WPSkirmishInit( WindowLayout *layout, void *userData )
