@@ -1108,6 +1108,25 @@ void Locomotor::locoUpdate_moveTowardsPosition(Object* obj, const Coord3D& goalP
 	}
 
 	handleBehaviorZ(obj, physics, goalPos);
+
+	// WarPowers @debug IG_TRACE aircraft movement forensics
+	{
+		static const bool wpT = getenv("IG_TRACE") && *getenv("IG_TRACE") != '0';
+		if (wpT && (m_template->m_surfaces & LOCOMOTORSURFACE_AIR) &&
+			(TheGameLogic->getFrame() % 30) == 0)
+		{
+			const Coord3D *p = obj->getPosition();
+			const Coord3D *v = physics->getVelocity();
+			const Coord3D *d2 = obj->getUnitDirectionVector2D();
+			fprintf(stderr, "[WPAIR] id=%u pos=(%.0f,%.0f,%.0f) goal=(%.0f,%.0f) dist=%.0f want=%.2f fwd2D=%.2f vel=(%.2f,%.2f,%.2f) dir=(%.2f,%.2f) ang=%.2f turn=%d brake=%d accel=%.3f\n",
+				(unsigned)obj->getID(), p->x, p->y, p->z, goalPos.x, goalPos.y,
+				onPathDistToGoal, desiredSpeed, physics->getForwardSpeed2D(),
+				v->x, v->y, v->z, d2->x, d2->y, (float)obj->getOrientation(),
+				(int)physics->getTurning(), (int)getFlag(IS_BRAKING),
+				(float)getMaxAcceleration(obj->getBodyModule()->getDamageState()));
+			fflush(stderr);
+		}
+	}
 	// Objects that are braking don't follow the normal physics, so they end up at their destination exactly.
 	obj->setStatus( MAKE_OBJECT_STATUS_MASK( OBJECT_STATUS_BRAKING ), getFlag(IS_BRAKING) );
 
