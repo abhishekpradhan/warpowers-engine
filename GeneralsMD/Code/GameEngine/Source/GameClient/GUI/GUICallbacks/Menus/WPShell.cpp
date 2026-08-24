@@ -112,6 +112,20 @@ void WPRecordMatchResult( Bool victory )
 #endif
 }
 
+#ifdef __EMSCRIPTEN__
+// ----------------------------------------------------------------------------
+// Page overlay bridge: the HTML control strip drives the master volume live.
+// (The in-engine Options screen was retired in favor of the overlay.)
+// ----------------------------------------------------------------------------
+extern "C" EMSCRIPTEN_KEEPALIVE void wpSetMasterVolume( int pct )
+{
+	if( pct < 0 ) pct = 0;
+	if( pct > 100 ) pct = 100;
+	if( TheAudio )
+		TheAudio->setVolume( ((Real)pct) / 100.0f, (AudioAffect)AudioAffect_All );
+}
+#endif
+
 // ----------------------------------------------------------------------------
 // Shared: start a map through the command-line path (menu-mode: m_initialFile
 // stays empty, so the post-match flow returns here instead of exiting).
