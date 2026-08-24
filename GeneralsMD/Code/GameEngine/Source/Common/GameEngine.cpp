@@ -1046,6 +1046,9 @@ void GameEngine::update()
 				// dozer is recalled, guard kills the 1HP site. Pair with
 				// WP_SCENE_DUMP=<frame> to census the scene after the death.
 				static const Bool wp_huskMode = wp_autoEnv && strcmp(wp_autoEnv, "husk") == 0;
+				// WP_AUTOTEST=defeat kills the player CC to exercise the WP_Lose map
+				// script -> DEFEAT screen (Menus/Defeat.wnd)
+				static const Bool wp_defeatMode = wp_autoEnv && strcmp(wp_autoEnv, "defeat") == 0;
 				if (wp_auto && TheGameLogic && TheGameLogic->isInGame() && ThePlayerList)
 				{
 					const UnsignedInt wp_f = TheGameLogic->getFrame();
@@ -1055,7 +1058,19 @@ void GameEngine::update()
 					static Coord3D wp_ccPos = {0,0,0};
 					const Int wp_localIdx = ThePlayerList->getLocalPlayer() ? ThePlayerList->getLocalPlayer()->getPlayerIndex() : -1;
 
-					if (wp_huskMode)
+					if (wp_defeatMode)
+					{
+						if (wp_stage == 0 && wp_f >= 300)
+						{
+							for (Object* o = TheGameLogic->getFirstObject(); o; o = o->getNextObject())
+								if (o->getTemplate()->isKindOf(KINDOF_COMMANDCENTER) &&
+									o->getControllingPlayer() &&
+									o->getControllingPlayer()->getPlayerIndex() == wp_localIdx)
+								{ o->kill(); fprintf(stderr, "[WP_AUTO] f=%u DEFEAT: killed own CC - defeat screen expected\n", wp_f); }
+							wp_stage = 1;
+						}
+					}
+					else if (wp_huskMode)
 					{
 						static ObjectID wp_hDozerId = INVALID_ID;
 						auto wp_hSelect = [](ObjectID id) {
@@ -1641,7 +1656,23 @@ static void igrotekaFrameTick(void* arg)
 	}
 	try
 	{
-		engine->update();
+		// WarPowers @fix throttled-tab catch-up: hidden/occluded tabs clamp RAF
+		// to ~1Hz, which used to crawl game time to a nearly-frozen trickle
+		// while audio kept playing. Run up to 10 updates per tick so game time
+		// tracks wall time (30 logic fps target).
+		static double wp_lastTickMs = 0.0;
+		double wp_nowMs = emscripten_get_now();
+		int wp_steps = 1;
+		if (wp_lastTickMs > 0.0)
+		{
+			double wp_dt = wp_nowMs - wp_lastTickMs;
+			wp_steps = (int)(wp_dt / (1000.0 / 30.0));
+			if (wp_steps < 1) wp_steps = 1;
+			if (wp_steps > 10) wp_steps = 10;
+		}
+		wp_lastTickMs = wp_nowMs;
+		for (int wp_i = 0; wp_i < wp_steps && !engine->getQuitting(); wp_i++)
+			engine->update();
 	}
 	catch (INIException e)
 	{

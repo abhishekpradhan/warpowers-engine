@@ -1638,6 +1638,11 @@ void INI::initFromINIMulti( void *what, const MultiIniFieldParse& parseTableList
 
 				if (!found)
 				{
+					// GeneralsX(WarPowers): unknown fields died silently in release
+					// (DEBUG_CRASH compiles out) — print loudly like unknown blocks do
+					fprintf(stderr, "FATAL: [LINE: %d - FILE: '%s'] Unknown field '%s'\n",
+						INI::getLineNum(), INI::getFilename().str(), field);
+					fflush(stderr);
 					DEBUG_CRASH( ("[LINE: %d - FILE: '%s'] Unknown field '%s' in block '%s'",
 														 INI::getLineNum(), INI::getFilename().str(), field, m_curBlockStart) );
 				}

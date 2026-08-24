@@ -986,6 +986,20 @@ void MiniAudioManager::openDevice(void)
 		return;
 	}
 
+	// WarPowers @feature WP_VOLUME=0..100 scales the master engine volume
+	// (the web page persists the user's slider in localStorage and forwards
+	// it through ENV at boot)
+	{
+		const char* wpVol = getenv("WP_VOLUME");
+		if (wpVol && *wpVol) {
+			float v = (float)atoi(wpVol) / 100.0f;
+			if (v < 0.0f) v = 0.0f;
+			if (v > 1.0f) v = 1.0f;
+			ma_engine_set_volume(&m_engine, v);
+			fprintf(stderr, "AUDIO: master volume from WP_VOLUME: %.2f\n", v);
+		}
+	}
+
 	ma_sound_group_init(&m_engine, 0, NULL, &m_musicGroup);
 	ma_sound_group_init(&m_engine, 0, NULL, &m_soundGroup);
 	ma_sound_group_init(&m_engine, 0, NULL, &m_sound3DGroup);
