@@ -355,6 +355,12 @@ WindowMsgHandledType WPOptionsSystem( GameWindow *window, UnsignedInt msg,
 				if( volume > 1.0f ) volume = 1.0f;
 				if( TheAudio )
 					TheAudio->setVolume( volume, (AudioAffect)AudioAffect_All );
+#ifdef __EMSCRIPTEN__
+				// Persist across sessions; the boot page seeds WP_VOLUME
+				// from this key.
+				EM_ASM({ try { localStorage.setItem('wpVolume', String($0)); } catch (e) {} },
+					(int)mData2);
+#endif
 			}
 			break;
 		}
