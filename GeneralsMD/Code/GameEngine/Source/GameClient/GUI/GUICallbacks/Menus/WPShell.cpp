@@ -301,6 +301,8 @@ static const WPMapEntry s_wpMaps[] = {
 	{ "WP:MapFlats", "WP:MapFlatsDesc", "Maps\\WPTest\\WPTest.map",   "Maps\\WPTestJ\\WPTestJ.map" },
 	{ "WP:MapRidge", "WP:MapRidgeDesc", "Maps\\WPRidge\\WPRidge.map", "Maps\\WPRidgeJ\\WPRidgeJ.map" },
 	{ "WP:MapScrap", "WP:MapScrapDesc", "Maps\\WPScrap\\WPScrap.map", "Maps\\WPScrapJ\\WPScrapJ.map" },
+	{ "WP:MapBasin", "WP:MapBasinDesc", "Maps\\WPBasin\\WPBasin.map", "Maps\\WPBasinJ\\WPBasinJ.map" },
+	{ "WP:MapRange", "WP:MapRangeDesc", "Maps\\WPRange\\WPRange.map", "Maps\\WPRangeJ\\WPRangeJ.map" },
 };
 static Int s_wpMapIdx = 0;
 static NameKeyType wpMapPrevID = NAMEKEY_INVALID;
