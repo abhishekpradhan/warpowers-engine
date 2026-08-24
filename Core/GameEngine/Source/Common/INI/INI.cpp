@@ -467,6 +467,15 @@ UnsignedInt INI::load( AsciiString filename, INILoadType loadType, Xfer *pXfer )
 						snprintf(buff, ARRAY_SIZE(buff), "Error parsing INI file '%s' (Line: '%s')\n",
 							m_filename.str(), currentLine.str());
 
+						// WarPowers: name the offender on stderr - in release the
+						// DEBUG_CRASHes inside block parsers are compiled out and the
+						// rethrown exception kills init as a SILENT exit (the
+						// IdleAnimation+LOOP forensics loop). Block + file is enough
+						// to bisect any data error without a debug build.
+						fprintf(stderr, "FATAL INI: error parsing block '%s' in file '%s' (line: '%s')\n",
+							token, m_filename.str(), currentLine.str());
+						fflush(stderr);
+
 						throw INIException(buff);
 					}
 					#ifdef DEBUG_CRASHING

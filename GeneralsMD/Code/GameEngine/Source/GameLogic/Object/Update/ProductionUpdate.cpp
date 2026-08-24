@@ -716,6 +716,20 @@ UpdateSleepTime ProductionUpdate::update()
 																	INT_TO_REAL( totalProductionFrames ) *
 																	100.0f;
 
+	// WarPowers @debug IG_TRACE production forensics (wasm-only stall hunt)
+	{
+		static const bool wpT = getenv("IG_TRACE") && *getenv("IG_TRACE") != '0';
+		if (wpT && (production->m_framesUnderConstruction % 60) == 1)
+		{
+			fprintf(stderr, "[WPPROD] '%s' frames=%d total=%d pct=%.1f energyRatio=%.3f\n",
+				production->m_type == PRODUCTION_UNIT ? production->m_objectToProduce->getName().str() : "upgrade",
+				(int)production->m_framesUnderConstruction, (int)totalProductionFrames,
+				(float)production->m_percentComplete,
+				(float)player->getEnergy()->getEnergySupplyRatio());
+			fflush(stderr);
+		}
+	}
+
 	// if we've reached 100% or more we're done, tada!
 	if( production->m_percentComplete >= 100.0f )
 	{

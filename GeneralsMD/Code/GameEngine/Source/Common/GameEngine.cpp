@@ -1521,7 +1521,11 @@ void GameEngine::update()
 					}
 					else if (wp_stage == 1 && wp_f >= 120)
 					{
-						const ThingTemplate* tt = TheThingFactory->findTemplate("WP_Tank");
+						// WP_AUTOTEST_UNIT overrides the fielded template (default WP_Tank)
+						// so any new unit class gets a spawn+move+shoot lab for free.
+						const char* wp_unitEnv = getenv("WP_AUTOTEST_UNIT");
+						const ThingTemplate* tt = TheThingFactory->findTemplate(
+							AsciiString(wp_unitEnv && wp_unitEnv[0] ? wp_unitEnv : "WP_Tank"));
 						Object* wp_cc = TheGameLogic->findObjectByID(wp_ccId);
 						if (tt && wp_cc)
 						{
@@ -1551,7 +1555,8 @@ void GameEngine::update()
 						Int found = 0;
 						for (Object* o = TheGameLogic->getFirstObject(); o; o = o->getNextObject())
 						{
-							if (o->getTemplate()->getName() == "WP_Tank" &&
+							const char* wp_unitEnv2 = getenv("WP_AUTOTEST_UNIT");
+							if (o->getTemplate()->getName() == (wp_unitEnv2 && wp_unitEnv2[0] ? wp_unitEnv2 : "WP_Tank") &&
 								o->getControllingPlayer() && o->getControllingPlayer()->getPlayerIndex() == wp_localIdx)
 							{
 								wp_fleet[found] = o->getID();
