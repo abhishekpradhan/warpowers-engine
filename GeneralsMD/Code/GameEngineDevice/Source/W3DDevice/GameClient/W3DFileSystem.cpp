@@ -40,6 +40,9 @@
 // for now we maintain old legacy files
 // #define MAINTAIN_LEGACY_FILES
 
+#ifndef __EMSCRIPTEN__
+#include <execinfo.h>  // WarPowers @debug empty-name backtrace
+#endif
 #include "Common/ArchiveFile.h"
 
 // Igroteka wasm: boot trace logs are off by default — thousands per boot,
@@ -413,7 +416,28 @@ char const * GameFileClass::Set_Name( char const *filename )
 #ifdef __EMSCRIPTEN__
 	if( m_fileExists == FALSE )
 	{
-		if (igTraceEnabled()) fprintf(stderr, "[W3DFS_MISS] '%s' (last path tried: '%s')\n", filename, m_filePath);
+		if (igTraceEnabled())
+		{
+			fprintf(stderr, "[W3DFS_MISS] '%s' (last path tried: '%s')\n", filename, m_filePath);
+			// WarPowers @debug one-shot backtrace for the per-frame empty-name
+			// hunt: who asks for a model called ""?
+			static Bool wpEmptyTraced = FALSE;
+			if (!wpEmptyTraced && (filename[0] == '.' || filename[0] == 0))
+			{
+				wpEmptyTraced = TRUE;
+				fprintf(stderr, "[W3DFS_MISS] empty-name requester backtrace:\n");
+#ifndef __EMSCRIPTEN__
+				{
+					void* frames[16];
+					int n = backtrace(frames, 16);
+					char** syms = backtrace_symbols(frames, n);
+					for (int i = 0; i < n && syms; ++i)
+						fprintf(stderr, "  %s\n", syms[i]);
+				}
+#endif
+				fflush(stderr);
+			}
+		}
 	}
 #endif
 

@@ -77,6 +77,9 @@
  *   WW3DAssetManager::Get_Streaming_Texture -- Gets a streaming texture.                      *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
+#if !defined(__EMSCRIPTEN__) && !defined(_WIN32)
+#include <execinfo.h>  // WarPowers @debug degenerate-name backtrace
+#endif
 #include "assetmgr.h"
 #include <assert.h>
 
@@ -796,6 +799,27 @@ RenderObjClass * WW3DAssetManager::Create_Render_Obj(const char * name)
 	if (WW3D_Load_On_Demand && proto == nullptr) {	// If we didn't find one, try to load on demand
 		AssetStatusClass::Peek_Instance()->Report_Load_On_Demand_RObj(name);
 
+		// WarPowers @debug empty-name .w3d hunt: no missing-cache here — a
+		// degenerate name re-hunts the filesystem on EVERY call. Count hits.
+		{
+			static unsigned wpHits = 0;
+			if (name == nullptr || name[0] == 0 || (name[0] == '.' && name[1] == 0)) {
+				if ((++wpHits % 300) == 1) {
+					fprintf(stderr, "[WPASSET] Create_Render_Obj degenerate name '%s' (hit %u)\n", name ? name : "(null)", wpHits);
+#if !defined(__EMSCRIPTEN__)
+					{
+						void* wpFrames[16];
+						int wpN = backtrace(wpFrames, 16);
+						char** wpSyms = backtrace_symbols(wpFrames, wpN);
+						for (int wpI = 0; wpI < wpN && wpSyms; ++wpI)
+							fprintf(stderr, "  %s\n", wpSyms[wpI]);
+					}
+#endif
+					fflush(stderr);
+				}
+			}
+		}
+
 		char filename [MAX_PATH];
 		const char *mesh_name = ::strchr (name, '.');
 		if (mesh_name != nullptr) {
@@ -981,6 +1005,17 @@ HAnimClass *	WW3DAssetManager::Get_HAnim(const char * name)
 			const char *animname = strchr( name, '.');
 			if (animname != nullptr) {
 				snprintf( filename, ARRAY_SIZE(filename), "%s.w3d", animname+1);
+				// WarPowers @debug empty-name .w3d hunt: an anim named "X." or
+				// "." derives an empty filename and hammers the filesystem
+				// every frame (wasm logs it as W3DFS_MISS '.w3d'/'..\.w3d').
+				{
+					static bool wpTraced = false;
+					if (!wpTraced && animname[1] == 0) {
+						wpTraced = true;
+						fprintf(stderr, "[WPASSET] Get_HAnim with degenerate name '%s' -> filename '%s'\n", name, filename);
+						fflush(stderr);
+					}
+				}
 			} else {
 				WWDEBUG_SAY(( "Animation %s has no . in the name", name ));
 				WWASSERT( 0 );
@@ -1031,6 +1066,18 @@ HTreeClass *	WW3DAssetManager::Get_HTree(const char * name)
 
 		char filename[ MAX_PATH ];
 		snprintf( filename, ARRAY_SIZE(filename), "%s.w3d", name);
+
+		// WarPowers @debug empty-name .w3d hunt: unlike Get_HAnim, this path
+		// has NO missing-cache — a degenerate name re-hunts the filesystem on
+		// every call (the per-frame wasm W3DFS_MISS spam).
+		{
+			static bool wpTraced = false;
+			if (!wpTraced && (name == nullptr || name[0] == 0 || (name[0] == '.' && name[1] == 0))) {
+				wpTraced = true;
+				fprintf(stderr, "[WPASSET] Get_HTree with degenerate name '%s'\n", name ? name : "(null)");
+				fflush(stderr);
+			}
+		}
 
 		// If we can't find it, try the parent directory
 		if ( Load_3D_Assets( filename ) == false ) {

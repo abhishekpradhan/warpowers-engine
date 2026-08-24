@@ -484,6 +484,11 @@ void W3DInGameUI::drawMoveHints( View *view )
 //			if( view->pointInView( &m_moveHint[ i ].pos == FALSE )
 //				continue;
 
+			// WarPowers @bugfix an empty MoveHintName re-hunts '.w3d' (and
+			// the '.' anim) on every draw — no missing-cache on this path.
+			if( TheGlobalData->m_moveHintName.isEmpty() )
+				continue;
+
 			// create render object and add to scene of needed
 			if( m_moveHintRenderObj[ i ] == nullptr )
 			{

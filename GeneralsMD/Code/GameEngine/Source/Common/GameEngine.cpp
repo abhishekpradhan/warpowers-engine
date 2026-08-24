@@ -1071,6 +1071,9 @@ void GameEngine::update()
 				// WP_AUTOTEST=defeat kills the player CC to exercise the WP_Lose map
 				// script -> DEFEAT screen (Menus/Defeat.wnd)
 				static const Bool wp_defeatMode = wp_autoEnv && strcmp(wp_autoEnv, "defeat") == 0;
+				// WP_AUTOTEST=win kills the ENEMY command structure to exercise the
+				// WP_Win map script -> VICTORY banner -> score screen
+				static const Bool wp_winMode = wp_autoEnv && strcmp(wp_autoEnv, "win") == 0;
 				// WP_AUTOTEST=cycle: play match 1 briefly, quit to the shell,
 				// redeploy the same map (the WPShell start path), and print
 				// display-state diagnostics through match 2 — headless repro
@@ -1142,6 +1145,18 @@ void GameEngine::update()
 									o->getControllingPlayer() &&
 									o->getControllingPlayer()->getPlayerIndex() == wp_localIdx)
 								{ o->kill(); fprintf(stderr, "[WP_AUTO] f=%u DEFEAT: killed own CC - defeat screen expected\n", wp_f); }
+							wp_stage = 1;
+						}
+					}
+					else if (wp_winMode)
+					{
+						if (wp_stage == 0 && wp_f >= 300)
+						{
+							for (Object* o = TheGameLogic->getFirstObject(); o; o = o->getNextObject())
+								if (o->getTemplate()->isKindOf(KINDOF_COMMANDCENTER) &&
+									o->getControllingPlayer() &&
+									o->getControllingPlayer()->getPlayerIndex() != wp_localIdx)
+								{ o->kill(); fprintf(stderr, "[WP_AUTO] f=%u WIN: killed enemy command structure - victory expected\n", wp_f); }
 							wp_stage = 1;
 						}
 					}
