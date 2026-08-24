@@ -1500,6 +1500,19 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 
 	// load a map
 	TheTerrainLogic->loadMap( TheGlobalData->m_mapName, false );
+	// WarPowers @debug IG_TRACE menu-start forensics
+	{
+		static const bool wpTrace = getenv("IG_TRACE") && *getenv("IG_TRACE") != '0';
+		if (wpTrace)
+		{
+			Region3D wpExtent;
+			wpExtent.lo.x = wpExtent.hi.x = 0.0f;
+			if (TheTerrainLogic)
+				TheTerrainLogic->getExtent(&wpExtent);
+			fprintf(stderr, "[WPSHELL] startNewGame loaded map '%s' extentW=%f\n",
+				TheGlobalData->m_mapName.str(), wpExtent.hi.x - wpExtent.lo.x);
+		}
+	}
 	// anytime the world's size changes, must reset the partition mgr
 	//ThePartitionManager->init();
 

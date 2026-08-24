@@ -1066,6 +1066,16 @@ void SDL3Mouse::translateEvent(UnsignedInt eventIndex, MouseIO *result)
 	scaleMouseCoordinates(rawX, rawY, windowID, scaledX, scaledY);
 	result->pos.x = scaledX;
 	result->pos.y = scaledY;
+
+	// WarPowers @debug IG_TRACE mouse mapping (click-routing forensics)
+	static const bool wpTrace = getenv("IG_TRACE") && *getenv("IG_TRACE") != '0';
+	if (wpTrace && event.type != SDL_EVENT_MOUSE_MOTION) {
+		SDL_Window* w = SDL_GetWindowFromID(windowID);
+		int ww = 0, wh = 0;
+		if (w) SDL_GetWindowSize(w, &ww, &wh);
+		fprintf(stderr, "[MOUSE] type=%u raw=%d,%d win=%dx%d scaled=%d,%d\n",
+			(unsigned)event.type, rawX, rawY, ww, wh, scaledX, scaledY);
+	}
 }
 
 #endif // !_WIN32

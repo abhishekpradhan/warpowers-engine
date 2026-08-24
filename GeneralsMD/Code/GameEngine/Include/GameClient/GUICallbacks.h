@@ -38,6 +38,18 @@
 //																				Shell Menus																						 //
 //=================================================================================================
 
+// WarPowers shell (WPShell.cpp) ------------------------------------------------------------------
+extern void WPShellShutdown( WindowLayout *layout, void *userData );
+extern void WPMainMenuInit( WindowLayout *layout, void *userData );
+extern void WPMainMenuUpdate( WindowLayout *layout, void *userData );
+extern void WPSkirmishInit( WindowLayout *layout, void *userData );
+extern void WPOptionsInit( WindowLayout *layout, void *userData );
+extern void WPScoreInit( WindowLayout *layout, void *userData );
+extern WindowMsgHandledType WPMainMenuSystem( GameWindow *window, UnsignedInt msg, WindowMsgData mData1, WindowMsgData mData2 );
+extern WindowMsgHandledType WPSkirmishSystem( GameWindow *window, UnsignedInt msg, WindowMsgData mData1, WindowMsgData mData2 );
+extern WindowMsgHandledType WPOptionsSystem( GameWindow *window, UnsignedInt msg, WindowMsgData mData1, WindowMsgData mData2 );
+extern WindowMsgHandledType WPScoreSystem( GameWindow *window, UnsignedInt msg, WindowMsgData mData1, WindowMsgData mData2 );
+
 // Main Menu --------------------------------------------------------------------------------------
 extern void MainMenuInit( WindowLayout *layout, void *userData );
 extern void MainMenuUpdate( WindowLayout *layout, void *userData );

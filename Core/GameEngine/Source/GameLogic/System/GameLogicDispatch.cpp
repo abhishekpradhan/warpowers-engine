@@ -347,6 +347,13 @@ void GameLogic::prepareNewGame( GameMode gameMode, GameDifficulty diff, Int rank
 		TheWritableGlobalData->m_pendingFile.clear();
 	}
 
+	// WarPowers @debug IG_TRACE menu-start forensics
+	{
+		static const bool wpTrace = getenv("IG_TRACE") && *getenv("IG_TRACE") != '0';
+		if (wpTrace)
+			fprintf(stderr, "[WPSHELL] prepareNewGame mode=%d mapName='%s'\n",
+				(int)gameMode, TheGlobalData->m_mapName.str());
+	}
 	m_rankPointsToAddAtGameStart = rankPoints;
 	DEBUG_LOG(("GameLogic::prepareNewGame() - m_rankPointsToAddAtGameStart = %d", m_rankPointsToAddAtGameStart));
 

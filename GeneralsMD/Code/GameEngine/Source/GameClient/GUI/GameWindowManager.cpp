@@ -1028,6 +1028,16 @@ WinInputReturnCode GameWindowManager::winProcessMouseEvent( GameWindowMessage ms
 						window = nullptr;
 				}
 
+			// WarPowers @debug IG_TRACE window hit-test forensics (menu click routing)
+			{
+				static const bool wpTrace = getenv("IG_TRACE") && *getenv("IG_TRACE") != '0';
+				if (wpTrace && (msg == GWM_LEFT_DOWN || msg == GWM_LEFT_UP)) {
+					fprintf(stderr, "[WINHIT] gwm=%d pos=%d,%d win=%s\n", (int)msg,
+						mousePos->x, mousePos->y,
+						window ? window->winGetInstanceData()->m_decoratedNameString.str() : "(none)");
+				}
+			}
+
 			if( window )
 			{
 				GameWindow *tempWin;

@@ -2205,6 +2205,14 @@ AGAIN:
 		{
 			//USE_PERF_TIMER(BigAssRenderLoop)
 			static Bool couldRender = true;
+			// WarPowers @debug IG_TRACE scene-skip forensics (black-scene triage)
+			{
+				static const bool wpTrace = getenv("IG_TRACE") && *getenv("IG_TRACE") != '0';
+				static unsigned wpSkipCount = 0;
+				if (wpTrace && (TheGlobalData->m_breakTheMovie || TheGlobalData->m_disableRender) && (++wpSkipCount % 120) == 1)
+					fprintf(stderr, "[SCENESKIP] breakTheMovie=%d disableRender=%d count=%u\n",
+						(int)TheGlobalData->m_breakTheMovie, (int)TheGlobalData->m_disableRender, wpSkipCount);
+			}
 			if ((TheGlobalData->m_breakTheMovie == FALSE) && (TheGlobalData->m_disableRender == false) && WW3D::Begin_Render( true, true, Vector3( 0.0f, 0.0f, 0.0f ), TheWaterTransparency->m_minWaterOpacity ) == WW3D_ERROR_OK)
 			{
 

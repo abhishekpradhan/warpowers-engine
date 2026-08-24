@@ -204,8 +204,11 @@ void ScriptActions::doSetInfantryLightingOverride(Real setting)
 //-------------------------------------------------------------------------------------------------
 /** doVictory */
 //-------------------------------------------------------------------------------------------------
+extern void WPRecordMatchResult( Bool victory );  // WarPowers @feature score screen
+
 void ScriptActions::doVictory()
 {
+	WPRecordMatchResult( TRUE );  // WarPowers @feature score screen
 	closeWindows(FALSE);
 	TheGameLogic->closeWindows();
 	doDisableInput();
@@ -230,6 +233,7 @@ void ScriptActions::doVictory()
 //-------------------------------------------------------------------------------------------------
 void ScriptActions::doDefeat()
 {
+	WPRecordMatchResult( FALSE );  // WarPowers @feature score screen
 	closeWindows(FALSE);
 	TheGameLogic->closeWindows();
 	doDisableInput();
@@ -254,6 +258,7 @@ void ScriptActions::doDefeat()
 //-------------------------------------------------------------------------------------------------
 void ScriptActions::doLocalDefeat()
 {
+	WPRecordMatchResult( FALSE );  // WarPowers @feature score screen
 	TheScriptEngine->markMPLocalDefeatWindowShown();
 	closeWindows(FALSE);
 	TheGameLogic->closeWindows();

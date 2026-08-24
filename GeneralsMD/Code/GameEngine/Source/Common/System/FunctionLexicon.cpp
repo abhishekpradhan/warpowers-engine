@@ -95,6 +95,10 @@ static FunctionLexicon::TableEntry gameWinSystemTable[] =
 
 	{ NAMEKEY_INVALID, "MOTDSystem",                         (void*)MOTDSystem },
 	{ NAMEKEY_INVALID, "MainMenuSystem",                     (void*)MainMenuSystem },
+	{ NAMEKEY_INVALID, "WPMainMenuSystem",                   (void*)WPMainMenuSystem },
+	{ NAMEKEY_INVALID, "WPSkirmishSystem",                   (void*)WPSkirmishSystem },
+	{ NAMEKEY_INVALID, "WPOptionsSystem",                    (void*)WPOptionsSystem },
+	{ NAMEKEY_INVALID, "WPScoreSystem",                      (void*)WPScoreSystem },
 	{ NAMEKEY_INVALID, "OptionsMenuSystem",                  (void*)OptionsMenuSystem },
 	{ NAMEKEY_INVALID, "SinglePlayerMenuSystem",             (void*)SinglePlayerMenuSystem },
 	{ NAMEKEY_INVALID, "QuitMenuSystem",                     (void*)QuitMenuSystem },
@@ -243,6 +247,10 @@ static FunctionLexicon::TableEntry winLayoutInitTable[] =
 {
 
 	{ NAMEKEY_INVALID, "MainMenuInit",                  (void*)MainMenuInit },
+	{ NAMEKEY_INVALID, "WPMainMenuInit",                (void*)WPMainMenuInit },
+	{ NAMEKEY_INVALID, "WPSkirmishInit",                (void*)WPSkirmishInit },
+	{ NAMEKEY_INVALID, "WPOptionsInit",                 (void*)WPOptionsInit },
+	{ NAMEKEY_INVALID, "WPScoreInit",                   (void*)WPScoreInit },
 	{ NAMEKEY_INVALID, "OptionsMenuInit",               (void*)OptionsMenuInit },
 	{ NAMEKEY_INVALID, "SaveLoadMenuInit",              (void*)SaveLoadMenuInit },
 	{ NAMEKEY_INVALID, "SaveLoadMenuFullScreenInit",    (void*)SaveLoadMenuFullScreenInit },
@@ -296,6 +304,7 @@ static FunctionLexicon::TableEntry winLayoutUpdateTable[] =
 {
 
 	{ NAMEKEY_INVALID, "MainMenuUpdate",                  (void*)MainMenuUpdate },
+	{ NAMEKEY_INVALID, "WPMainMenuUpdate",                (void*)WPMainMenuUpdate },
 	{ NAMEKEY_INVALID, "OptionsMenuUpdate",               (void*)OptionsMenuUpdate },
 	{ NAMEKEY_INVALID, "SinglePlayerMenuUpdate",          (void*)SinglePlayerMenuUpdate },
 	{ NAMEKEY_INVALID, "MapSelectMenuUpdate",             (void*)MapSelectMenuUpdate },
@@ -338,6 +347,7 @@ static FunctionLexicon::TableEntry winLayoutShutdownTable[] =
 {
 
 	{ NAMEKEY_INVALID, "MainMenuShutdown",                  (void*)MainMenuShutdown },
+	{ NAMEKEY_INVALID, "WPShellShutdown",                (void*)WPShellShutdown },
 	{ NAMEKEY_INVALID, "OptionsMenuShutdown",               (void*)OptionsMenuShutdown },
 	{ NAMEKEY_INVALID, "SaveLoadMenuShutdown",              (void*)SaveLoadMenuShutdown },
 	{ NAMEKEY_INVALID, "PopupCommunicatorShutdown",         (void*)PopupCommunicatorShutdown },

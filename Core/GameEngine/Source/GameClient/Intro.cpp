@@ -116,8 +116,20 @@ void Intro::doPostIntro()
 	// (the -file direct-load path pops them), nothing ever clears the flag
 	// and W3DDisplay::draw skips scene rendering forever. Only arm the
 	// freeze when a shell screen is actually there to clear it.
+	//
+	// WarPowers @fix: Intro::update() lands in IntroState_Done EVERY frame
+	// for the rest of the session, so this must be one-shot — otherwise the
+	// freeze re-arms continuously whenever any shell screen exists (with the
+	// in-engine menu that is: always), and the first menu-started match
+	// renders a black scene forever.
+	static Bool armedOnce = FALSE;
+	if (armedOnce)
+		return;
 	if (TheShell && TheShell->top())
+	{
 		TheWritableGlobalData->m_breakTheMovie = TRUE;
+		armedOnce = TRUE;
+	}
 }
 
 void Intro::doAsyncWait(UnsignedInt milliseconds)
