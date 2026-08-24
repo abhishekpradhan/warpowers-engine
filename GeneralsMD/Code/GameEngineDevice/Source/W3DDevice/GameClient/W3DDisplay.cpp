@@ -2318,6 +2318,16 @@ AGAIN:
 					m_profilerFrameCapture->Capture(getWidth(), getHeight());
 				}
 #endif
+				// WarPowers @feature menu curtain: black out the whole frame
+				// during the match-exit teardown window (confirm click ->
+				// next surface ready) - those frames otherwise show the
+				// un-dimmed dying world and read as flicker.
+				{
+					extern Bool g_wpMenuCurtain;
+					if (g_wpMenuCurtain)
+						drawFillRect( 0, 0, m_width, m_height, GameMakeColor( 0, 0, 0, 255 ) );
+				}
+
 				// render is all done!
 				WW3D::End_Render();
 			}

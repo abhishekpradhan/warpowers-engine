@@ -135,8 +135,14 @@ void destroyQuitMenu()
 /**
  *  quits the program
  */
+extern Bool g_wpMenuCurtain;  // WarPowers @feature menu curtain
+
 static void exitQuitMenu()
 {
+	// Raise the curtain now: the frames between this click and the shell's
+	// first paint show the un-dimmed dying world otherwise (reads as
+	// flicker).
+	g_wpMenuCurtain = TRUE;
 	TheGameLogic->quit(FALSE);
   // destroy the quit menu
 	destroyQuitMenu();

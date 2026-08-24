@@ -2606,6 +2606,10 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 	HideControlBar();
 #endif
 	TheWritableGlobalData->m_loadScreenRender = FALSE;	///< mark to resume rendering as normal
+	{
+		extern Bool g_wpMenuCurtain;  // WarPowers @feature menu curtain
+		g_wpMenuCurtain = FALSE;      // next match is ready (covers Restart)
+	}
 	{ static const bool wpT = getenv("IG_TRACE") && *getenv("IG_TRACE") != '0'; if (wpT) fprintf(stderr, "[WPSHELL] startNewGame checkpoint loadScreenRender-cleared\n"); }
 
 	// if we're in a gamespy game, mark us as playing

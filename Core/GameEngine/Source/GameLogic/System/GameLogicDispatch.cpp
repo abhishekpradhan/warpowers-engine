@@ -85,6 +85,12 @@
 
 #include "GameNetwork/NetworkInterface.h"
 
+// WarPowers @feature menu curtain: TRUE from the moment a match exit is
+// committed until the next surface (main menu or new match) is ready;
+// W3DDisplay paints the frame black while set, hiding the teardown frames
+// (pause-dim gone, world dying, engine reset) that read as flicker.
+Bool g_wpMenuCurtain = FALSE;
+
 
 
 
@@ -258,6 +264,7 @@ void GameLogic::clearGameData( Bool showScoreScreen )
 	}
 
 	setClearingGameData( TRUE );
+	g_wpMenuCurtain = TRUE;  // WarPowers @feature menu curtain
 
 //	m_background = TheWindowManager->winCreateLayout("Menus/BlankWindow.wnd");
 //	DEBUG_ASSERTCRASH(m_background,("We Couldn't Load Menus/BlankWindow.wnd"));

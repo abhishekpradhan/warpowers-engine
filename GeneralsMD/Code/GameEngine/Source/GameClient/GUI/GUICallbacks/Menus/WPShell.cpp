@@ -168,8 +168,12 @@ static NameKeyType wpButtonEngageID = NAMEKEY_INVALID;
 static NameKeyType wpButtonOptionsID = NAMEKEY_INVALID;
 static NameKeyType wpButtonQuitID = NAMEKEY_INVALID;
 
+extern Bool g_wpMenuCurtain;  // WarPowers @feature menu curtain
+
 void WPMainMenuInit( WindowLayout *layout, void *userData )
 {
+	// The menu is up — drop the exit curtain.
+	g_wpMenuCurtain = FALSE;
 	// The intro render-freeze is normally cleared by the stock MainMenuInit;
 	// this layout owns that job now (see Intro::doPostIntro).
 	TheWritableGlobalData->m_breakTheMovie = FALSE;
