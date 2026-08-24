@@ -28,6 +28,10 @@
 
 #include "PreRTS.h"
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
+
 #include "Common/GameAudio.h"
 #include "Common/AudioAffect.h"
 #include "Common/GameEngine.h"
@@ -91,6 +95,21 @@ void WPRecordMatchResult( Bool victory )
 			s_wpResult.moneyEarned = score->getTotalMoneyEarned();
 		}
 	}
+
+#ifdef __EMSCRIPTEN__
+	// Web-shell mode: the page renders the result card (the engine quits back
+	// to it after the end-game banner), so hand the stats out now — by shell
+	// time the player/score data is gone.
+	EM_ASM({
+		if (typeof Module !== 'undefined' && Module.onMatchResult)
+			Module.onMatchResult({ victory: $0 === 1, unitsBuilt: $1,
+				unitsLost: $2, unitsDestroyed: $3, buildingsBuilt: $4,
+				moneyEarned: $5, durationSeconds: $6 });
+	}, s_wpResult.victory ? 1 : 0, s_wpResult.unitsBuilt, s_wpResult.unitsLost,
+		s_wpResult.unitsDestroyed, s_wpResult.buildingsBuilt,
+		s_wpResult.moneyEarned,
+		(int)(s_wpResult.durationFrames / LOGICFRAMES_PER_SECOND));
+#endif
 }
 
 // ----------------------------------------------------------------------------

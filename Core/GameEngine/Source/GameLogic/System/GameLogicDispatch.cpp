@@ -299,7 +299,12 @@ void GameLogic::clearGameData( Bool showScoreScreen )
 //	if(shellGame)
 
 
-	if (TheGlobalData->m_initialFile.isEmpty() == FALSE || m_quitToDesktopAfterMatch)
+	// WarPowers @feature web-shell mode: with WP_BOOT_MAP the page is the
+	// only menu — every match exit returns to it (engine quits; the page
+	// shows the result card + REDEPLOY). Restart Battle still works: the
+	// stock restart path calls setQuitting(FALSE) right after clearGameData.
+	static const bool wpWebShell = getenv("WP_BOOT_MAP") != nullptr;
+	if (TheGlobalData->m_initialFile.isEmpty() == FALSE || m_quitToDesktopAfterMatch || wpWebShell)
 	{
 		TheGameEngine->setQuitting(TRUE);
 		m_quitToDesktopAfterMatch = FALSE;
