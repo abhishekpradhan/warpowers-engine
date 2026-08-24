@@ -153,6 +153,16 @@ void PlayerList::newGame()
 	{
 		Dict *d = TheSidesList->getSideInfo(i)->getDict();
 		AsciiString pname = d->getAsciiString(TheKey_playerName);
+		// WarPowers @debug IG_TRACE local-player selection forensics
+		{
+			static const bool wpT = getenv("IG_TRACE") && *getenv("IG_TRACE") != '0';
+			if (wpT) {
+				Bool ex = FALSE;
+				fprintf(stderr, "[WPSIDE] i=%d name='%s' human=%d\n", (int)i,
+					pname.str(), (int)d->getBool(TheKey_playerIsHuman, &ex));
+				fflush(stderr);
+			}
+		}
 		if (pname.isEmpty())
 			continue;	// it's neutral, which we've already done, so skip it.
 

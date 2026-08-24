@@ -250,6 +250,18 @@ WindowMsgHandledType ControlBarObserverSystem( GameWindow *window, UnsignedInt m
 void ControlBar::populateObserverList()
 {
 	Int currentButton = 0, i;
+
+	// WarPowers @fix: our ControlBar.wnd ships no observer widgets - and the
+	// observer context is also where a FAILED map load lands (empty world ->
+	// neutral local player). Bail instead of winHide()ing null windows; the
+	// stderr line names the real problem.
+	if (buttonPlayer[0] == nullptr || staticTextPlayer[0] == nullptr)
+	{
+		fprintf(stderr, "WARNING: observer control bar requested but observer windows are absent "
+			"(missing map file or observer UI not shipped) - skipping populate\n");
+		fflush(stderr);
+		return;
+	}
 	if(TheRecorder->isMultiplayer())
 	{
 

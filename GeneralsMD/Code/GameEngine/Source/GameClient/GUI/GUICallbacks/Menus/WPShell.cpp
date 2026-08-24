@@ -43,6 +43,7 @@
 #include "Common/RandomValue.h"
 #include "Common/ScoreKeeper.h"
 #include "GameClient/Color.h"
+#include "GameClient/GadgetPushButton.h"
 #include "GameClient/GadgetStaticText.h"
 #include "GameClient/GadgetSlider.h"
 #include "GameClient/GameText.h"
@@ -293,11 +294,41 @@ static NameKeyType wpDeployMeridianID = NAMEKEY_INVALID;
 static NameKeyType wpDeployJackalID = NAMEKEY_INVALID;
 static NameKeyType wpSkirmishBackID = NAMEKEY_INVALID;
 
+// Battlefield rotation: layouts from tools/genmap.py --layout=... . The
+// picker cycles; the choice persists in the browser (localStorage 'wpMap').
+struct WPMapEntry { const char *label; const char *mer; const char *jak; };
+static const WPMapEntry s_wpMaps[] = {
+	{ "WP:MapFlats", "Maps\\WPTest\\WPTest.map",   "Maps\\WPTestJ\\WPTestJ.map" },
+	{ "WP:MapRidge", "Maps\\WPRidge\\WPRidge.map", "Maps\\WPRidgeJ\\WPRidgeJ.map" },
+	{ "WP:MapScrap", "Maps\\WPScrap\\WPScrap.map", "Maps\\WPScrapJ\\WPScrapJ.map" },
+};
+static Int s_wpMapIdx = 0;
+static NameKeyType wpMapButtonID = NAMEKEY_INVALID;
+
+static void wpSkirmishRefreshMapButton( void )
+{
+	GameWindow *w = TheWindowManager->winGetWindowFromId( nullptr, wpMapButtonID );
+	// winSetText, not GadgetButtonSetText: our shell buttons route their
+	// SYSTEMCALLBACK to PassSelectedButtonsToParentSystem, which drops the
+	// GGM_SET_LABEL message the gadget helper sends.
+	if (w)
+		w->winSetText( TheGameText->fetch( s_wpMaps[s_wpMapIdx].label ) );
+}
+
 void WPSkirmishInit( WindowLayout *layout, void *userData )
 {
 	wpDeployMeridianID = TheNameKeyGenerator->nameToKey( "WPSkirmish.wnd:ButtonDeployMeridian" );
 	wpDeployJackalID = TheNameKeyGenerator->nameToKey( "WPSkirmish.wnd:ButtonDeployJackal" );
 	wpSkirmishBackID = TheNameKeyGenerator->nameToKey( "WPSkirmish.wnd:ButtonBack" );
+	wpMapButtonID = TheNameKeyGenerator->nameToKey( "WPSkirmish.wnd:ButtonMap" );
+
+#if defined(__EMSCRIPTEN__)
+	s_wpMapIdx = EM_ASM_INT({
+		try { return Math.max(0, Math.min($0, parseInt(localStorage.getItem('wpMap') || '0', 10) || 0)); }
+		catch (e) { return 0; }
+	}, (int)(ARRAY_SIZE(s_wpMaps) - 1));
+#endif
+	wpSkirmishRefreshMapButton();
 
 	layout->hide( FALSE );
 	layout->bringForward();
@@ -327,9 +358,18 @@ WindowMsgHandledType WPSkirmishSystem( GameWindow *window, UnsignedInt msg,
 			// expanded by CommandLine.cpp's (file-static) converter, which this
 			// path never runs through. Short form here = extent-0 empty world.
 			if( controlID == wpDeployMeridianID )
-				wpStartMap( "Maps\\WPTest\\WPTest.map" );
+				wpStartMap( s_wpMaps[s_wpMapIdx].mer );
 			else if( controlID == wpDeployJackalID )
-				wpStartMap( "Maps\\WPTestJ\\WPTestJ.map" );
+				wpStartMap( s_wpMaps[s_wpMapIdx].jak );
+			else if( controlID == wpMapButtonID )
+			{
+				s_wpMapIdx = (s_wpMapIdx + 1) % (Int)ARRAY_SIZE(s_wpMaps);
+				wpSkirmishRefreshMapButton();
+#if defined(__EMSCRIPTEN__)
+				EM_ASM({ try { localStorage.setItem('wpMap', String($0)); } catch (e) {} },
+					(int)s_wpMapIdx);
+#endif
+			}
 			else if( controlID == wpSkirmishBackID )
 				TheShell->pop();
 			break;
