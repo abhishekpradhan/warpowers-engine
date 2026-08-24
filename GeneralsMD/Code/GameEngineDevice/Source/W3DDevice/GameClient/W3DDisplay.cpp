@@ -2008,8 +2008,15 @@ void W3DDisplay::draw()
 	{
 		static const char* wpDumpEnv = getenv("WP_SCENE_DUMP");
 		static Bool wpDumped = FALSE;
+		// '+N' re-arms per match: when the logic frame counter drops back
+		// below N (new game), the next crossing dumps again.
+		static const Bool wpDumpRepeat = wpDumpEnv && wpDumpEnv[0] == '+';
+		const UnsignedInt wpDumpFrame = wpDumpEnv ? (UnsignedInt)atoi(wpDumpRepeat ? wpDumpEnv + 1 : wpDumpEnv) : 0;
+		if (wpDumpEnv && wpDumpRepeat && wpDumped && TheGameLogic &&
+				TheGameLogic->getFrame() < wpDumpFrame)
+			wpDumped = FALSE;
 		if (wpDumpEnv && !wpDumped && TheGameLogic &&
-				TheGameLogic->getFrame() >= (UnsignedInt)atoi(wpDumpEnv))
+				TheGameLogic->getFrame() >= wpDumpFrame)
 		{
 			wpDumped = TRUE;
 			if (m_3DScene)

@@ -840,6 +840,28 @@ void GameEngine::init()
 				InitRandom(0);
 			}
 		}
+		else
+		{
+			// WarPowers @feature WP_BOOT_MAP: boot straight into a map like
+			// -file, but WITHOUT m_initialFile — so the post-match flow
+			// returns to the in-engine shell (score screen, redeploy)
+			// instead of quitting to desktop. The web page's DEPLOY button
+			// uses this; -file keeps its quit-after-match semantics for the
+			// autotest harness. Long map path required (Maps\X\X.map).
+			const char* wpBootMap = getenv("WP_BOOT_MAP");
+			if (wpBootMap && *wpBootMap)
+			{
+				TheWritableGlobalData->m_shellMapOn = FALSE;
+				TheWritableGlobalData->m_playIntro = FALSE;
+				TheWritableGlobalData->m_pendingFile = wpBootMap;
+
+				GameMessage *msg = TheMessageStream->appendMessage( GameMessage::MSG_NEW_GAME );
+				msg->appendIntegerArgument(GAME_SINGLE_PLAYER);
+				msg->appendIntegerArgument(DIFFICULTY_NORMAL);
+				msg->appendIntegerArgument(0);
+				InitRandom(0);
+			}
+		}
 
 		//
 		if (TheMapCache && TheGlobalData->m_shellMapOn)
@@ -1049,10 +1071,63 @@ void GameEngine::update()
 				// WP_AUTOTEST=defeat kills the player CC to exercise the WP_Lose map
 				// script -> DEFEAT screen (Menus/Defeat.wnd)
 				static const Bool wp_defeatMode = wp_autoEnv && strcmp(wp_autoEnv, "defeat") == 0;
+				// WP_AUTOTEST=cycle: play match 1 briefly, quit to the shell,
+				// redeploy the same map (the WPShell start path), and print
+				// display-state diagnostics through match 2 — headless repro
+				// for the second-match-black-screen bug. Pair with
+				// WP_SCENE_DUMP=+N for a per-match scene census.
+				static const Bool wp_cycleMode = wp_autoEnv && strcmp(wp_autoEnv, "cycle") == 0;
+				static Int wp_cycleStage = 0;
+				if (wp_cycleMode && TheGameLogic && !TheGameLogic->isInGame())
+				{
+					if (wp_cycleStage == 1 && TheShell && TheShell->top())
+					{
+						fprintf(stderr, "[WP_AUTO] CYCLE: shell is back, redeploying match 2\n");
+						fflush(stderr);
+						TheWritableGlobalData->m_pendingFile = "Maps\\WPTest\\WPTest.map";
+						TheWritableGlobalData->m_shellMapOn = FALSE;
+						GameMessage *wp_msg = TheMessageStream->appendMessage( GameMessage::MSG_NEW_GAME );
+						wp_msg->appendIntegerArgument(GAME_SINGLE_PLAYER);
+						wp_msg->appendIntegerArgument(DIFFICULTY_NORMAL);
+						wp_msg->appendIntegerArgument(0);
+						InitRandom(0);
+						wp_cycleStage = 2;
+					}
+				}
 				if (wp_auto && TheGameLogic && TheGameLogic->isInGame() && ThePlayerList)
 				{
 					const UnsignedInt wp_f = TheGameLogic->getFrame();
 					static UnsignedInt wp_stage = 0;
+					if (wp_cycleMode)
+					{
+						if (wp_cycleStage == 0 && wp_f >= 300)
+						{
+							// quit() with no quit menu up just OPENS the menu
+							// (canOpenQuitMenu guard); the second call passes
+							// the guard and actually exits — same net effect
+							// as the player's Abandon.
+							fprintf(stderr, "[WP_AUTO] CYCLE: opening quit menu at f=%u\n", wp_f);
+							fflush(stderr);
+							TheGameLogic->quit(FALSE);
+							TheGameLogic->quit(FALSE);
+							fprintf(stderr, "[WP_AUTO] CYCLE: quit issued\n");
+							fflush(stderr);
+							wp_cycleStage = 1;
+						}
+						else if (wp_cycleStage == 2 && wp_f >= 60 && (wp_f % 120) == 0 && wp_f <= 720)
+						{
+							GameWindow* wp_cb = TheWindowManager ? TheWindowManager->winGetWindowFromId(nullptr,
+								TheNameKeyGenerator->nameToKey("ControlBar.wnd:ControlBarParent")) : nullptr;
+							Int wp_cbx = -1, wp_cby = -1; Bool wp_cbHidden = TRUE;
+							if (wp_cb) { wp_cb->winGetPosition(&wp_cbx, &wp_cby); wp_cbHidden = wp_cb->winIsHidden(); }
+							Coord3D wp_cam = {0,0,0};
+							if (TheTacticalView) wp_cam = TheTacticalView->get3DCameraPosition();
+							fprintf(stderr, "[WP_AUTO] CYCLE2 f=%u loadScrRender=%d breakMovie=%d cbHidden=%d cbPos=(%d,%d) cam=(%.0f,%.0f,%.0f)\n",
+								wp_f, (int)TheGlobalData->m_loadScreenRender, (int)TheGlobalData->m_breakTheMovie,
+								(int)wp_cbHidden, wp_cbx, wp_cby, wp_cam.x, wp_cam.y, wp_cam.z);
+							fflush(stderr);
+						}
+					}
 					static ObjectID wp_ccId = INVALID_ID, wp_enemyCcId = INVALID_ID, wp_tankId = INVALID_ID;
 					static ObjectID wp_stageTank2 = INVALID_ID;
 					static Coord3D wp_ccPos = {0,0,0};

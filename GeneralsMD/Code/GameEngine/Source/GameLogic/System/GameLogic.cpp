@@ -432,6 +432,7 @@ void GameLogic::init()
 	// create the partition manager
 	ThePartitionManager = NEW PartitionManager;
 	ThePartitionManager->init();
+	{ static const bool wpT = getenv("IG_TRACE") && *getenv("IG_TRACE") != '0'; if (wpT) { fprintf(stderr, "[WPSHELL] cp partition-init\n"); fflush(stderr); } }
 	ThePartitionManager->setName("ThePartitionManager");
 
 
@@ -1705,6 +1706,7 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 		TheSidesList->addTeam(&d);
 	//}
 	TheSidesList->validateSides();
+	{ static const bool wpT = getenv("IG_TRACE") && *getenv("IG_TRACE") != '0'; if (wpT) { fprintf(stderr, "[WPSHELL] cp validateSides\n"); fflush(stderr); } }
 
 	// update the loadscreen
 	updateLoadProgress(LOAD_PROGRESS_POST_SIDE_LIST_INIT);
@@ -1718,6 +1720,7 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 
 	// Tell the script engine that a newe set of scripts is loaded.
 	TheScriptEngine->newMap();
+	{ static const bool wpT = getenv("IG_TRACE") && *getenv("IG_TRACE") != '0'; if (wpT) { fprintf(stderr, "[WPSHELL] cp scriptEngine-newMap\n"); fflush(stderr); } }
 
 	// update the loadscreen
 	updateLoadProgress(LOAD_PROGRESS_POST_SCRIPT_ENGINE_NEW_MAP);
@@ -1875,6 +1878,7 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 
 	// set the radar as on a new map
 	TheRadar->newMap( TheTerrainLogic );
+	{ static const bool wpT = getenv("IG_TRACE") && *getenv("IG_TRACE") != '0'; if (wpT) { fprintf(stderr, "[WPSHELL] cp radar-newMap\n"); fflush(stderr); } }
 
 	// TheSuperHackers @tweak Force on radar for all observers.
 	for (Int i = 0; i < MAX_PLAYER_COUNT; ++i)
@@ -1914,6 +1918,7 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 
 	// update the terrain logic now that all is loaded
 	TheTerrainLogic->newMap( loadingSaveGame );
+	{ static const bool wpT = getenv("IG_TRACE") && *getenv("IG_TRACE") != '0'; if (wpT) { fprintf(stderr, "[WPSHELL] cp terrainLogic-newMap\n"); fflush(stderr); } }
 
 	// update the loadscreen
 	updateLoadProgress(LOAD_PROGRESS_POST_TERRAIN_LOGIC_NEW_MAP);
@@ -1974,6 +1979,7 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 	// tell the AI about it
 	// Note that it is important that the pathfinder be called before the map objects are loaded.
 	TheAI->pathfinder()->newMap();
+	{ static const bool wpT = getenv("IG_TRACE") && *getenv("IG_TRACE") != '0'; if (wpT) { fprintf(stderr, "[WPSHELL] cp pathfinder-newMap\n"); fflush(stderr); } }
 
 	// update the loadscreen
 	updateLoadProgress(LOAD_PROGRESS_POST_PATHFINDER_NEW_MAP);
@@ -2265,6 +2271,7 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 	updateLoadProgress(LOAD_PROGRESS_POST_PRELOAD_ASSETS);
 
 	// TheSuperHackers @info Initialize the camera height limits to default if the resolution was changed
+	{ static const bool wpT = getenv("IG_TRACE") && *getenv("IG_TRACE") != '0'; if (wpT) { fprintf(stderr, "[WPSHELL] cp camera-defaults\n"); fflush(stderr); } }
 	TheTacticalView->setCameraHeightAboveGroundLimitsToDefault();
 	TheTacticalView->setAngleToDefault();
 	TheTacticalView->setPitchToDefault();
@@ -2584,6 +2591,7 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 		}
 	}
 
+	{ static const bool wpT = getenv("IG_TRACE") && *getenv("IG_TRACE") != '0'; if (wpT) fprintf(stderr, "[WPSHELL] startNewGame checkpoint controlbar-branch\n"); }
 	if(m_gameMode == GAME_SHELL)
 	{
 		HideControlBar();
@@ -2598,6 +2606,7 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 	HideControlBar();
 #endif
 	TheWritableGlobalData->m_loadScreenRender = FALSE;	///< mark to resume rendering as normal
+	{ static const bool wpT = getenv("IG_TRACE") && *getenv("IG_TRACE") != '0'; if (wpT) fprintf(stderr, "[WPSHELL] startNewGame checkpoint loadScreenRender-cleared\n"); }
 
 	// if we're in a gamespy game, mark us as playing
 	if (TheGameSpyBuddyMessageQueue && TheGameSpyGame && isInInternetGame())

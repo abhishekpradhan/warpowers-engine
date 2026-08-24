@@ -545,7 +545,12 @@ void GameClient::update()
 			m_intro = nullptr;
 
 			TheShell->showShellMap(TRUE);
-			TheShell->showShell();
+			// WarPowers @fix: with the WP_BOOT_MAP direct boot the match is
+			// already running when the intro state machine finishes — don't
+			// raise the main menu over it. (-file avoided this only via the
+			// initialFile guard inside showShell.)
+			if (!TheGameLogic || !TheGameLogic->isInGame())
+				TheShell->showShell();
 		}
 	}
 
