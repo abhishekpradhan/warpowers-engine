@@ -296,23 +296,38 @@ static NameKeyType wpSkirmishBackID = NAMEKEY_INVALID;
 
 // Battlefield rotation: layouts from tools/genmap.py --layout=... . The
 // picker cycles; the choice persists in the browser (localStorage 'wpMap').
-struct WPMapEntry { const char *label; const char *mer; const char *jak; };
+struct WPMapEntry { const char *label; const char *desc; const char *mer; const char *jak; };
 static const WPMapEntry s_wpMaps[] = {
-	{ "WP:MapFlats", "Maps\\WPTest\\WPTest.map",   "Maps\\WPTestJ\\WPTestJ.map" },
-	{ "WP:MapRidge", "Maps\\WPRidge\\WPRidge.map", "Maps\\WPRidgeJ\\WPRidgeJ.map" },
-	{ "WP:MapScrap", "Maps\\WPScrap\\WPScrap.map", "Maps\\WPScrapJ\\WPScrapJ.map" },
+	{ "WP:MapFlats", "WP:MapFlatsDesc", "Maps\\WPTest\\WPTest.map",   "Maps\\WPTestJ\\WPTestJ.map" },
+	{ "WP:MapRidge", "WP:MapRidgeDesc", "Maps\\WPRidge\\WPRidge.map", "Maps\\WPRidgeJ\\WPRidgeJ.map" },
+	{ "WP:MapScrap", "WP:MapScrapDesc", "Maps\\WPScrap\\WPScrap.map", "Maps\\WPScrapJ\\WPScrapJ.map" },
 };
 static Int s_wpMapIdx = 0;
-static NameKeyType wpMapButtonID = NAMEKEY_INVALID;
+static NameKeyType wpMapPrevID = NAMEKEY_INVALID;
+static NameKeyType wpMapNextID = NAMEKEY_INVALID;
 
 static void wpSkirmishRefreshMapButton( void )
 {
-	GameWindow *w = TheWindowManager->winGetWindowFromId( nullptr, wpMapButtonID );
-	// winSetText, not GadgetButtonSetText: our shell buttons route their
-	// SYSTEMCALLBACK to PassSelectedButtonsToParentSystem, which drops the
-	// GGM_SET_LABEL message the gadget helper sends.
+	// GadgetStaticTextSetText, not winSetText: STATICTEXT caches its
+	// render string in the gadget data - bare winSetText leaves the drawn
+	// text stale/empty (the score screen labels burned this in first).
+	GameWindow *w = TheWindowManager->winGetWindowFromId( nullptr,
+		TheNameKeyGenerator->nameToKey( "WPSkirmish.wnd:MapName" ) );
 	if (w)
-		w->winSetText( TheGameText->fetch( s_wpMaps[s_wpMapIdx].label ) );
+		GadgetStaticTextSetText( w, TheGameText->fetch( s_wpMaps[s_wpMapIdx].label ) );
+	w = TheWindowManager->winGetWindowFromId( nullptr,
+		TheNameKeyGenerator->nameToKey( "WPSkirmish.wnd:MapDesc" ) );
+	if (w)
+	{
+		// "n / N" tail makes the rotation explicit - the arrows alone don't
+		// say how many battlefields there are.
+		UnicodeString desc = TheGameText->fetch( s_wpMaps[s_wpMapIdx].desc );
+		UnicodeString tail;
+		tail.format( L"  \u2014  %d / %d", (int)(s_wpMapIdx + 1),
+			(int)ARRAY_SIZE(s_wpMaps) );
+		desc.concat( tail );
+		GadgetStaticTextSetText( w, desc );
+	}
 }
 
 void WPSkirmishInit( WindowLayout *layout, void *userData )
@@ -320,7 +335,8 @@ void WPSkirmishInit( WindowLayout *layout, void *userData )
 	wpDeployMeridianID = TheNameKeyGenerator->nameToKey( "WPSkirmish.wnd:ButtonDeployMeridian" );
 	wpDeployJackalID = TheNameKeyGenerator->nameToKey( "WPSkirmish.wnd:ButtonDeployJackal" );
 	wpSkirmishBackID = TheNameKeyGenerator->nameToKey( "WPSkirmish.wnd:ButtonBack" );
-	wpMapButtonID = TheNameKeyGenerator->nameToKey( "WPSkirmish.wnd:ButtonMap" );
+	wpMapPrevID = TheNameKeyGenerator->nameToKey( "WPSkirmish.wnd:ButtonMapPrev" );
+	wpMapNextID = TheNameKeyGenerator->nameToKey( "WPSkirmish.wnd:ButtonMapNext" );
 
 #if defined(__EMSCRIPTEN__)
 	s_wpMapIdx = EM_ASM_INT({
@@ -361,9 +377,10 @@ WindowMsgHandledType WPSkirmishSystem( GameWindow *window, UnsignedInt msg,
 				wpStartMap( s_wpMaps[s_wpMapIdx].mer );
 			else if( controlID == wpDeployJackalID )
 				wpStartMap( s_wpMaps[s_wpMapIdx].jak );
-			else if( controlID == wpMapButtonID )
+			else if( controlID == wpMapPrevID || controlID == wpMapNextID )
 			{
-				s_wpMapIdx = (s_wpMapIdx + 1) % (Int)ARRAY_SIZE(s_wpMaps);
+				const Int n = (Int)ARRAY_SIZE(s_wpMaps);
+				s_wpMapIdx = (s_wpMapIdx + (controlID == wpMapNextID ? 1 : n - 1)) % n;
 				wpSkirmishRefreshMapButton();
 #if defined(__EMSCRIPTEN__)
 				EM_ASM({ try { localStorage.setItem('wpMap', String($0)); } catch (e) {} },
