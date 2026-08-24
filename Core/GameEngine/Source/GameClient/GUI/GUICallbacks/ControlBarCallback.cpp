@@ -62,6 +62,42 @@ WindowLayout *popupCommunicatorLayout = nullptr;
 //-------------------------------------------------------------------------------------------------
 /** Input procedure for the left HUD */
 //-------------------------------------------------------------------------------------------------
+// WarPowers @fix: the HUD strip must never leak clicks into the world.
+// When the hit chain all returns MSG_IGNORED (disabled build button, the
+// gap between buttons, a bare panel), winProcessMouseEvent treats the
+// event as unused and the game translators turn it into a rally-point /
+// move order BEHIND the opaque bar. This callback sits on
+// ControlBar.wnd:ControlBarParent and consumes button events - except
+// an UP whose DOWN happened out in the world (a band-select drag
+// released over the bar must still reach the selection translator).
+WindowMsgHandledType WPHudSwallowInput( GameWindow *window, UnsignedInt msg,
+																				WindowMsgData mData1, WindowMsgData mData2 )
+{
+	static Bool s_downOnHud = FALSE;
+	switch( msg )
+	{
+		case GWM_LEFT_DOWN:
+		case GWM_RIGHT_DOWN:
+		case GWM_MIDDLE_DOWN:
+			s_downOnHud = TRUE;
+			return MSG_HANDLED;
+		case GWM_LEFT_UP:
+		case GWM_RIGHT_UP:
+		case GWM_MIDDLE_UP:
+			if( s_downOnHud )
+			{
+				s_downOnHud = FALSE;
+				return MSG_HANDLED;
+			}
+			return MSG_IGNORED;
+		case GWM_LEFT_DRAG:
+		case GWM_RIGHT_DRAG:
+			return s_downOnHud ? MSG_HANDLED : MSG_IGNORED;
+		default:
+			return MSG_IGNORED;
+	}
+}
+
 WindowMsgHandledType LeftHUDInput( GameWindow *window, UnsignedInt msg,
 																	 WindowMsgData mData1, WindowMsgData mData2 )
 {

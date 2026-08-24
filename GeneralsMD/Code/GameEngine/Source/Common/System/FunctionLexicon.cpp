@@ -216,6 +216,7 @@ static FunctionLexicon::TableEntry gameWinInputTable[] =
 	{ NAMEKEY_INVALID, "DiplomacyInput",                    (void*)DiplomacyInput },
 	{ NAMEKEY_INVALID, "EstablishConnectionsControlInput",  (void*)EstablishConnectionsControlInput },
 	{ NAMEKEY_INVALID, "LeftHUDInput",                      (void*)LeftHUDInput },
+	{ NAMEKEY_INVALID, "WPHudSwallowInput",                 (void*)WPHudSwallowInput },
 	{ NAMEKEY_INVALID, "ScoreScreenInput",                  (void*)ScoreScreenInput },
 	{ NAMEKEY_INVALID, "SaveLoadMenuInput",                 (void*)SaveLoadMenuInput },
 	{ NAMEKEY_INVALID, "BeaconWindowInput",                 (void*)BeaconWindowInput },

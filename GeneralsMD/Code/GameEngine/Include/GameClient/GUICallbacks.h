@@ -336,6 +336,7 @@ extern WindowMsgHandledType ControlBarSystem( GameWindow *window, UnsignedInt ms
 extern WindowMsgHandledType ControlBarObserverSystem( GameWindow *window, UnsignedInt msg, WindowMsgData mData1, WindowMsgData mData2 );
 extern WindowMsgHandledType ControlBarInput( GameWindow *window, UnsignedInt msg, WindowMsgData mData1, WindowMsgData mData2 );
 extern WindowMsgHandledType LeftHUDInput( GameWindow *window, UnsignedInt msg, WindowMsgData mData1, WindowMsgData mData2 );
+extern WindowMsgHandledType WPHudSwallowInput( GameWindow *window, UnsignedInt msg, WindowMsgData mData1, WindowMsgData mData2 );
 extern void ToggleControlBar( Bool immediate = TRUE );
 extern void HideControlBar( Bool immediate = TRUE );
 extern void ShowControlBar( Bool immediate = TRUE );

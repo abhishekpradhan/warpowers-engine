@@ -1211,7 +1211,10 @@ CommandAvailability ControlBar::getCommandAvailability( const CommandButton *com
 			}
 			if( makeType == CANMAKE_NO_MONEY )
 			{
-				return COMMAND_RESTRICTED; //COMMAND_CANT_AFFORD;
+				// WarPowers @fix: CANT_AFFORD keeps the icon colored (ALWAYS_COLOR)
+				// so 'too expensive right now' reads differently from 'locked';
+				// the disabled-click deny sound (GUIClickDisabled) still plays.
+				return COMMAND_CANT_AFFORD;
 			}
 
 			break;
