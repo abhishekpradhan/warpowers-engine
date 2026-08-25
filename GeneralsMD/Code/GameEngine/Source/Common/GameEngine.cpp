@@ -1042,6 +1042,38 @@ void GameEngine::update()
 			/// @todo Move audio init, update, etc, into GameClient update
 
 			TheAudio->UPDATE();
+
+			// WarPowers @feature music rotation: cycles the Track_WP_* list
+			// (Music.ini) with a short silence between tracks. Runs in menu
+			// and match alike; respects the mixer's music volume.
+			{
+				static const char* const s_wpTracks[] = {
+					"Track_WP_01", "Track_WP_02", "Track_WP_03",
+					"Track_WP_04", "Track_WP_05", "Track_WP_06",
+				};
+				static AudioHandle s_wpMusicHandle = 0;
+				static Int s_wpTrackIdx = -1;
+				static Int s_wpMusicGap = 150;   // ~5s before the first track
+				if (TheAudio)
+				{
+					if (s_wpMusicHandle != 0 && TheAudio->isCurrentlyPlaying(s_wpMusicHandle))
+					{
+						// still playing
+					}
+					else if (s_wpMusicGap > 0)
+					{
+						--s_wpMusicGap;
+					}
+					else
+					{
+						s_wpTrackIdx = (s_wpTrackIdx + 1) % (Int)ARRAY_SIZE(s_wpTracks);
+						AudioEventRTS wpTrack(s_wpTracks[s_wpTrackIdx]);
+						s_wpMusicHandle = TheAudio->addAudioEvent(&wpTrack);
+						s_wpMusicGap = 240;      // ~8s of quiet between tracks
+					}
+				}
+			}
+
 			TheGameClient->UPDATE();
 			// WarPowers @debug WP_AUTOTEST: scripted input smoke test. Injects
 			// the same logic messages real mouse input produces: select the

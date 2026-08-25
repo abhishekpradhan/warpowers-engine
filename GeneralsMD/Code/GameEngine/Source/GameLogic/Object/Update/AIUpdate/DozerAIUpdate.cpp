@@ -1136,7 +1136,11 @@ StateReturnType DozerPrimaryIdleState::update()
 	// we don't want to add in if we're already in the list or if
 	// we're "Effectively dead"
 	//
-	if( ai->isIdle() && !m_isMarkedAsIdle && !dozer->isEffectivelyDead())
+	// WarPowers: re-assert membership every idle tick instead of gating on
+	// m_isMarkedAsIdle — a map-placed dozer registers during load, then
+	// InGameUI::reset clears the list while this flag stays TRUE, orphaning
+	// the dozer from the idle-worker button forever. addIdleWorker dedups.
+	if( ai->isIdle() && !dozer->isEffectivelyDead())
 	{
 		m_idlePlayerNumber = dozer->getControllingPlayer()->getPlayerIndex();
 		TheInGameUI->addIdleWorker(getMachineOwner());
