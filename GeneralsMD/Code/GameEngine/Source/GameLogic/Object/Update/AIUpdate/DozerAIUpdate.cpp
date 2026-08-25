@@ -182,8 +182,20 @@ StateReturnType DozerActionPickActionPosState::update()
 	}
 
 	// pick a location to move to
+	//
+	// WarPowers @bugfix: never trust the stored order-time dock point. newTask
+	// computes it from the dozer's position AT ORDER TIME — often across the
+	// map, and (for fresh construction) before the site's footprint existed —
+	// so it can land unreachably close to or inside the building. The result
+	// was a silent forever-loop: move ends short of the point, MoveToActionPos
+	// fails on idle, this state re-issues the SAME stale point, the pathfinder
+	// completes instantly, repeat — dozer parked, site at 0%, money spent
+	// (reproduced deterministically by WP_AUTOTEST=wedge after the map regen
+	// changed base geometry). Recompute the approach from CURRENT positions
+	// every time this state runs; the dock-action phase self-positions after.
 	Coord3D goalPos;
-	const Coord3D *pos = dozerAI->getDockPoint( m_task, DOZER_DOCK_POINT_START );
+	Bool wp_fresh = DozerAIUpdate::findGoodBuildOrRepairPosition( dozer, goalObject, goalPos );
+	const Coord3D *pos = wp_fresh ? &goalPos : nullptr;
 	if( pos )
 		goalPos = *pos;
 	else
@@ -1690,8 +1702,49 @@ UpdateSleepTime DozerAIUpdate::update()
 	else
 		getObject()->setWeaponSetFlag(WEAPONSET_MINE_CLEARING_DETAIL);//maybe go clear some mines, if I feel like it
 
+	// WarPowers @bugfix: the primary machine can be left with NO current state
+	// when a new construct order lands during the previous build's completion
+	// transition (re-entrant resetToDefaultState through a state's onExit —
+	// caught live via WP_DOZER_TRACE: curTask=BUILD, target set, outer idle,
+	// current state null for 270+ frames). A stateless machine silently does
+	// nothing every frame: the paid-for site never starts, the dozer never
+	// registers idle, auto-resume never runs. Self-heal: put the machine back
+	// in its default state so the pending task's transition can fire.
+	if( m_dozerMachine->getCurrentStateID() == INVALID_STATE_ID )
+	{
+		fprintf(stderr, "[WPDOZ] f=%u id=%u primary machine had no current state — self-healing to default\n",
+			TheGameLogic->getFrame(), getObject()->getID());
+		fflush(stderr);
+		m_dozerMachine->resetToDefaultState();
+	}
+
 	// run our own state machine
 	m_dozerMachine->updateStateMachine();
+
+	// WarPowers @debug WP_DOZER_TRACE: task-wedge forensics. Every ~15 frames
+	// print the full gate state the primary machine's IDLE->BUILD transition
+	// depends on (isBuildMostImportant requires outer isIdle() + most-recent
+	// command). A pending build that never starts shows exactly which gate
+	// holds it hostage.
+	{
+		static const char* wp_dozEnv = getenv("WP_DOZER_TRACE");
+		if (wp_dozEnv && (TheGameLogic->getFrame() % 15 == 0))
+		{
+			ObjectID wp_buildTarget = getTaskTarget(DOZER_TASK_BUILD);
+			if (wp_buildTarget != INVALID_ID || getCurrentTask() != DOZER_TASK_INVALID)
+			{
+				const Coord3D* wp_p = getObject()->getPosition();
+				fprintf(stderr,
+					"[WPDOZ] f=%u id=%u pos=(%.0f,%.0f) curTask=%d recent=%d buildTgt=%u "
+					"outerIdle=%d prim=%d attack=%d\n",
+					TheGameLogic->getFrame(), getObject()->getID(), wp_p->x, wp_p->y,
+					(int)getCurrentTask(), (int)getMostRecentCommand(), wp_buildTarget,
+					(int)isIdle(), (int)m_dozerMachine->getCurrentStateID(),
+					(int)getAIStateType());
+				fflush(stderr);
+			}
+		}
+	}
 
 	return UPDATE_SLEEP_NONE;
 

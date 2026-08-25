@@ -1090,6 +1090,12 @@ void GameEngine::update()
 				// construct Power Station -> construct Vehicle Works -> build a tank
 				// from the factory. Verifies D016 construction end to end.
 				static const Bool wp_baseMode = wp_autoEnv && strcmp(wp_autoEnv, "base") == 0;
+				// WP_AUTOTEST=wedge: identical to base but the SECOND construct order is
+				// injected while the first structure is still ~90% under construction —
+				// the exact timing that wedged the dozer's primary state machine
+				// (null current state; see the self-heal in DozerAIUpdate::update).
+				// Passing = VehiclePlant still gets built afterwards.
+				static const Bool wp_wedgeMode = wp_autoEnv && strcmp(wp_autoEnv, "wedge") == 0;
 				// WP_AUTOTEST=ghost verifies the fog-memory lifecycle: spawn a neutral
 				// structure out of base vision, scout it with a tank, retreat (fog ->
 				// snapshot), kill it while fogged (orphan ghost), re-scout (ghost must
@@ -1393,7 +1399,7 @@ void GameEngine::update()
 							wp_stage = 6;
 						}
 					}
-					else if (wp_baseMode)
+					else if (wp_baseMode || wp_wedgeMode)
 					{
 						// --- D016 base-loop machine (stages 10..16) ---
 						static ObjectID wp_dozerId = INVALID_ID;
@@ -1467,9 +1473,17 @@ void GameEngine::update()
 									wp_ppId = pp->getID();
 									fprintf(stderr, "[WP_AUTO] f=%u BASE: PowerArray placed id=%u\n", wp_f, (unsigned)wp_ppId);
 								}
-								if (!pp->getStatusBits().test(OBJECT_STATUS_UNDER_CONSTRUCTION))
+								Bool wp_orderNow = !pp->getStatusBits().test(OBJECT_STATUS_UNDER_CONSTRUCTION);
+								if (wp_wedgeMode && !wp_orderNow && pp->getConstructionPercent() >= 88.0f)
 								{
-									fprintf(stderr, "[WP_AUTO] f=%u BASE: PowerArray CONSTRUCTED\n", wp_f);
+									fprintf(stderr, "[WP_AUTO] f=%u WEDGE: PowerArray at %.0f%% — injecting second construct NOW\n",
+										wp_f, pp->getConstructionPercent());
+									wp_orderNow = TRUE;
+								}
+								if (wp_orderNow)
+								{
+									fprintf(stderr, "[WP_AUTO] f=%u BASE: PowerArray %s\n", wp_f,
+										pp->getStatusBits().test(OBJECT_STATUS_UNDER_CONSTRUCTION) ? "still building (wedge inject)" : "CONSTRUCTED");
 									wp_select(wp_dozerId);
 									const ThingTemplate* tt = TheThingFactory->findTemplate("WP_VehiclePlant");
 									GameMessage* m = TheMessageStream->appendMessage(GameMessage::MSG_DOZER_CONSTRUCT);
