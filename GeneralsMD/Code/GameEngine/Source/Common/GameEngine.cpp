@@ -846,10 +846,19 @@ void GameEngine::init()
 				// shutdown the top, but do not pop it off the stack
 	//			TheShell->hideShell();
 
+				// WarPowers @debug WP_DIFFICULTY=0/1/2 overrides the -file
+				// match difficulty (headless testing of the per-difficulty AI).
+				GameDifficulty wpDiff = DIFFICULTY_NORMAL;
+				{
+					const char* wpDiffEnv = getenv("WP_DIFFICULTY");
+					if (wpDiffEnv && *wpDiffEnv >= '0' && *wpDiffEnv <= '2')
+						wpDiff = (GameDifficulty)(*wpDiffEnv - '0');
+				}
+
 				// send a message to the logic for a new game
 				GameMessage *msg = TheMessageStream->appendMessage( GameMessage::MSG_NEW_GAME );
 				msg->appendIntegerArgument(GAME_SINGLE_PLAYER);
-				msg->appendIntegerArgument(DIFFICULTY_NORMAL);
+				msg->appendIntegerArgument(wpDiff);
 				msg->appendIntegerArgument(0);
 				InitRandom(0);
 			}

@@ -131,19 +131,27 @@ extern "C" EMSCRIPTEN_KEEPALIVE void wpSetMasterVolume( int pct )
 // Shared: start a map through the command-line path (menu-mode: m_initialFile
 // stays empty, so the post-match flow returns here instead of exiting).
 // ----------------------------------------------------------------------------
+// Opponent difficulty picked on the deployment screen (0/1/2 = the
+// GameDifficulty enum). MSG_NEW_GAME's difficulty argument feeds
+// prepareNewGame -> ScriptEngine::setGlobalDifficulty, which the AIPlayer
+// ctor snapshots and the per-difficulty map scripts (easy/normal/hard flag
+// bytes) key off. Restart Battle re-reads the live global, so the choice
+// survives restarts for free.
+static Int s_wpDiffIdx = DIFFICULTY_NORMAL;
+
 static void wpStartMap( const char *mapPath )
 {
 	// WarPowers @debug IG_TRACE menu-start forensics
 	static const bool wpTrace = getenv("IG_TRACE") && *getenv("IG_TRACE") != '0';
 	if (wpTrace)
-		fprintf(stderr, "[WPSHELL] startMap '%s'\n", mapPath);
+		fprintf(stderr, "[WPSHELL] startMap '%s' diff=%d\n", mapPath, (int)s_wpDiffIdx);
 	TheWritableGlobalData->m_pendingFile = mapPath;
 	TheWritableGlobalData->m_shellMapOn = FALSE;
 	TheWritableGlobalData->m_playIntro = FALSE;
 
 	GameMessage *msg = TheMessageStream->appendMessage( GameMessage::MSG_NEW_GAME );
 	msg->appendIntegerArgument( GAME_SINGLE_PLAYER );
-	msg->appendIntegerArgument( DIFFICULTY_NORMAL );
+	msg->appendIntegerArgument( (GameDifficulty)s_wpDiffIdx );
 	msg->appendIntegerArgument( 0 );
 	InitRandom( 0 );
 }
@@ -308,6 +316,15 @@ static Int s_wpMapIdx = 0;
 static NameKeyType wpMapPrevID = NAMEKEY_INVALID;
 static NameKeyType wpMapNextID = NAMEKEY_INVALID;
 
+struct WPDiffEntry { const char *label; const char *desc; };
+static const WPDiffEntry s_wpDiffs[] = {
+	{ "WP:DiffEasy",   "WP:DiffEasyDesc" },
+	{ "WP:DiffNormal", "WP:DiffNormalDesc" },
+	{ "WP:DiffHard",   "WP:DiffHardDesc" },
+};
+static NameKeyType wpDiffPrevID = NAMEKEY_INVALID;
+static NameKeyType wpDiffNextID = NAMEKEY_INVALID;
+
 static void wpSkirmishRefreshMapButton( void )
 {
 	// GadgetStaticTextSetText, not winSetText: STATICTEXT caches its
@@ -321,6 +338,14 @@ static void wpSkirmishRefreshMapButton( void )
 		TheNameKeyGenerator->nameToKey( "WPSkirmish.wnd:MapDesc" ) );
 	if (w)
 		GadgetStaticTextSetText( w, TheGameText->fetch( s_wpMaps[s_wpMapIdx].desc ) );
+	w = TheWindowManager->winGetWindowFromId( nullptr,
+		TheNameKeyGenerator->nameToKey( "WPSkirmish.wnd:DiffName" ) );
+	if (w)
+		GadgetStaticTextSetText( w, TheGameText->fetch( s_wpDiffs[s_wpDiffIdx].label ) );
+	w = TheWindowManager->winGetWindowFromId( nullptr,
+		TheNameKeyGenerator->nameToKey( "WPSkirmish.wnd:DiffDesc" ) );
+	if (w)
+		GadgetStaticTextSetText( w, TheGameText->fetch( s_wpDiffs[s_wpDiffIdx].desc ) );
 }
 
 void WPSkirmishInit( WindowLayout *layout, void *userData )
@@ -330,12 +355,18 @@ void WPSkirmishInit( WindowLayout *layout, void *userData )
 	wpSkirmishBackID = TheNameKeyGenerator->nameToKey( "WPSkirmish.wnd:ButtonBack" );
 	wpMapPrevID = TheNameKeyGenerator->nameToKey( "WPSkirmish.wnd:ButtonMapPrev" );
 	wpMapNextID = TheNameKeyGenerator->nameToKey( "WPSkirmish.wnd:ButtonMapNext" );
+	wpDiffPrevID = TheNameKeyGenerator->nameToKey( "WPSkirmish.wnd:ButtonDiffPrev" );
+	wpDiffNextID = TheNameKeyGenerator->nameToKey( "WPSkirmish.wnd:ButtonDiffNext" );
 
 #if defined(__EMSCRIPTEN__)
 	s_wpMapIdx = EM_ASM_INT({
 		try { return Math.max(0, Math.min($0, parseInt(localStorage.getItem('wpMap') || '0', 10) || 0)); }
 		catch (e) { return 0; }
 	}, (int)(ARRAY_SIZE(s_wpMaps) - 1));
+	s_wpDiffIdx = EM_ASM_INT({
+		try { return Math.max(0, Math.min($0, parseInt(localStorage.getItem('wpDiff') || '1', 10) || 0)); }
+		catch (e) { return 1; }
+	}, (int)(ARRAY_SIZE(s_wpDiffs) - 1));
 #endif
 	wpSkirmishRefreshMapButton();
 
@@ -378,6 +409,16 @@ WindowMsgHandledType WPSkirmishSystem( GameWindow *window, UnsignedInt msg,
 #if defined(__EMSCRIPTEN__)
 				EM_ASM({ try { localStorage.setItem('wpMap', String($0)); } catch (e) {} },
 					(int)s_wpMapIdx);
+#endif
+			}
+			else if( controlID == wpDiffPrevID || controlID == wpDiffNextID )
+			{
+				const Int n = (Int)ARRAY_SIZE(s_wpDiffs);
+				s_wpDiffIdx = (s_wpDiffIdx + (controlID == wpDiffNextID ? 1 : n - 1)) % n;
+				wpSkirmishRefreshMapButton();
+#if defined(__EMSCRIPTEN__)
+				EM_ASM({ try { localStorage.setItem('wpDiff', String($0)); } catch (e) {} },
+					(int)s_wpDiffIdx);
 #endif
 			}
 			else if( controlID == wpSkirmishBackID )
