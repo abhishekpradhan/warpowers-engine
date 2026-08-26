@@ -46,6 +46,7 @@
 #include "GameClient/Display.h"  // WarPowers @debug WP_AUTOTEST=husk
 #include "GameClient/View.h"  // WarPowers @debug WP_AUTOTEST
 #include "GameLogic/Module/ProductionUpdate.h"  // WarPowers @debug WP_AUTOTEST
+#include "Common/ScoreKeeper.h"  // WarPowers @debug WP_AI_TRACE score probe
 #include "GameLogic/SidesList.h"  // WarPowers @debug WP_AI_TRACE (BuildListInfo)
 // WarPowers @debug WP_AI_TRACE: symbolized backtrace for the named-object
 // forensics (kept out of the headers). No execinfo under emscripten.
@@ -1106,6 +1107,22 @@ void GameEngine::update()
 				if (wp_aiEnv && TheGameLogic && TheGameLogic->isInGame() &&
 					ThePlayerList && (TheGameLogic->getFrame() % 300 == 0))
 				{
+					// scorekeeper probe: every playable player's per-victim
+					// building-kill buckets (feeds PLAYER_DESTROYED_N_BUILDINGS_PLAYER)
+					for (Int wp_si = 0; wp_si < ThePlayerList->getPlayerCount(); ++wp_si)
+					{
+						Player* wp_sp = ThePlayerList->getNthPlayer(wp_si);
+						if (!wp_sp || wp_sp->getPlayerTemplate() == nullptr) continue;
+						ScoreKeeper* wp_sk = wp_sp->getScoreKeeper();
+						if (!wp_sk) continue;
+						fprintf(stderr, "[WPSCORE] p=%d bldKilled=[%d,%d,%d,%d] total=%d\n",
+							wp_si,
+							wp_sk->getTotalBuildingsDestroyedOfPlayer(0),
+							wp_sk->getTotalBuildingsDestroyedOfPlayer(1),
+							wp_sk->getTotalBuildingsDestroyedOfPlayer(2),
+							wp_sk->getTotalBuildingsDestroyedOfPlayer(3),
+							wp_sk->getTotalBuildingsDestroyed());
+					}
 					for (Int wp_pi = 0; wp_pi < ThePlayerList->getPlayerCount(); ++wp_pi)
 					{
 						Player* wp_pl = ThePlayerList->getNthPlayer(wp_pi);
@@ -1221,6 +1238,11 @@ void GameEngine::update()
 				// (null current state; see the self-heal in DozerAIUpdate::update).
 				// Passing = VehiclePlant still gets built afterwards.
 				static const Bool wp_wedgeMode = wp_autoEnv && strcmp(wp_autoEnv, "wedge") == 0;
+				// WP_AUTOTEST=strike: field 4 tanks and destroy the nearest enemy
+				// STRUCTURE to the player base (the AI's forward tower) — a
+				// deterministic building-kill to exercise kill-credit scoring and
+				// the PLAYER_DESTROYED_N_BUILDINGS_PLAYER punish condition.
+				static const Bool wp_strikeMode = wp_autoEnv && strcmp(wp_autoEnv, "strike") == 0;
 				// WP_AUTOTEST=ghost verifies the fog-memory lifecycle: spawn a neutral
 				// structure out of base vision, scout it with a tank, retreat (fog ->
 				// snapshot), kill it while fogged (orphan ghost), re-scout (ghost must
@@ -1522,6 +1544,81 @@ void GameEngine::update()
 							fprintf(stderr, "[WP_AUTO] f=%u GHOST: sequence complete - check [GHOST] traces above\n", wp_f);
 							TheGameEngine->setQuitting(TRUE);
 							wp_stage = 6;
+						}
+					}
+					else if (wp_strikeMode)
+					{
+						static ObjectID wp_stFleet[4] = {INVALID_ID, INVALID_ID, INVALID_ID, INVALID_ID};
+						static ObjectID wp_stTarget = INVALID_ID;
+						if (wp_stage == 0 && wp_f >= 90)
+						{
+							for (Object* o = TheGameLogic->getFirstObject(); o; o = o->getNextObject())
+							{
+								if (!o->getTemplate()->isKindOf(KINDOF_COMMANDCENTER)) continue;
+								Int idx = o->getControllingPlayer() ? o->getControllingPlayer()->getPlayerIndex() : -1;
+								if (idx == wp_localIdx) { wp_ccId = o->getID(); wp_ccPos = *o->getPosition(); }
+							}
+							if (wp_ccId != INVALID_ID)
+							{
+								GameMessage* s0 = TheMessageStream->appendMessage(GameMessage::MSG_CREATE_SELECTED_GROUP);
+								s0->appendBooleanArgument(TRUE);
+								s0->appendObjectIDArgument(wp_ccId);
+								const ThingTemplate* tt = TheThingFactory->findTemplate("WP_Tank");
+								if (tt)
+									for (Int q = 0; q < 4; ++q)
+									{
+										GameMessage* m = TheMessageStream->appendMessage(GameMessage::MSG_QUEUE_UNIT_CREATE);
+										m->appendIntegerArgument(tt->getTemplateID());
+										m->appendIntegerArgument(1);
+									}
+								fprintf(stderr, "[WP_AUTO] f=%u STRIKE: queued 4 tanks\n", wp_f);
+								wp_stage = 1;
+							}
+						}
+						else if (wp_stage == 1 && (wp_f % 30) == 0 && wp_f >= 900)
+						{
+							Int wp_n = 0;
+							for (Object* o = TheGameLogic->getFirstObject(); o && wp_n < 4; o = o->getNextObject())
+								if (o->getTemplate()->getName() == "WP_Tank" && !o->isEffectivelyDead() &&
+									o->getControllingPlayer() &&
+									o->getControllingPlayer()->getPlayerIndex() == wp_localIdx)
+									wp_stFleet[wp_n++] = o->getID();
+							if (wp_n >= 4)
+							{
+								// nearest enemy structure to OUR base = the forward tower
+								Real bestSq = 1e18f; Object* tgt = nullptr;
+								for (Object* o = TheGameLogic->getFirstObject(); o; o = o->getNextObject())
+								{
+									if (!o->isKindOf(KINDOF_STRUCTURE) || o->isEffectivelyDead()) continue;
+									Player* op = o->getControllingPlayer();
+									if (!op || op->getPlayerIndex() == wp_localIdx || op->getPlayerTemplate() == nullptr) continue;
+									if (op->getPlayerType() != PLAYER_COMPUTER) continue;
+									Real dx = o->getPosition()->x - wp_ccPos.x;
+									Real dy = o->getPosition()->y - wp_ccPos.y;
+									if (dx*dx + dy*dy < bestSq) { bestSq = dx*dx + dy*dy; tgt = o; }
+								}
+								if (tgt)
+								{
+									wp_stTarget = tgt->getID();
+									GameMessage* s2 = TheMessageStream->appendMessage(GameMessage::MSG_CREATE_SELECTED_GROUP);
+									s2->appendBooleanArgument(TRUE);
+									for (Int fi = 0; fi < 4; ++fi) s2->appendObjectIDArgument(wp_stFleet[fi]);
+									GameMessage* m = TheMessageStream->appendMessage(GameMessage::MSG_DO_ATTACK_OBJECT);
+									m->appendObjectIDArgument(wp_stTarget);
+									fprintf(stderr, "[WP_AUTO] f=%u STRIKE: attacking structure id=%u tmpl=%s\n",
+										wp_f, (unsigned)wp_stTarget, tgt->getTemplate()->getName().str());
+									wp_stage = 2;
+								}
+							}
+						}
+						else if (wp_stage == 2 && (wp_f % 30) == 0)
+						{
+							Object* tgt = TheGameLogic->findObjectByID(wp_stTarget);
+							if (!tgt || tgt->isEffectivelyDead())
+							{
+								fprintf(stderr, "[WP_AUTO] f=%u STRIKE: structure down — watch [WPSCORE]/teamPunish\n", wp_f);
+								wp_stage = 3;
+							}
 						}
 					}
 					else if (wp_baseMode || wp_wedgeMode)

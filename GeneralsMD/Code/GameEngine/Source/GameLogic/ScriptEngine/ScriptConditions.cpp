@@ -46,6 +46,7 @@
 #include "GameClient/InGameUI.h"
 #include "GameClient/View.h"
 
+#include "Common/ScoreKeeper.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/BodyModule.h"
@@ -1978,13 +1979,19 @@ Bool ScriptConditions::evaluatePlayerDestroyedNOrMoreBuildings(Parameter *pPlaye
 {
 	Player* pPlayer = playerFromParam(pPlayerParm);
 	Player* pOpponent = playerFromParam(pOpponentParm);
-//Int N = pNumParm->getInt();
+	Int N = pNumParm->getInt();
 	if (!pPlayer || !pOpponent) {
 		return false;
 	}
 
-	/// @todo CLH implement me!
-	return FALSE;
+	// WarPowers: implement the stock stub via ScoreKeeper's per-victim
+	// building-kill counts (fed by the SCORE KindOf on our templates).
+	// Powers the AI's "punish" team: player aggression unlocks retaliation.
+	ScoreKeeper *score = pPlayer->getScoreKeeper();
+	if (!score) {
+		return false;
+	}
+	return score->getTotalBuildingsDestroyedOfPlayer( pOpponent->getPlayerIndex() ) >= N;
 }
 
 //-------------------------------------------------------------------------------------------------
