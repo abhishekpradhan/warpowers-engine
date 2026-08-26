@@ -46,6 +46,20 @@
 #include "GameClient/Display.h"  // WarPowers @debug WP_AUTOTEST=husk
 #include "GameClient/View.h"  // WarPowers @debug WP_AUTOTEST
 #include "GameLogic/Module/ProductionUpdate.h"  // WarPowers @debug WP_AUTOTEST
+#include "GameLogic/SidesList.h"  // WarPowers @debug WP_AI_TRACE (BuildListInfo)
+// WarPowers @debug WP_AI_TRACE: symbolized backtrace for the named-object
+// forensics (kept out of the headers). No execinfo under emscripten.
+#ifndef __EMSCRIPTEN__
+#include <execinfo.h>
+void WPPrintBacktrace()
+{
+	void* wp_frames[24];
+	int wp_n = backtrace(wp_frames, 24);
+	backtrace_symbols_fd(wp_frames, wp_n, 2);
+}
+#else
+void WPPrintBacktrace() {}
+#endif
 #include "GameLogic/TerrainLogic.h"  // WarPowers @debug WP_AUTOTEST=ghost
 #include "GameLogic/AIPathfind.h"  // WarPowers @debug WP_AUTOTEST=ghost
 #include "Common/GameAudio.h"
@@ -1070,6 +1084,108 @@ void GameEngine::update()
 						AudioEventRTS wpTrack(s_wpTracks[s_wpTrackIdx]);
 						s_wpMusicHandle = TheAudio->addAudioEvent(&wpTrack);
 						s_wpMusicGap = 240;      // ~8s of quiet between tracks
+					}
+				}
+			}
+
+			// WarPowers @debug WP_AI_TRACE: computer-player forensics for the
+			// Phase 4 opponent. Every ~10s print each AI player's economy and
+			// army so a headless run shows whether it trains dozers, expands
+			// its build list, and produces attack teams.
+			{
+				static const char* wp_aiEnv = getenv("WP_AI_TRACE");
+				if (wp_aiEnv && TheGameLogic && TheGameLogic->isInGame() &&
+					ThePlayerList && (TheGameLogic->getFrame() % 300 == 0))
+				{
+					for (Int wp_pi = 0; wp_pi < ThePlayerList->getPlayerCount(); ++wp_pi)
+					{
+						Player* wp_pl = ThePlayerList->getNthPlayer(wp_pi);
+						if (!wp_pl || wp_pl->getPlayerType() != PLAYER_COMPUTER)
+							continue;
+						if (wp_pl->getPlayerTemplate() == nullptr)
+							continue;   // neutral/civilian slots
+						Int wp_structs = 0, wp_units = 0, wp_dozers = 0, wp_underCon = 0;
+						for (Object* wp_o = TheGameLogic->getFirstObject(); wp_o; wp_o = wp_o->getNextObject())
+						{
+							if (wp_o->getControllingPlayer() != wp_pl) continue;
+							if (wp_o->isEffectivelyDead()) continue;
+							if (wp_o->isKindOf(KINDOF_STRUCTURE)) {
+								++wp_structs;
+								if (wp_o->getStatusBits().test(OBJECT_STATUS_UNDER_CONSTRUCTION)) ++wp_underCon;
+							} else if (wp_o->isKindOf(KINDOF_INFANTRY) || wp_o->isKindOf(KINDOF_VEHICLE)) {
+								++wp_units;
+								if (wp_o->isKindOf(KINDOF_DOZER)) ++wp_dozers;
+							}
+						}
+						fprintf(stderr, "[WPAI] f=%u p=%d money=%d structs=%d(uc=%d) units=%d dozers=%d bldU=%d bldB=%d\n",
+							TheGameLogic->getFrame(), wp_pi, wp_pl->getMoney()->countMoney(),
+							wp_structs, wp_underCon, wp_units, wp_dozers,
+							(int)wp_pl->getCanBuildUnits(), (int)wp_pl->getCanBuildBase());
+						// Per-prototype production gates for teams that carry a
+						// production condition (the Phase 4 attack teams).
+						for (Player::PlayerTeamList::const_iterator wp_t = wp_pl->getPlayerTeams()->begin();
+							 wp_t != wp_pl->getPlayerTeams()->end(); ++wp_t)
+						{
+							TeamPrototype* wp_proto = *wp_t;
+							if (wp_proto->getTemplateInfo()->m_productionCondition.isEmpty())
+								continue;
+							fprintf(stderr, "[WPAI]   team=%s cond=%d inst=%d/%d pri=%d\n",
+								wp_proto->getName().str(),
+								(int)wp_proto->evaluateProductionCondition(),
+								wp_proto->countTeamInstances(),
+								wp_proto->getTemplateInfo()->m_maxInstances,
+								wp_proto->getTemplateInfo()->m_productionPriority);
+							// factory availability for the team's first unit type,
+							// replicated from AIPlayer::findFactory (build-list scan)
+							if (wp_proto->getTemplateInfo()->m_numUnitsInfo > 0)
+							{
+								const ThingTemplate* wp_ut = TheThingFactory->findTemplate(
+									wp_proto->getTemplateInfo()->m_unitsInfo[0].unitThingName);
+								Int wp_blEntries = 0, wp_blLinked = 0, wp_blPU = 0, wp_blCanMake = 0, wp_blIdle = 0;
+								for (BuildListInfo* wp_bli = wp_pl->getBuildList(); wp_bli; wp_bli = wp_bli->getNext())
+								{
+									++wp_blEntries;
+									Object* wp_fo = TheGameLogic->findObjectByID(wp_bli->getObjectID());
+									if (!wp_fo) continue;
+									++wp_blLinked;
+									ProductionUpdateInterface* wp_pu = wp_fo->getProductionUpdateInterface();
+									if (!wp_pu) continue;
+									++wp_blPU;
+									if (wp_ut && TheBuildAssistant->isPossibleToMakeUnit(wp_fo, wp_ut) == FALSE) continue;
+									++wp_blCanMake;
+									if (wp_pu->getProductionCount() == 0) ++wp_blIdle;
+								}
+								fprintf(stderr, "[WPAI]     unit=%s bl=%d linked=%d pu=%d canMake=%d idle=%d\n",
+									wp_ut ? wp_ut->getName().str() : "?", wp_blEntries, wp_blLinked,
+									wp_blPU, wp_blCanMake, wp_blIdle);
+								// split the canMake failure: command-set scan vs player->canBuild
+								if (wp_ut)
+								{
+									for (BuildListInfo* wp_bli2 = wp_pl->getBuildList(); wp_bli2; wp_bli2 = wp_bli2->getNext())
+									{
+										Object* wp_fo2 = TheGameLogic->findObjectByID(wp_bli2->getObjectID());
+										if (!wp_fo2 || !wp_fo2->getProductionUpdateInterface()) continue;
+										const CommandSet* wp_cs = TheControlBar->findCommandSet(wp_fo2->getCommandSetString());
+										Int wp_btn = 0;
+										if (wp_cs)
+											for (Int wp_ci = 0; wp_ci < MAX_COMMANDS_PER_SET; ++wp_ci)
+											{
+												const CommandButton* wp_cb = wp_cs->getCommandButton(wp_ci);
+												if (wp_cb && (wp_cb->getCommandType() == GUI_COMMAND_UNIT_BUILD ||
+															  wp_cb->getCommandType() == GUI_COMMAND_DOZER_CONSTRUCT) &&
+													wp_cb->getThingTemplate() && wp_cb->getThingTemplate()->isEquivalentTo(wp_ut))
+													++wp_btn;
+											}
+										fprintf(stderr, "[WPAI]       fac=%s set='%s' cs=%d btn=%d canBuild=%d buildable=%d\n",
+											wp_fo2->getTemplate()->getName().str(),
+											wp_fo2->getCommandSetString().str(),
+											wp_cs ? 1 : 0, wp_btn, (int)wp_pl->canBuild(wp_ut),
+											(int)wp_ut->getBuildable());
+									}
+								}
+							}
+						}
+						fflush(stderr);
 					}
 				}
 			}

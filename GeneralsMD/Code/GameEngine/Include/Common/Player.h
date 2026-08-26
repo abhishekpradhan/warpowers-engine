@@ -601,7 +601,18 @@ public:
 
 	/// Enable/Disable the construction of units
 	Bool getCanBuildUnits() { return m_canBuildUnits; }
-	void setCanBuildUnits(Bool canProduce) { m_canBuildUnits = canProduce; }
+	void setCanBuildUnits(Bool canProduce) {
+		// WarPowers @debug WP_AI_TRACE: who toggles AI production?
+		if (getenv("WP_AI_TRACE") && m_canBuildUnits != canProduce) {
+			fprintf(stderr, "[WPAI] setCanBuildUnits(%d) player=%s\n", (int)canProduce,
+				m_playerName.str());
+			if (!canProduce) {
+				extern void WPPrintBacktrace();
+				WPPrintBacktrace();
+			}
+		}
+		m_canBuildUnits = canProduce;
+	}
 
 	/// Enable/Disable the construction of base buildings.
 	Bool getCanBuildBase() { return m_canBuildBase; }

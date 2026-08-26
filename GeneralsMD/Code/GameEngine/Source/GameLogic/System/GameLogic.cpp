@@ -4412,6 +4412,19 @@ void GameLogic::destroyObject( Object *obj )
 	if (!obj || obj->isDestroyed())
 		return;
 
+	// WarPowers @debug WP_AI_TRACE: catch whoever destroys a NAMED object
+	// (win/lose anchors) — the Phase 4 phantom-defeat forensics.
+	if (getenv("WP_AI_TRACE") && obj->getName().isNotEmpty())
+	{
+		fprintf(stderr, "[WPDESTROY] name='%s' tmpl=%s id=%u f=%u dead=%d\n",
+			obj->getName().str(),
+			obj->getTemplate() ? obj->getTemplate()->getName().str() : "?",
+			(unsigned)obj->getID(), TheGameLogic->getFrame(),
+			(int)obj->isEffectivelyDead());
+		extern void WPPrintBacktrace();
+		WPPrintBacktrace();
+	}
+
 	// run the object onDestroy event if provided
 	for (BehaviorModule** m = obj->getBehaviorModules(); *m; ++m)
 	{

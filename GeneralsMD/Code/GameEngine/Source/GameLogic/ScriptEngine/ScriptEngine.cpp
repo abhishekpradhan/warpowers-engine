@@ -7133,6 +7133,17 @@ void ScriptEngine::removeObjectFromCache( Object* pDeadObject )
 {
 	for (VecNamedRequestsIt it = m_namedObjects.begin(); it != m_namedObjects.end(); ++it) {
 		if (pDeadObject == (it->second)) {
+			// WarPowers @debug WP_AI_TRACE: who nulls a named entry?
+			if (getenv("WP_AI_TRACE"))
+			{
+				fprintf(stderr, "[WPNAMED] cache null: entry='%s' dying obj=%u tmpl=%s name='%s' f=%u\n",
+					it->first.str(), (unsigned)pDeadObject->getID(),
+					pDeadObject->getTemplate() ? pDeadObject->getTemplate()->getName().str() : "?",
+					pDeadObject->getName().str(),
+					TheGameLogic ? TheGameLogic->getFrame() : 0);
+				extern void WPPrintBacktrace();
+				WPPrintBacktrace();
+			}
 			it->second = nullptr;	// Don't remove it, cause we want to check whether we ever knew a name later
 			break;
 		}
