@@ -996,7 +996,8 @@ void MiniAudioManager::openDevice(void)
 			if (v < 0.0f) v = 0.0f;
 			if (v > 1.0f) v = 1.0f;
 			ma_engine_set_volume(&m_engine, v);
-			fprintf(stderr, "AUDIO: master volume from WP_VOLUME: %.2f\n", v);
+			if (wpAudioTrace())
+				fprintf(stderr, "AUDIO: master volume from WP_VOLUME: %.2f\n", v);
 		}
 	}
 

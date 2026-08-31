@@ -116,7 +116,8 @@ void WPRecordMatchResult( Bool victory )
 #ifdef __EMSCRIPTEN__
 // ----------------------------------------------------------------------------
 // Page overlay bridge: the HTML control strip drives the master volume live.
-// (The in-engine Options screen was retired in favor of the overlay.)
+// (In web builds the overlay drives volume live; the in-engine Options
+// screen still serves the menu / quit-menu path.)
 // ----------------------------------------------------------------------------
 extern "C" EMSCRIPTEN_KEEPALIVE void wpSetMasterVolume( int pct )
 {
@@ -325,11 +326,11 @@ static const WPDiffEntry s_wpDiffs[] = {
 static NameKeyType wpDiffPrevID = NAMEKEY_INVALID;
 static NameKeyType wpDiffNextID = NAMEKEY_INVALID;
 
-static void wpSkirmishRefreshMapButton( void )
+static void wpSkirmishRefreshLabels( void )
 {
 	// GadgetStaticTextSetText, not winSetText: STATICTEXT caches its
 	// render string in the gadget data - bare winSetText leaves the drawn
-	// text stale/empty (the score screen labels burned this in first).
+	// text stale/empty.
 	GameWindow *w = TheWindowManager->winGetWindowFromId( nullptr,
 		TheNameKeyGenerator->nameToKey( "WPSkirmish.wnd:MapName" ) );
 	if (w)
@@ -368,7 +369,7 @@ void WPSkirmishInit( WindowLayout *layout, void *userData )
 		catch (e) { return 1; }
 	}, (int)(ARRAY_SIZE(s_wpDiffs) - 1));
 #endif
-	wpSkirmishRefreshMapButton();
+	wpSkirmishRefreshLabels();
 
 	layout->hide( FALSE );
 	layout->bringForward();
@@ -405,7 +406,7 @@ WindowMsgHandledType WPSkirmishSystem( GameWindow *window, UnsignedInt msg,
 			{
 				const Int n = (Int)ARRAY_SIZE(s_wpMaps);
 				s_wpMapIdx = (s_wpMapIdx + (controlID == wpMapNextID ? 1 : n - 1)) % n;
-				wpSkirmishRefreshMapButton();
+				wpSkirmishRefreshLabels();
 #if defined(__EMSCRIPTEN__)
 				EM_ASM({ try { localStorage.setItem('wpMap', String($0)); } catch (e) {} },
 					(int)s_wpMapIdx);
@@ -415,7 +416,7 @@ WindowMsgHandledType WPSkirmishSystem( GameWindow *window, UnsignedInt msg,
 			{
 				const Int n = (Int)ARRAY_SIZE(s_wpDiffs);
 				s_wpDiffIdx = (s_wpDiffIdx + (controlID == wpDiffNextID ? 1 : n - 1)) % n;
-				wpSkirmishRefreshMapButton();
+				wpSkirmishRefreshLabels();
 #if defined(__EMSCRIPTEN__)
 				EM_ASM({ try { localStorage.setItem('wpDiff', String($0)); } catch (e) {} },
 					(int)s_wpDiffIdx);

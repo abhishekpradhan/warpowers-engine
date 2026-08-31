@@ -603,7 +603,8 @@ public:
 	Bool getCanBuildUnits() { return m_canBuildUnits; }
 	void setCanBuildUnits(Bool canProduce) {
 		// WarPowers @debug WP_AI_TRACE: who toggles AI production?
-		if (getenv("WP_AI_TRACE") && m_canBuildUnits != canProduce) {
+		static const bool wp_aiTrc = getenv("WP_AI_TRACE") != nullptr;
+		if (wp_aiTrc && m_canBuildUnits != canProduce) {
 			fprintf(stderr, "[WPAI] setCanBuildUnits(%d) player=%s\n", (int)canProduce,
 				m_playerName.str());
 			if (!canProduce) {

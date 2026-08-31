@@ -137,6 +137,15 @@ ScriptConditions::~ScriptConditions()
 //-------------------------------------------------------------------------------------------------
 /** Init */
 //-------------------------------------------------------------------------------------------------
+// WarPowers @hardening: debounce for evaluateNamedUnitDestroyed. A single
+// anomalous frame in the named-object cache must never end the match on its
+// own; a genuinely destroyed object stays missing forever, so requiring the
+// miss to persist a few frames costs nothing real. (During the Phase 4
+// forensics this fired on what turned out to be a REAL kill — the AI's
+// recruited raiders — but the hardening stays: the cache nulls entries by
+// pointer match and one bad frame would otherwise be an instant defeat.)
+static std::map<AsciiString, UnsignedInt> s_wpNamedMissFrame;
+
 void ScriptConditions::init()
 {
 
@@ -152,7 +161,10 @@ void ScriptConditions::reset()
 
 	deleteInstance(s_transportStatuses);
 	s_transportStatuses = nullptr;
-	// Empty for now.  jba.
+	// WarPowers: drop named-miss debounce state from the previous match —
+	// a stale entry would make the frame-delta check underflow and turn the
+	// debounce into an instant TRUE in the next game.
+	s_wpNamedMissFrame.clear();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -289,15 +301,6 @@ Bool ScriptConditions::evaluateBridgeRepaired(Parameter *pBridgeParm)
 //-------------------------------------------------------------------------------------------------
 /** evaluateNamedUnitDestroyed */
 //-------------------------------------------------------------------------------------------------
-// WarPowers @hardening: debounce for evaluateNamedUnitDestroyed. A single
-// anomalous frame in the named-object cache must never end the match on its
-// own; a genuinely destroyed object stays missing forever, so requiring the
-// miss to persist a few frames costs nothing real. (During the Phase 4
-// forensics this fired on what turned out to be a REAL kill — the AI's
-// recruited raiders — but the hardening stays: the cache nulls entries by
-// pointer match and one bad frame would otherwise be an instant defeat.)
-static std::map<AsciiString, UnsignedInt> s_wpNamedMissFrame;
-
 Bool ScriptConditions::evaluateNamedUnitDestroyed(Parameter *pUnitParm)
 {
 	Object *theUnit = TheScriptEngine->getUnitNamed( pUnitParm->getString() );

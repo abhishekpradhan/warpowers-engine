@@ -1814,16 +1814,16 @@ void GameEngine::update()
 								m->appendIntegerArgument(tt->getTemplateID());
 								m->appendIntegerArgument(1);
 							}
-							fprintf(stderr, "[WP_AUTO] f=%u queued %dx WP_Tank (templateID=%d)\n", wp_f, wp_count, (int)tt->getTemplateID());
+							fprintf(stderr, "[WP_AUTO] f=%u queued %dx %s (templateID=%d)\n", wp_f, wp_count, tt->getName().str(), (int)tt->getTemplateID());
 						}
 						wp_stage = 2;
 					}
 					else if (wp_stage == 2 && wp_f >= 330)
 					{
 						Int found = 0;
+						const char* wp_unitEnv2 = getenv("WP_AUTOTEST_UNIT");
 						for (Object* o = TheGameLogic->getFirstObject(); o; o = o->getNextObject())
 						{
-							const char* wp_unitEnv2 = getenv("WP_AUTOTEST_UNIT");
 							if (o->getTemplate()->getName() == (wp_unitEnv2 && wp_unitEnv2[0] ? wp_unitEnv2 : "WP_Tank") &&
 								o->getControllingPlayer() && o->getControllingPlayer()->getPlayerIndex() == wp_localIdx)
 							{
@@ -1831,7 +1831,7 @@ void GameEngine::update()
 								if (++found >= 4) break;
 							}
 						}
-						Int need = wp_buildOnly ? 1 : 4;   // serial build queue: four take ~2x the pair's time
+						Int need = wp_buildOnly ? 1 : 4;
 						if (found >= need)
 						{
 							wp_tankId = wp_fleet[0];
@@ -1950,6 +1950,8 @@ void GameEngine::update()
 					if (wp_f >= wp_lastStatus + 150)
 					{
 						wp_lastStatus = wp_f;
+						fprintf(stderr, "[WP_AUTO] f=%u particles=%u\n", wp_f,
+							TheParticleSystemManager ? (unsigned)TheParticleSystemManager->getParticleCount() : 0u);
 						for (Object* o = TheGameLogic->getFirstObject(); o; o = o->getNextObject())
 						{
 							if (strncmp(o->getTemplate()->getName().str(), "WP_", 3) != 0)
@@ -1959,8 +1961,6 @@ void GameEngine::update()
 							Real pct = -1.0f;
 							if (pui && pui->firstProduction())
 								pct = pui->firstProduction()->getPercentComplete();
-							fprintf(stderr, "[WP_AUTO] f=%u particles=%u\n", wp_f,
-								TheParticleSystemManager ? (unsigned)TheParticleSystemManager->getParticleCount() : 0u);
 							fprintf(stderr, "[WP_AUTO] f=%u status '%s' id=%u pos=(%.0f,%.0f) hp=%.0f prodQ=%d pct=%.0f disabled=%d\n",
 								wp_f, o->getTemplate()->getName().str(), (unsigned)o->getID(),
 								o->getPosition()->x, o->getPosition()->y, hp,

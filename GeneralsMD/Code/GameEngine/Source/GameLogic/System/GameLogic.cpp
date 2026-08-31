@@ -432,6 +432,8 @@ void GameLogic::init()
 	// create the partition manager
 	ThePartitionManager = NEW PartitionManager;
 	ThePartitionManager->init();
+	// [WPSHELL] "cp *" lines = startNewGame/init checkpoint breadcrumbs
+	// (IG_TRACE) for bisecting map-load hangs.
 	{ static const bool wpT = getenv("IG_TRACE") && *getenv("IG_TRACE") != '0'; if (wpT) { fprintf(stderr, "[WPSHELL] cp partition-init\n"); fflush(stderr); } }
 	ThePartitionManager->setName("ThePartitionManager");
 
@@ -4414,7 +4416,8 @@ void GameLogic::destroyObject( Object *obj )
 
 	// WarPowers @debug WP_AI_TRACE: catch whoever destroys a NAMED object
 	// (win/lose anchors) — the Phase 4 phantom-defeat forensics.
-	if (getenv("WP_AI_TRACE") && obj->getName().isNotEmpty())
+	static const bool wp_aiTrc = getenv("WP_AI_TRACE") != nullptr;
+	if (wp_aiTrc && obj->getName().isNotEmpty())
 	{
 		fprintf(stderr, "[WPDESTROY] name='%s' tmpl=%s id=%u f=%u dead=%d\n",
 			obj->getName().str(),
@@ -4768,7 +4771,7 @@ void GameLogic::sendObjectDestroyed( Object *obj )
 		static int wpT = -1;
 		if (wpT < 0) { const char* e = getenv("IG_TRACE"); wpT = (e && *e && *e != '0') ? 1 : 0; }
 		if (wpT)
-			fprintf(stderr, "[DEATH] sendObjectDestroyed obj=%s id=%u draw=%p\n",
+			fprintf(stderr, "[WPDEATH] sendObjectDestroyed obj=%s id=%u draw=%p\n",
 				obj->getTemplate()->getName().str(), (unsigned)obj->getID(), (void*)draw);
 	}
 	if(draw)

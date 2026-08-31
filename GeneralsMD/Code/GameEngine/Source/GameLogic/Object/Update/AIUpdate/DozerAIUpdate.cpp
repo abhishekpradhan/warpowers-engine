@@ -195,10 +195,7 @@ StateReturnType DozerActionPickActionPosState::update()
 	// every time this state runs; the dock-action phase self-positions after.
 	Coord3D goalPos;
 	Bool wp_fresh = DozerAIUpdate::findGoodBuildOrRepairPosition( dozer, goalObject, goalPos );
-	const Coord3D *pos = wp_fresh ? &goalPos : nullptr;
-	if( pos )
-		goalPos = *pos;
-	else
+	if( !wp_fresh )
 	{
 
 		// pick a spot to use
@@ -1712,9 +1709,13 @@ UpdateSleepTime DozerAIUpdate::update()
 	// in its default state so the pending task's transition can fire.
 	if( m_dozerMachine->getCurrentStateID() == INVALID_STATE_ID )
 	{
-		fprintf(stderr, "[WPDOZ] f=%u id=%u primary machine had no current state — self-healing to default\n",
-			TheGameLogic->getFrame(), getObject()->getID());
-		fflush(stderr);
+		static const char* wp_dozHealEnv = getenv("WP_DOZER_TRACE");
+		if (wp_dozHealEnv && *wp_dozHealEnv)
+		{
+			fprintf(stderr, "[WPDOZ] f=%u id=%u primary machine had no current state - self-healing to default\n",
+				TheGameLogic->getFrame(), getObject()->getID());
+			fflush(stderr);
+		}
 		m_dozerMachine->resetToDefaultState();
 	}
 

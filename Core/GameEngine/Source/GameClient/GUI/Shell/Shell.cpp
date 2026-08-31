@@ -701,7 +701,7 @@ void Shell::doPush( AsciiString layoutFile )
 	// linkScreen. Seen with Menus/ScoreScreen.wnd in the post-game path.
 	if (newScreen == nullptr)
 	{
-		fprintf(stderr, "DEBUG: Shell::doPush() layout '%s' missing, push skipped\n", layoutFile.str());
+		fprintf(stderr, "WARNING: Shell::doPush() layout '%s' missing, push skipped\n", layoutFile.str());
 		fflush(stderr);
 		return;
 	}

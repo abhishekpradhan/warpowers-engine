@@ -1,7 +1,7 @@
 > **War Powers engine fork** (private): our fork of GeneralsX for the
 > [War Powers](https://github.com/abhishekpradhan/warpowers) browser RTS —
 > native macOS + Emscripten/wasm targets, zero-retail data support.
-> License: GPL-3.0 (inherited). Upstream README follows.
+> License: GPL-3.0 with EA's additional terms (inherited). Upstream README follows.
 
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/fbraz3/GeneralsGameCode)
 [![GeneralsX CI](https://github.com/fbraz3/GeneralsX/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/fbraz3/GeneralsX/actions/workflows/ci.yml)

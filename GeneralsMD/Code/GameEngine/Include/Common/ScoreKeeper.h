@@ -87,7 +87,7 @@ public:
 	Int getTotalUnitsBuilt() { return m_totalUnitsBuilt; }
 	Int getTotalUnitsLost() { return m_totalUnitsLost; }
 	Int getTotalBuildingsDestroyed();
-	// WarPowers: per-victim count for the (previously stubbed)
+	// WarPowers: per-victim count backing the
 	// PLAYER_DESTROYED_N_BUILDINGS_PLAYER script condition.
 	Int getTotalBuildingsDestroyedOfPlayer( Int playerIdx )
 	{

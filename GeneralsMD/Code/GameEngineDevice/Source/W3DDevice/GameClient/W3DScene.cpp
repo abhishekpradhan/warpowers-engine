@@ -332,12 +332,12 @@ void RTS3DScene::wpDumpRenderObjects()
 		RenderObjClass *robj = it.Peek_Obj();
 		Vector3 p = robj->Get_Position();
 		DrawableInfo *di = (DrawableInfo *)robj->Get_User_Data();
-		fprintf(stderr, "[SCENE] %3d cls=%d name='%s' pos=(%.0f,%.0f,%.0f) vis=%d hidden=%d drawinfo=%p draw=%p ghost=%p\n",
+		fprintf(stderr, "[WPSCENE] %3d cls=%d name='%s' pos=(%.0f,%.0f,%.0f) vis=%d hidden=%d drawinfo=%p draw=%p ghost=%p\n",
 			count++, robj->Class_ID(), robj->Get_Name() ? robj->Get_Name() : "?",
 			p.X, p.Y, p.Z, (int)robj->Is_Really_Visible(), (int)robj->Is_Hidden(),
 			(void*)di, di ? (void*)di->m_drawable : nullptr, di ? (void*)di->m_ghostObject : nullptr);
 	}
-	fprintf(stderr, "[SCENE] total %d render objects\n", count);
+	fprintf(stderr, "[WPSCENE] total %d render objects\n", count);
 	fflush(stderr);
 }
 

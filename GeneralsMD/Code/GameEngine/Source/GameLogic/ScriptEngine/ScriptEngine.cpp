@@ -7134,7 +7134,8 @@ void ScriptEngine::removeObjectFromCache( Object* pDeadObject )
 	for (VecNamedRequestsIt it = m_namedObjects.begin(); it != m_namedObjects.end(); ++it) {
 		if (pDeadObject == (it->second)) {
 			// WarPowers @debug WP_AI_TRACE: who nulls a named entry?
-			if (getenv("WP_AI_TRACE"))
+			static const bool wp_aiTrc = getenv("WP_AI_TRACE") != nullptr;
+			if (wp_aiTrc)
 			{
 				fprintf(stderr, "[WPNAMED] cache null: entry='%s' dying obj=%u tmpl=%s name='%s' f=%u\n",
 					it->first.str(), (unsigned)pDeadObject->getID(),
