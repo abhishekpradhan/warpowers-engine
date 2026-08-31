@@ -1,7 +1,7 @@
 [submodule "references/fbraz3-dxvk"]
 	path = references/fbraz3-dxvk
 	url = https://github.com/abhishekpradhan/warpowers-dxvk.git
-	branch = warpowers-dxvk
+	branch = main
 [submodule "references/OpenSAGE.BlenderPlugin"]
 	path = references/OpenSAGE.BlenderPlugin
 	url = https://github.com/OpenSAGE/OpenSAGE.BlenderPlugin.git
