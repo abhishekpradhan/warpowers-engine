@@ -319,10 +319,9 @@ void W3DGadgetPushButtonImageDraw( GameWindow *window,
 }
 
 // GeneralsX @tweak Codex 05/09/2026 Give War Powers unavailable commands a shape cue as well as color.
-static Bool isWarPowersDisabledCommand( GameWindow *window, WinInstanceData *instData )
+static Bool isWarPowersCommandPortrait( GameWindow *window, WinInstanceData *instData )
 {
-	if( BitIsSet( window->winGetStatus(), WIN_STATUS_ENABLED ) ||
-		!BitIsSet( window->winGetStatus(), WIN_STATUS_USE_OVERLAY_STATES ) ||
+	if( !BitIsSet( window->winGetStatus(), WIN_STATUS_USE_OVERLAY_STATES ) ||
 		!GadgetButtonGetEnabledImage( window ) )
 		return FALSE;
 
@@ -370,7 +369,11 @@ void W3DGadgetPushButtonImageDrawOne( GameWindow *window,
 {
 	const Image *image = nullptr;
 	ICoord2D size, start, end;
-	const Bool warPowersDisabledCommand = isWarPowersDisabledCommand( window, instData );
+	const Bool warPowersPortrait = isWarPowersCommandPortrait( window, instData );
+	const Bool warPowersDisabledCommand = warPowersPortrait && !BitIsSet( window->winGetStatus(), WIN_STATUS_ENABLED );
+	// Queue entries retain their normal appearance and progress while remaining available to cancel.
+	const Bool warPowersAvailableCommand = warPowersPortrait && !warPowersDisabledCommand &&
+		instData->m_decoratedNameString.startsWith( "ControlBar.wnd:ButtonCommand" );
 
 	//
 	// get pointer to image we want to draw depending on our state,
@@ -449,10 +452,35 @@ void W3DGadgetPushButtonImageDrawOne( GameWindow *window,
 				}
 			}
 		}
-		// Retain the normal recharge artwork/wedge; other unavailable portraits are visibly dimmer.
+		// GeneralsX @tweak Codex 05/09/2026 Separate available color portraits from unavailable grayscale faces.
 		if( warPowersDisabledCommand && !BitIsSet( window->winGetStatus(), WIN_STATUS_NOT_READY ) )
-			colorMultiplier = 0xff808080;
+		{
+			drawMode = Display::DRAW_IMAGE_GRAYSCALE;
+			colorMultiplier = 0xffffffff;
+		}
+		else if( warPowersAvailableCommand )
+		{
+			drawMode = Display::DRAW_IMAGE_BRIGHTENED;
+			colorMultiplier = 0xffa0a0a0; // MODULATE2X gives approximately 1.25 times the original RGB.
+		}
 		TheDisplay->drawImage( image, start.x, start.y, end.x, end.y, colorMultiplier, drawMode );
+		if( warPowersDisabledCommand )
+		{
+			// Native grayscale ignores the vertex tint. A separate veil dims that path reliably.
+			// Recharge keeps its color and receives a lighter veil; its sweep is drawn afterwards.
+			const UnsignedByte opacity = BitIsSet( window->winGetStatus(), WIN_STATUS_NOT_READY ) ? 40 : 126;
+			TheDisplay->drawFillRect( start.x, start.y, size.x, size.y, GameMakeColor(4, 7, 10, opacity) );
+			if( size.x > 4 && size.y > 4 )
+				TheDisplay->drawOpenRect( start.x + 1, start.y + 1, size.x - 2, size.y - 2, 1,
+					GameMakeColor(55, 62, 67, 255) );
+		}
+		else if( warPowersAvailableCommand && size.x > 4 && size.y > 4 )
+		{
+			// The available gold rim sits below text, veterancy, clocks and selected/hover overlays.
+			const Int stroke = MAX( 1, MIN(size.x, size.y) / 22 );
+			TheDisplay->drawOpenRect( start.x + 1, start.y + 1, size.x - 2, size.y - 2, stroke,
+				GameMakeColor(215, 180, 90, 255) );
+		}
 	}
 
 	// draw the button text

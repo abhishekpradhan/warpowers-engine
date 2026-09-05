@@ -68,7 +68,9 @@ public:
 		DRAW_IMAGE_SOLID,
 		DRAW_IMAGE_GRAYSCALE,		//draw image without blending and ignoring alpha
 		DRAW_IMAGE_ALPHA,		//alpha blend the image into frame buffer
-		DRAW_IMAGE_ADDITIVE	//additive blend the image into frame buffer
+		DRAW_IMAGE_ADDITIVE,	//additive blend the image into frame buffer
+		// GeneralsX @feature Codex 05/09/2026 Alpha-blended RGB at twice the supplied color multiplier.
+		DRAW_IMAGE_BRIGHTENED
 	};
 
 	typedef void (DebugDisplayCallback)( DebugDisplayInterface *debugDisplay, void *userData, FILE *fp );

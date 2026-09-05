@@ -344,6 +344,18 @@ void WPUpdatePlayerExperience()
 	const AsciiString map = inGame ? wpCurrentMapID() : AsciiString::TheEmptyString;
 	const UnsignedInt frame = inGame ? TheGameLogic->getFrame() : 0;
 	Int units = 0, structures = 0, builders = 0, production = 0, income = 0, idleWorkers = 0;
+	// GeneralsX @feature Codex 05/09/2026 Report completed, living training requirements without replacing script stage authority.
+	const char *trainingNames[] = { "WP_Fabricator", "WP_Exchange", "WP_PowerArray", "WP_Porter",
+		"WP_VehiclePlant", "WP_Tank", "WP_Vigil" };
+	Int trainingCounts[ARRAY_SIZE(trainingNames)] = {};
+	if( map == "WPTraining" && player && TheThingFactory )
+	{
+		const ThingTemplate *trainingTemplates[ARRAY_SIZE(trainingNames)];
+		for( Int i = 0; i < (Int)ARRAY_SIZE(trainingNames); ++i )
+			trainingTemplates[i] = TheThingFactory->findTemplate(trainingNames[i]);
+		// The native comparison also excludes construction, but can briefly include dying objects.
+		player->countObjectsByThingTemplate((Int)ARRAY_SIZE(trainingNames), trainingTemplates, TRUE, trainingCounts, TRUE);
+	}
 	Real headquartersHealth = 0.0f, headquartersMaxHealth = 0.0f;
 	if( player )
 		for( Object *object = TheGameLogic->getFirstObject(); object; object = object->getNextObject() )
@@ -478,7 +490,9 @@ void WPUpdatePlayerExperience()
 		double(score ? score->getTotalUnitsDestroyed() : 0), double(score ? score->getTotalBuildingsBuilt() : 0),
 		double(score ? score->getTotalMoneyEarned() : 0), double(idleWorkers),
 		double(TheScriptEngine ? (int)TheScriptEngine->getGlobalDifficulty() : 1),
-		double(headquartersHealth), double(headquartersMaxHealth)
+		double(headquartersHealth), double(headquartersMaxHealth),
+		double(trainingCounts[0]), double(trainingCounts[1]), double(trainingCounts[2]),
+		double(trainingCounts[3]), double(trainingCounts[4]), double(trainingCounts[5]), double(trainingCounts[6])
 	};
 	EM_ASM({
 		if (!Module.onGameState) return;
@@ -491,7 +505,9 @@ void WPUpdatePlayerExperience()
 			selected: {count: n(11), name: UTF8ToString($3), template: UTF8ToString($4), health: n(12), maxHealth: n(13)},
 			objectiveStage: n(14), objectiveProgress: n(15), objectiveTarget: n(16), objectiveSeconds: n(17),
 			unitsBuilt: n(18), unitsLost: n(19), unitsDestroyed: n(20), buildingsBuilt: n(21), moneyEarned: n(22),
-			idleWorkers: n(23), difficulty: n(24), headquartersHealth: n(25), headquartersMaxHealth: n(26)});
+			idleWorkers: n(23), difficulty: n(24), headquartersHealth: n(25), headquartersMaxHealth: n(26),
+			trainingCounts: {WP_Fabricator: n(27), WP_Exchange: n(28), WP_PowerArray: n(29), WP_Porter: n(30),
+				WP_VehiclePlant: n(31), WP_Tank: n(32), WP_Vigil: n(33)}});
 	}, state, map.str(), wpOperationID(map), selectedName.str(), selectedTemplate.str());
 #endif
 }
