@@ -48,6 +48,8 @@
 #include <stdlib.h>
 
 // USER INCLUDES //////////////////////////////////////////////////////////////
+#include "Common/Player.h"
+#include "Common/PlayerList.h"
 #include "GameClient/Gadget.h"
 #include "GameClient/GameWindowGlobal.h"
 #include "GameClient/GameWindowManager.h"
@@ -72,6 +74,7 @@
 
 void W3DGadgetPushButtonImageDrawThree(GameWindow *window, WinInstanceData *instData );
 void W3DGadgetPushButtonImageDrawOne(GameWindow *window, WinInstanceData *instData );
+static void drawWarPowersDisabledBadge( const ICoord2D& start, const ICoord2D& size );
 
 // PRIVATE FUNCTIONS //////////////////////////////////////////////////////////
 
@@ -271,6 +274,11 @@ void W3DGadgetPushButtonDraw( GameWindow *window, WinInstanceData *instData )
 		}
 	}
 
+	// GeneralsX @tweak Codex 05/09/2026 Mark unavailable faction deployment without changing selected mode tabs.
+	if( !BitIsSet( window->winGetStatus(), WIN_STATUS_ENABLED ) &&
+		(instData->m_decoratedNameString == "WPSkirmish.wnd:ButtonDeployMeridian" ||
+		 instData->m_decoratedNameString == "WPSkirmish.wnd:ButtonDeployJackal") )
+		drawWarPowersDisabledBadge( origin, size );
 }
 
 
@@ -310,11 +318,59 @@ void W3DGadgetPushButtonImageDraw( GameWindow *window,
 	}
 }
 
+// GeneralsX @tweak Codex 05/09/2026 Give War Powers unavailable commands a shape cue as well as color.
+static Bool isWarPowersDisabledCommand( GameWindow *window, WinInstanceData *instData )
+{
+	if( BitIsSet( window->winGetStatus(), WIN_STATUS_ENABLED ) ||
+		!BitIsSet( window->winGetStatus(), WIN_STATUS_USE_OVERLAY_STATES ) ||
+		!GadgetButtonGetEnabledImage( window ) )
+		return FALSE;
+
+	// Empty queue slots clear overlay states; populated slots remain enabled for cancellation.
+	const AsciiString& name = instData->m_decoratedNameString;
+	if( !name.startsWith( "ControlBar.wnd:ButtonCommand" ) &&
+		!name.startsWith( "ControlBar.wnd:ButtonQueue" ) )
+		return FALSE;
+
+	Player *localPlayer = ThePlayerList ? ThePlayerList->getLocalPlayer() : nullptr;
+	return localPlayer && (localPlayer->getSide() == "WP" || localPlayer->getSide() == "WPJ");
+}
+
+static void drawWarPowersDisabledBadge( const ICoord2D& start, const ICoord2D& size )
+{
+	const Int shortSide = MIN( size.x, size.y );
+	if( shortSide < 16 )
+		return;
+
+	const Int inset = MAX( 1, shortSide / 22 );
+	const Int badgeSize = MAX( 12, shortSide * 2 / 5 );
+	const Int x = start.x + size.x - badgeSize - inset;
+	const Int y = start.y + inset;
+	const Int stroke = MAX( 1, badgeSize / 10 );
+	const Int lockX = x + badgeSize / 4;
+	const Int lockY = y + badgeSize / 2;
+	const Int lockWidth = badgeSize / 2;
+	const Int lockHeight = badgeSize / 3;
+	const Int shackleWidth = MAX( 4, lockWidth - 2 * stroke );
+	const Int shackleX = lockX + (lockWidth - shackleWidth) / 2;
+	const Int shackleY = y + badgeSize / 5;
+	const Color dark = GameMakeColor( 12, 16, 19, 255 );
+	const Color light = GameMakeColor( 244, 240, 221, 255 );
+
+	// An opaque backing and pale lock remain distinct on light portraits and in grayscale.
+	TheDisplay->drawFillRect( x, y, badgeSize, badgeSize, dark );
+	TheDisplay->drawOpenRect( x, y, badgeSize, badgeSize, 1, light );
+	TheDisplay->drawOpenRect( shackleX, shackleY, shackleWidth, lockY - shackleY + stroke, stroke, light );
+	TheDisplay->drawFillRect( lockX, lockY, lockWidth, lockHeight, light );
+	TheDisplay->drawFillRect( lockX + lockWidth / 2, lockY + stroke, stroke, MAX( 1, lockHeight - 2 * stroke ), dark );
+}
+
 void W3DGadgetPushButtonImageDrawOne( GameWindow *window,
 																	 WinInstanceData *instData )
 {
 	const Image *image = nullptr;
 	ICoord2D size, start, end;
+	const Bool warPowersDisabledCommand = isWarPowersDisabledCommand( window, instData );
 
 	//
 	// get pointer to image we want to draw depending on our state,
@@ -393,6 +449,9 @@ void W3DGadgetPushButtonImageDrawOne( GameWindow *window,
 				}
 			}
 		}
+		// Retain the normal recharge artwork/wedge; other unavailable portraits are visibly dimmer.
+		if( warPowersDisabledCommand && !BitIsSet( window->winGetStatus(), WIN_STATUS_NOT_READY ) )
+			colorMultiplier = 0xff808080;
 		TheDisplay->drawImage( image, start.x, start.y, end.x, end.y, colorMultiplier, drawMode );
 	}
 
@@ -481,6 +540,10 @@ void W3DGadgetPushButtonImageDrawOne( GameWindow *window,
 			}
 		}
 	}
+
+	// Draw last so clocks and flashing never erase the unavailable-state marker.
+	if( warPowersDisabledCommand )
+		drawWarPowersDisabledBadge( start, size );
 }
 
 
