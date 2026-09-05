@@ -727,9 +727,7 @@ void	Render2DSentenceClass::Build_Sentence_Centered (const WCHAR *text, int *hkX
 {
 	float char_height = Font->Get_Char_Height ();
 	int		wordWidth = 0;
-	int notCenteredHotkeyX = 0;
-	int notCenteredHotkeyY = 0;
-	Vector2 extent = Build_Sentence_Not_Centered(text,&notCenteredHotkeyX, &notCenteredHotkeyY, TRUE); //Get_Formatted_Text_Extents(text);
+	Vector2 extent = Build_Sentence_Not_Centered(text, nullptr, nullptr, TRUE);
 
 	//
 	//	Start fresh
@@ -757,7 +755,6 @@ void	Render2DSentenceClass::Build_Sentence_Centered (const WCHAR *text, int *hkX
 	int wordCount = 0;
 	int hotKeyPosX = 0;
 	int hotKeyPosY = 0;
-	bool calcHotKeyX = false;
 	bool dontBlit = false;
 	while (!end)
 	{
@@ -779,21 +776,13 @@ void	Render2DSentenceClass::Build_Sentence_Centered (const WCHAR *text, int *hkX
 			//
 			int charWidth = 0;
 			while ((*word != 0) && (*word > L' ') && (*word != L'\n')) {
-				if( ParseHotKey && (*word == L'&') && (*word+1 != 0) && (*word+1 > L' ') && (*word+1 != L'\n'))
+				// GeneralsX @bugfix Codex 05/09/2026 Check the next character before skipping a hotkey marker.
+				if( ParseHotKey && (*word == L'&') && (*(word+1) != 0) && (*(word+1) > L' ') && (*(word+1) != L'\n'))
 				{
-					int offset = 0;
-					if (word_width != 0 )
-					{
-						const WCHAR *word_back = word;
-						*word_back--;
-						if (*word_back == L' ')
-						{
-							line_width -= word_width;
-							offset =-1;
-						}
-					}
-					*word++;
-					calcHotKeyX = true;
+					// Preserve the existing inter-word spacing adjustment.
+					if (word_width != 0 && *(word - 1) == L' ')
+						line_width -= word_width;
+					word++;
 				}
 
 				charWidth = Font->Get_Char_Spacing (*word++);
@@ -856,11 +845,6 @@ void	Render2DSentenceClass::Build_Sentence_Centered (const WCHAR *text, int *hkX
 		Cursor.X = (int)((extent.X - line_width) / 2);
 		if(Cursor.X < 0)
 			Cursor.X = 0;
-		if(calcHotKeyX)
-		{
-			calcHotKeyX = false;
-			hotKeyPosX = Cursor.X + notCenteredHotkeyX;
-		}
 
 		for(int i = 0; i <= charCount; i++) {
 			WCHAR ch = *text++;
@@ -870,6 +854,9 @@ void	Render2DSentenceClass::Build_Sentence_Centered (const WCHAR *text, int *hkX
 			//
 			if(ParseHotKey && (ch == L'&') && (*text != 0) && (*text > L' ') && (*text != L'\n'))
 			{
+				// GeneralsX @bugfix Codex 05/09/2026 Locate the hotkey on its rendered line, after wrapping/centering.
+				hotKeyPosX = Cursor.X + TextureOffset.I - TextureStartX;
+				hotKeyPosY = Cursor.Y;
 				ch = *text++;
 				dontBlit = true;
 			}
@@ -961,7 +948,8 @@ void	Render2DSentenceClass::Build_Sentence_Centered (const WCHAR *text, int *hkX
 
 		if(hkX)
 			*hkX = hotKeyPosX;
-		if(hkX)
+		// GeneralsX @bugfix Codex 05/09/2026 Hotkey coordinate outputs are independently optional.
+		if(hkY)
 			*hkY = hotKeyPosY;
 }
 ////////////////////////////////////////////////////////////////////////////////////
@@ -1062,7 +1050,8 @@ Vector2	Render2DSentenceClass::Build_Sentence_Not_Centered (const WCHAR *text, i
 					const WCHAR *word	= text;
 					float word_width	= char_spacing;
 					while ((*word != 0) && (*word > L' ')) {
-						if(ParseHotKey && (*word == L'&') && (*word+1 != 0) && (*word+1 > L' ') && (*word+1 != L'\n'))
+						// GeneralsX @bugfix Codex 05/09/2026 Keep a trailing ampersand inside the string bounds.
+						if(ParseHotKey && (*word == L'&') && (*(word+1) != 0) && (*(word+1) > L' ') && (*(word+1) != L'\n'))
 							*word++;
 						word_width += Font->Get_Char_Spacing (*word++);
 					}
@@ -1144,7 +1133,8 @@ Vector2	Render2DSentenceClass::Build_Sentence_Not_Centered (const WCHAR *text, i
 
 	if(hkX)
 		*hkX = hotKeyPosX;
-	if(hkX)
+	// GeneralsX @bugfix Codex 05/09/2026 Hotkey coordinate outputs are independently optional.
+	if(hkY)
 		*hkY = hotKeyPosY;
 
 	return extent;

@@ -84,16 +84,20 @@ add_link_options("-fwasm-exceptions")
 # name the C++ frame instead of "wasm-function[12345]" — the Safari
 # quit-crash hunt needed exactly that.
 add_link_options("-O1" "-g0" "--profiling-funcs")
+# GeneralsX @build Codex 05/09/2026 Leave address space for ASan shadow memory.
+# ASan places its shadow inside wasm32 memory; a 4GB application limit cannot
+# fit both. Ordinary release builds keep their existing 4GB ceiling.
+if(RTS_BUILD_OPTION_ASAN)
+    set(wasm_maximum_memory 2147483648)
+else()
+    set(wasm_maximum_memory 4294967296)
+endif()
 add_link_options(
     "-sALLOW_MEMORY_GROWTH=1"
     "-sGROWABLE_ARRAYBUFFERS=0"
     "-sINITIAL_MEMORY=536870912"
-    # 4GB (the wasm32 ceiling): the staged game files live in the wasm heap
-    # via MEMFS — ~1.9GB with audio — plus engine pools plus a loaded
-    # mission overran the old 2GB cap. Failed growth -> null malloc ->
-    # out-of-bounds writes (Safari trapped on quit-to-menu; Chrome likely
-    # corrupted silently).
-    "-sMAXIMUM_MEMORY=4294967296"
+    # Staged files, renderer allocations and a loaded mission share this heap.
+    "-sMAXIMUM_MEMORY=${wasm_maximum_memory}"
     "-sSTACK_SIZE=8388608"
     "-sEXIT_RUNTIME=0"
     # Persistent user saves are mounted and restored by the browser shell.

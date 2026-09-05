@@ -59,6 +59,10 @@ Utilities for large-scale code refactoring and fixes:
 ### `qa/` - Quality Assurance & Testing
 
 - `test-keyboard-modifiers.py` - Compiles the production keyboard methods against deterministic event/timer fixtures; needs Python 3 and a native C++17 compiler. Run `python3 scripts/qa/test-keyboard-modifiers.py` from the engine root. `keyboard-modifiers-fixture.cpp` is its isolated fixture, not a standalone engine target. See [CONTRIBUTING.md](../CONTRIBUTING.md) for scope and the optional failing-baseline check.
+- `test-sentence-hotkeys.py` - Compiles actual sentence layout and glyph blitting against a deterministic font/surface fixture with address and undefined-behavior sanitizers. Covers centered/left text, trailing ampersands, wrapped hotkey positions and independently optional outputs; needs Python 3 and a sanitizer-capable native C++17 compiler. `--baseline REV` verifies the earlier failures. The paired `sentence-hotkeys-fixture.cpp` supplies contracts, not a second layout implementation.
+- `test-mip-filter.py` - Compiles the actual `D3DXFilterTexture` method against observable surface references. Checks consecutive mip copies, cache/caller ownership and failure cleanup; Python 3 and a native C++17 compiler, with optional `--baseline REV`. `mip-filter-fixture.cpp` models reference contracts without a GPU or complete game build.
+
+- `test-surface-copy.py` - Compiles the production D3DX surface-copy method under ASan/UBSan. Covers row pitches, subrectangles, compressed blocks, one-pixel mip tails and lock/error cleanup. `--baseline REV` requires the previous row-copy bug; `--gli-root PATH` also checks the Linux filter against real cached GLI headers. `surface-copy-fixture.cpp` supplies guarded CPU surfaces.
 
 #### `qa/smoke/` - Smoke Tests
 - `docker-smoke-test-zh.sh` - Quick startup validation (expects crash, checks init output)

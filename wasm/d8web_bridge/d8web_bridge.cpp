@@ -686,12 +686,11 @@ HRESULT STDMETHODCALLTYPE BridgeTexture::GetDevice(IDirect3DDevice8** dev) {
 }
 HRESULT STDMETHODCALLTYPE BridgeTexture::GetSurfaceLevel(UINT level, IDirect3DSurface8** out) {
     if (!out) return D3DERR_INVALIDCALL;
-    // D3D8 contract: level surfaces are texture-owned; a caller's Release()
-    // must not invalidate them while the texture lives. The engine's
-    // D3DXFilterTexture releases each level wrapper and keeps using it as the
-    // next mip's source — a fresh wrapper per call is a use-after-free (the
-    // freed wrapper's address gets reused by the next level's wrapper, so the
-    // filter degenerated to same-surface copies and mips stayed black).
+    // GeneralsX @bugfix Codex 05/09/2026 Document the cache's actual ownership.
+    // The cache owns one reference and every successful query returns another.
+    // Callers must keep that reference until their final use. The old mip filter
+    // borrowed a released reference and consumed the cache's final reference;
+    // that caller bug is fixed in D3DXFilterTexture, not masked by this cache.
     if (level >= m_inner->GetLevelCount()) { *out = nullptr; return D3DERR_INVALIDCALL; }
     if (m_levelSurfaces.size() <= level) m_levelSurfaces.resize(m_inner->GetLevelCount(), nullptr);
     BridgeSurface*& slot = m_levelSurfaces[level];

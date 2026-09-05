@@ -32,6 +32,23 @@ The runner extracts and compiles the actual `Keyboard.cpp` update, repeat and tr
 
 The `WP_AUTOTEST` hooks in `GameEngine.cpp` are focused diagnostics. `base` and `wedge` exercise construction; unit/control labs may create explicitly logged fixtures; `economy` checks native hauling and `powers` checks effects with forced readiness; `win` and `defeat` trigger result paths directly. Do not describe those as human-played balanced victories or as coverage of the entire interface. Pair them with input-driven checks when selection, layout, loading or restart behavior changes.
 
+`WP_AUTOTEST=retry` starts from the ordinary menu and repeats Field Orientation
+through paid construction/production, actual supply deliveries and native UI
+selection of eight unit/building categories. It waits for training stage 4,
+then kills the headquarters after a configurable match duration, allowing the
+normal loss script, native score screen and Retry callback to run. It never
+calls reset directly or advances objective counters. `WP_RETRY_RUNS` defaults
+to 3 (range 1–30); `WP_RETRY_FRAMES` defaults to 5400 (range 900–54000, at 30
+simulation frames per second). Each run must reach a fresh stage-0 training
+battlefield with a selectable headquarters and visible HUD. PASS pauses that
+final scene. The browser equivalent is
+`/?autotest=retry&retryruns=3&retryframes=5400`, without a `map` parameter.
+Only this diagnostic bypasses the pausing web debrief, retaining result
+telemetry without saving operation records; ordinary play and the `defeat`
+diagnostic retain the debrief. This is a controlled lifecycle test with an
+explicitly injected headquarters loss, not a human-played defeat or balance
+check. Use `retryframes=14400` for an eight-minute match before Retry.
+
 `WP_REVIEW_SCENE=1` creates faction asset rows on a fresh Flats map (`WPTest` or `WPTestJ`); `WP_REVIEW_SCENE=stress` adds at most 120 mixed combat units with native attack-move orders. The scene logs fixture counts, observed frame rates and WebAssembly heap capacity for 60 simulation seconds. These are controlled development fixtures, not a normal opening or an automatic visual/performance acceptance test. Pausing or background throttling affects wall-time measurements; heap capacity is not live memory usage. The Jackal Dynamo appears as an art reference even though it is not part of the player's build order.
 
 For save changes, distinguish successful serialization from durable IndexedDB persistence, then verify reload, restore and failure recovery. For audio or rendering changes, check the relevant native backends as well as the browser path. Use the inherited [testing notes](TESTING.md) for retail replay work with appropriately licensed local data. Do not assume inherited CI is running for this fork.

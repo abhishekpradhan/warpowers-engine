@@ -129,6 +129,7 @@ void WPPrintBacktrace() {}
 #include "GameClient/MetaEvent.h"
 #include "GameClient/MapUtil.h"
 #include "GameClient/GameWindowManager.h"
+#include "GameClient/GadgetStaticText.h"
 #include "GameClient/GlobalLanguage.h"
 #include "GameClient/Drawable.h"
 #include "GameClient/GUICallbacks.h"
@@ -1056,6 +1057,315 @@ Bool GameEngine::canUpdateRegularGameLogic(UnsignedInt logicTimeQueryFlags)
 /// -----------------------------------------------------------------------------------------------
 DECLARE_PERF_TIMER(GameEngine_update)
 
+// GeneralsX @feature Codex 05/09/2026 Repeat the real War Powers score Retry
+// lifecycle with paid production, supply deliveries and changing HUD text.
+// This diagnostic is dataset-specific and never runs during ordinary play.
+static void WPUpdateRetryDiagnostic()
+{
+	const char* mode = getenv("WP_AUTOTEST");
+	if (!mode || strcmp(mode, "retry") != 0) return;
+	enum Phase { START_MENU, SELECT_TRAINING, CONFIRM_DEPLOY, WAIT_MATCH,
+		PLAY_MATCH, WAIT_SCORE, SCORE_DWELL, STOPPED };
+	static Phase phase = START_MENU;
+	if (phase == STOPPED) return;
+	auto boundedSetting = [](const char* name, Int fallback, Int minimum, Int maximum) -> Int {
+		const char* text = getenv(name);
+		if (!text || !*text) return fallback;
+		char* end = nullptr;
+		const long value = strtol(text, &end, 10);
+		if (end == text || *end) return fallback;
+		return value < minimum ? minimum : value > maximum ? maximum : (Int)value;
+	};
+	static const Int runs = boundedSetting("WP_RETRY_RUNS", 3, 1, 30);
+	static const UnsignedInt matchFrames = (UnsignedInt)boundedSetting("WP_RETRY_FRAMES", 5400, 900, 54000);
+	static UnsignedInt ticks = 0, phaseTick = 0, taskFrame = 0, readyFrame = 0;
+	static UnsignedInt lastFrame = 0, lastFrameTick = 0, selectionFrame = 0, heartbeatFrame = 0;
+	static Int completed = 0, taskIndex = 0, selectionIndex = 0;
+	static Int initialBoxes = 0, maxCargo = 0;
+	static ObjectID cacheID = INVALID_ID;
+	static ObjectID uiSelectionID = INVALID_ID;
+	static UnsignedInt uiSelectionMask = 0, pendingSelectionMask = 0;
+	static Bool taskIssued = FALSE, ready = FALSE, injectedLoss = FALSE, supplyDelivered = FALSE;
+	static Coord3D home = { 0, 0, 0 };
+	++ticks;
+	if (ticks == 1)
+	{
+		fprintf(stderr, "[WP_AUTO] RETRY_CONFIG runs=%d frames=%u; normal menu callbacks, paid construction/production; no direct reset or objective mutation\n", runs, matchFrames);
+		fflush(stderr);
+	}
+	const Bool inGame = TheGameLogic && TheGameLogic->isInGame();
+	const UnsignedInt frame = inGame ? TheGameLogic->getFrame() : 0;
+	auto finish = [&](Bool passed, const char* detail) {
+		fprintf(stderr, "[WP_AUTO] RETRY %s completed=%d/%d phase=%d frame=%u: %s\n",
+			passed ? "PASS" : "FAIL", completed, runs, (Int)phase, frame, detail);
+		fflush(stderr);
+		phase = STOPPED;
+		// Hold the final scene for inspection instead of quitting the browser or
+		// letting the diagnostic continue changing the world after its verdict.
+		if (inGame) TheGameLogic->setGamePaused(TRUE, FALSE, TRUE);
+	};
+	auto transition = [&](Phase next) { phase = next; phaseTick = ticks; };
+	auto window = [](const char* name) -> GameWindow* {
+		return TheWindowManager && TheNameKeyGenerator ? TheWindowManager->winGetWindowFromId(nullptr,
+			TheNameKeyGenerator->nameToKey(name)) : nullptr;
+	};
+	auto click = [&](const char* name) -> Bool {
+		GameWindow* button = window(name);
+		if (!button || button->winIsHidden() || !BitIsSet(button->winGetStatus(), WIN_STATUS_ENABLED) || !button->winGetOwner()) return FALSE;
+		fprintf(stderr, "[WP_AUTO] RETRY_CLICK run=%d button=%s\n", completed + 1, name);
+		fflush(stderr);
+		// GadgetPushButtonInput sends this same notification to this owner.
+		TheWindowManager->winSendSystemMsg(button->winGetOwner(), GBM_SELECTED, (WindowMsgData)button, 0);
+		return TRUE;
+	};
+	auto labelEquals = [&](const char* name, const char* key) -> Bool {
+		GameWindow* label = window(name);
+		return label && TheGameText && GadgetStaticTextGetText(label) == TheGameText->fetch(key);
+	};
+	if (phase != PLAY_MATCH && ticks - phaseTick > 1800)
+	{
+		finish(FALSE, "menu/load/result transition timed out after 1800 client updates");
+		return;
+	}
+	if (phase == START_MENU)
+	{
+		if (inGame) { finish(FALSE, "start from the normal main menu, without a map URL or -file argument"); return; }
+		if (click("MainMenu.wnd:ButtonEngage")) transition(SELECT_TRAINING);
+		return;
+	}
+	if (phase == SELECT_TRAINING)
+	{
+		if (labelEquals("WPSkirmish.wnd:MapName", "WP:MapTraining")) transition(CONFIRM_DEPLOY);
+		else if (click("WPSkirmish.wnd:ButtonModeTraining")) transition(CONFIRM_DEPLOY);
+		return;
+	}
+	if (phase == CONFIRM_DEPLOY)
+	{
+		if (!labelEquals("WPSkirmish.wnd:MapName", "WP:MapTraining")) { finish(FALSE, "deployment did not select Field Orientation"); return; }
+		if (!labelEquals("WPSkirmish.wnd:DiffName", "WP:DiffNormal"))
+		{
+			if (ticks % 30 == 0) click("WPSkirmish.wnd:ButtonDiffNext");
+			return;
+		}
+		if (click("WPSkirmish.wnd:ButtonDeployMeridian")) transition(WAIT_MATCH);
+		return;
+	}
+	if (phase == WAIT_SCORE || phase == SCORE_DWELL)
+	{
+		if (inGame) return; // The map's DEFEAT banner/exit timer still owns the transition.
+		GameWindow* score = window("WPScore.wnd:ScoreParent");
+		if (!score || score->winIsHidden()) return;
+		if (!labelEquals("WPScore.wnd:ResultBanner", "WP:Defeat")) { finish(FALSE, "native score screen did not report defeat"); return; }
+		if (phase == WAIT_SCORE)
+		{
+			fprintf(stderr, "[WP_AUTO] RETRY_RESULT run=%d result=DEFEAT source=native-score loss=%s; warming score text before Retry\n",
+				completed + 1, injectedLoss ? "injected-hq-damage" : "natural-combat");
+			fflush(stderr);
+			transition(SCORE_DWELL);
+		}
+		else if (ticks - phaseTick >= 120 && click("WPScore.wnd:ButtonRetry"))
+		{
+			++completed;
+			transition(WAIT_MATCH);
+		}
+		return;
+	}
+	if (!inGame)
+	{
+		if (phase == PLAY_MATCH) finish(FALSE, "match exited before a verified headquarters loss");
+		return;
+	}
+	if (!ThePlayerList || !TheThingFactory || !TheTerrainLogic || !TheScriptEngine) return;
+	Player* owner = ThePlayerList->getLocalPlayer();
+	if (!owner) { finish(FALSE, "training has no local player"); return; }
+	auto find = [&](const char* name, Bool completedOnly) -> Object* {
+		for (Object* object = TheGameLogic->getFirstObject(); object; object = object->getNextObject())
+			if (object->getControllingPlayer() == owner && object->getTemplate()->getName() == name &&
+				!object->isEffectivelyDead() && (!completedOnly || !object->getStatusBits().test(OBJECT_STATUS_UNDER_CONSTRUCTION))) return object;
+		return nullptr;
+	};
+	auto count = [&](const char* name) -> Int {
+		Int result = 0;
+		for (Object* object = TheGameLogic->getFirstObject(); object; object = object->getNextObject())
+			if (object->getControllingPlayer() == owner && object->getTemplate()->getName() == name &&
+				!object->isEffectivelyDead() && !object->getStatusBits().test(OBJECT_STATUS_UNDER_CONSTRUCTION)) ++result;
+		return result;
+	};
+	auto select = [&](Object* object) -> Bool {
+		if (!object || !object->getDrawable() || !TheInGameUI || !TheMessageStream) return FALSE;
+		pendingSelectionMask = 0;
+		// Match SelectionXlat's single-selection path: the local drawable selection
+		// drives displayed text, while the group message drives game-logic orders.
+		TheInGameUI->deselectAllDrawables();
+		TheInGameUI->selectDrawable(object->getDrawable());
+		if (TheInGameUI->getSelectCount() != 1 || TheInGameUI->getFirstSelectedDrawable() != object->getDrawable()) return FALSE;
+		GameMessage* message = TheMessageStream->appendMessage(GameMessage::MSG_CREATE_SELECTED_GROUP);
+		message->appendBooleanArgument(TRUE);
+		message->appendObjectIDArgument(object->getID());
+		uiSelectionID = object->getID();
+		return TRUE;
+	};
+	const char* selections[] = { "WP_CommandCenter", "WP_Fabricator", "WP_Exchange", "WP_Porter",
+		"WP_VehiclePlant", "WP_Tank", "WP_Vigil", "WP_Directorate" };
+	const UnsignedInt allSelectionMask = (1U << ARRAY_SIZE(selections)) - 1;
+	Object* uiObject = TheGameLogic->findObjectByID(uiSelectionID);
+	if (pendingSelectionMask && uiObject && !uiObject->isEffectivelyDead() && TheInGameUI &&
+		TheInGameUI->getSelectCount() == 1 && TheInGameUI->getFirstSelectedDrawable() == uiObject->getDrawable())
+	{
+		// Observe the real selection on a later client update, after the HUD can
+		// consume it. Readiness requires every roster category in the churn loop.
+		uiSelectionMask |= pendingSelectionMask;
+		pendingSelectionMask = 0;
+	}
+	const TCounter* objective = TheScriptEngine->getCounter("WP_ObjectiveStage");
+	Object* headquarters = find("WP_CommandCenter", TRUE);
+	if (phase == WAIT_MATCH)
+	{
+		if (TheGameLogic->isLoadingMap() || frame < 90) return;
+		GameWindow* bar = window("ControlBar.wnd:ControlBarParent");
+		if (!strstr(TheGameState->getPristineMapName().str(), "WPTraining") || !headquarters ||
+			!objective || objective->value != 0 || frame > 300 || !bar || bar->winIsHidden() ||
+			TheGlobalData->m_loadScreenRender || TheGlobalData->m_breakTheMovie)
+		{
+			finish(FALSE, "fresh training map/stage/headquarters/visible HUD did not recover after deployment");
+			return;
+		}
+		if (!TheInGameUI || TheInGameUI->getSelectCount() != 1 || TheInGameUI->getFirstSelectedDrawable() != headquarters->getDrawable())
+		{
+			if (!select(headquarters)) finish(FALSE, "fresh training headquarters cannot be selected by the native UI");
+			return;
+		}
+		if (completed == runs) { finish(TRUE, "every native defeat/score Retry reached a fresh training battlefield with native headquarters selection; final scene paused"); return; }
+		home = *headquarters->getPosition(); taskIndex = 0; selectionIndex = 0;
+		taskIssued = FALSE; ready = FALSE; injectedLoss = FALSE; readyFrame = 0; taskFrame = frame;
+		selectionFrame = heartbeatFrame = 0; lastFrame = frame; lastFrameTick = ticks;
+		uiSelectionMask = pendingSelectionMask = 0;
+		maxCargo = 0; supplyDelivered = FALSE; cacheID = INVALID_ID;
+		for (Object* object = TheGameLogic->getFirstObject(); object; object = object->getNextObject())
+			if (object->getName() == "HomeSupplyA") cacheID = object->getID();
+		Object* cache = TheGameLogic->findObjectByID(cacheID);
+		SupplyWarehouseDockUpdate* dock = cache ? static_cast<SupplyWarehouseDockUpdate*>(cache->findUpdateModule(NAMEKEY("SupplyWarehouseDockUpdate"))) : nullptr;
+		if (!dock || dock->getBoxesStored() <= 0) { finish(FALSE, "training home supply cache is missing or empty"); return; }
+		initialBoxes = dock->getBoxesStored();
+		fprintf(stderr, "[WP_AUTO] RETRY_MATCH run=%d/%d frame=%u stage=0; beginning actual training economy and army\n", completed + 1, runs, frame);
+		fflush(stderr);
+		transition(PLAY_MATCH);
+	}
+	if (frame != lastFrame) { lastFrame = frame; lastFrameTick = ticks; }
+	if (ticks - lastFrameTick > 1800) { finish(FALSE, "game logic stopped advancing during the stress match"); return; }
+	if (!headquarters)
+	{
+		if (!ready) finish(FALSE, "headquarters lost before the production and stage-four setup completed");
+		else transition(WAIT_SCORE);
+		return;
+	}
+	if (!supplyDelivered)
+	{
+		Object* porter = find("WP_Porter", TRUE);
+		SupplyTruckAIInterface* truck = porter && porter->getAIUpdateInterface() ? porter->getAIUpdateInterface()->getSupplyTruckAIInterface() : nullptr;
+		Object* cache = TheGameLogic->findObjectByID(cacheID);
+		SupplyWarehouseDockUpdate* dock = cache ? static_cast<SupplyWarehouseDockUpdate*>(cache->findUpdateModule(NAMEKEY("SupplyWarehouseDockUpdate"))) : nullptr;
+		const Int cargo = truck ? truck->getNumberBoxes() : 0;
+		if (cargo > maxCargo) maxCargo = cargo;
+		if (truck && dock && maxCargo > 0 && initialBoxes - dock->getBoxesStored() > cargo)
+		{
+			supplyDelivered = TRUE;
+			fprintf(stderr, "[WP_AUTO] RETRY_SUPPLY run=%d frame=%u stockRemoved=%d cargo=%d maxCargo=%d; actual hauler delivery observed\n",
+				completed + 1, frame, initialBoxes - dock->getBoxesStored(), cargo, maxCargo);
+			fflush(stderr);
+		}
+	}
+	struct Task { const char* name; const char* producer; Int count; Bool structure; Real dx; Real dy; };
+	static const Task tasks[] = {
+		{ "WP_Fabricator", "WP_CommandCenter", 1, FALSE, 0, 0 },
+		{ "WP_Exchange", "WP_Fabricator", 1, TRUE, 120, -130 },
+		{ "WP_PowerArray", "WP_Fabricator", 1, TRUE, -75, 75 },
+		{ "WP_Porter", "WP_Exchange", 1, FALSE, 0, 0 },
+		{ "WP_VehiclePlant", "WP_Fabricator", 1, TRUE, 105, 105 },
+		{ "WP_Tank", "WP_VehiclePlant", 2, FALSE, 0, 0 },
+		{ "WP_Vigil", "WP_CommandCenter", 1, FALSE, 0, 0 },
+		{ "WP_Directorate", "WP_Fabricator", 1, TRUE, -125, -100 }
+	};
+	if (!ready)
+	{
+		if (frame - taskFrame > 2700) { finish(FALSE, "training construction/production prerequisite stalled for 90 game seconds"); return; }
+		if (taskIndex < (Int)ARRAY_SIZE(tasks))
+		{
+			const Task& task = tasks[taskIndex];
+			const Int finished = count(task.name);
+			if (finished >= task.count)
+			{
+				fprintf(stderr, "[WP_AUTO] RETRY_TASK run=%d frame=%u template=%s complete=%d stage=%d\n",
+					completed + 1, frame, task.name, finished, objective ? objective->value : -1);
+				fflush(stderr);
+				++taskIndex; taskIssued = FALSE; taskFrame = frame;
+			}
+			else if (!taskIssued)
+			{
+				Object* producer = find(task.producer, TRUE);
+				const ThingTemplate* thing = TheThingFactory->findTemplate(task.name);
+				if (!producer || !thing) { finish(FALSE, "missing training producer/template"); return; }
+				if (owner->getMoney()->countMoney() < thing->calcCostToBuild(owner) * (task.count - finished)) return;
+				if (!select(producer)) { finish(FALSE, "native producer drawable selection failed"); return; }
+				if (task.structure)
+				{
+					Coord3D position = home; position.x += task.dx; position.y += task.dy;
+					position.z = TheTerrainLogic->getGroundHeight(position.x, position.y);
+					GameMessage* message = TheMessageStream->appendMessage(GameMessage::MSG_DOZER_CONSTRUCT);
+					message->appendIntegerArgument(thing->getTemplateID());
+					message->appendLocationArgument(position); message->appendRealArgument(0.0f);
+				}
+				else for (Int i = finished; i < task.count; ++i)
+				{
+					GameMessage* message = TheMessageStream->appendMessage(GameMessage::MSG_QUEUE_UNIT_CREATE);
+					message->appendIntegerArgument(thing->getTemplateID()); message->appendIntegerArgument(1);
+				}
+				fprintf(stderr, "[WP_AUTO] RETRY_ORDER run=%d frame=%u template=%s count=%d path=%s\n",
+					completed + 1, frame, task.name, task.count - finished, task.structure ? "native-dozer" : "native-production");
+				fflush(stderr);
+				taskIssued = TRUE;
+				return;
+			}
+		}
+		else if (objective && objective->value == 4 && supplyDelivered && uiSelectionMask == allSelectionMask)
+		{
+			ready = TRUE; readyFrame = frame;
+			fprintf(stderr, "[WP_AUTO] RETRY_READY run=%d frame=%u stage=4 money=%d uiSelectionMask=0x%x; supply, army and Directorate are real completed objects with observed native UI selection\n",
+				completed + 1, frame, owner->getMoney()->countMoney(), uiSelectionMask);
+			fflush(stderr);
+		}
+	}
+	// Select different real objects so native names, health, orders, production,
+	// money and recharge displays create/release their normal text resources.
+	if (frame % 30 == 0 && selectionFrame != frame)
+	{
+		selectionFrame = frame;
+		const Int index = selectionIndex++ % ARRAY_SIZE(selections);
+		Object* object = find(selections[index], TRUE);
+		if (object)
+		{
+			if (!select(object)) { finish(FALSE, "native drawable selection failed during HUD churn"); return; }
+			pendingSelectionMask = 1U << index;
+		}
+	}
+	if (frame % 900 == 0 && heartbeatFrame != frame)
+	{
+		heartbeatFrame = frame;
+		fprintf(stderr, "[WP_AUTO] RETRY_HEARTBEAT run=%d frame=%u task=%d stage=%d money=%d uiSelectionMask=0x%x uiSelected=%d\n",
+			completed + 1, frame, taskIndex, objective ? objective->value : -1, owner->getMoney()->countMoney(),
+			uiSelectionMask, TheInGameUI ? TheInGameUI->getSelectCount() : 0);
+		fflush(stderr);
+	}
+	if (ready && frame >= matchFrames && frame - readyFrame >= 300)
+	{
+		fprintf(stderr, "[WP_AUTO] RETRY_LOSS run=%d frame=%u injecting lethal headquarters damage; awaiting unmodified WP_Lose script/result\n", completed + 1, frame);
+		fflush(stderr);
+		injectedLoss = TRUE;
+		headquarters->kill();
+		transition(WAIT_SCORE);
+	}
+}
+
 /** -----------------------------------------------------------------------------------------------
  * Update the game engine by updating the GameClient and GameLogic singletons.
  */
@@ -1227,6 +1537,7 @@ void GameEngine::update()
 			// browser mission telemetry without changing simulation state.
 			extern void WPUpdatePlayerExperience();
 			WPUpdatePlayerExperience();
+			WPUpdateRetryDiagnostic();
 			// WarPowers @debug WP_AUTOTEST: scripted input smoke test. Injects
 			// the same logic messages real mouse input produces: select the
 			// local command center, queue a tank, select the tank, move it,
@@ -1234,7 +1545,7 @@ void GameEngine::update()
 			// full command chain headlessly.
 			{
 				static const char* wp_autoEnv = getenv("WP_AUTOTEST");
-				static const Bool wp_auto = wp_autoEnv != nullptr;
+				static const Bool wp_auto = wp_autoEnv && strcmp(wp_autoEnv, "retry") != 0;
 				// WP_AUTOTEST=build stops after the tank spawns (stages 0-2),
 				// leaving move/attack to a human at the mouse.
 				static const Bool wp_buildOnly = wp_autoEnv && strcmp(wp_autoEnv, "build") == 0;

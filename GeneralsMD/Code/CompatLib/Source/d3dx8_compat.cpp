@@ -95,13 +95,16 @@ D3DXLoadSurfaceFromSurface(
 	DWORD Filter,
 	D3DCOLOR ColorKey)
 {
-	D3DSURFACE_DESC descSrc;
-	D3DSURFACE_DESC descDest;
-
-	//DEBUG_ASSERTCRASH(pDestPalette == NULL);
-
-	pSrcSurface->GetDesc(&descSrc);
-	pDestSurface->GetDesc(&descDest);
+	// GeneralsX @bugfix Codex 05/09/2026 Validate surface copies and retain each lock until cleanup.
+	if (!pSrcSurface || !pDestSurface || pSrcPalette || pDestPalette || ColorKey)
+	{
+		return D3DERR_INVALIDCALL;
+	}
+	D3DSURFACE_DESC descSrc = {}, descDest = {};
+	HRESULT hr = pSrcSurface->GetDesc(&descSrc);
+	if (FAILED(hr)) return hr;
+	hr = pDestSurface->GetDesc(&descDest);
+	if (FAILED(hr)) return hr;
 
 #ifdef __EMSCRIPTEN__
 	static const bool ig_trace_lsfs = getenv("IG_TRACE") && *getenv("IG_TRACE") != '0';
@@ -117,26 +120,98 @@ D3DXLoadSurfaceFromSurface(
 		return D3DERR_INVALIDCALL;
 	}
 
-	D3DLOCKED_RECT srcRect;
-	pSrcSurface->LockRect(&srcRect, NULL, 0);
-
-	D3DLOCKED_RECT destRect;
-	pDestSurface->LockRect(&destRect, NULL, 0);
-
-	// Fast path: No scaling needs to be done if the dimensions are the same
-	if (descDest.Width == descSrc.Width && descDest.Height == descSrc.Height)
+	// Equal-size region copies are used by bitmap tiling and font image packing.
+	// Compressed regions must cover complete blocks, except at the surface edge.
+	UINT blockSize = 1, blockBytes = 0;
+	switch (descSrc.Format)
 	{
-		// Copy the data directly
-		memcpy(destRect.pBits, srcRect.pBits, srcRect.Pitch * descSrc.Height);
-		pDestSurface->UnlockRect();
-		pSrcSurface->UnlockRect();
-		return D3D_OK;
+		case D3DFMT_A8R8G8B8: case D3DFMT_X8R8G8B8: blockBytes = 4; break;
+		case D3DFMT_R8G8B8: blockBytes = 3; break;
+		case D3DFMT_A1R5G5B5: case D3DFMT_X1R5G5B5: case D3DFMT_R5G6B5:
+		case D3DFMT_A4R4G4B4: case D3DFMT_A8L8: case D3DFMT_V8U8:
+		case D3DFMT_L6V5U5: blockBytes = 2; break;
+		case D3DFMT_X8L8V8U8: blockBytes = 4; break;
+		case D3DFMT_A8: case D3DFMT_L8: blockBytes = 1; break;
+		case D3DFMT_DXT1: blockSize = 4; blockBytes = 8; break;
+		case D3DFMT_DXT2: case D3DFMT_DXT3: case D3DFMT_DXT4: case D3DFMT_DXT5:
+			blockSize = 4; blockBytes = 16; break;
+		default: return D3DERR_INVALIDCALL;
+	}
+	auto region = [blockSize](const RECT* requested, const D3DSURFACE_DESC& desc, RECT& result) -> bool {
+		// RECT coordinates are signed. Reject dimensions that cannot be represented.
+		if (!desc.Width || !desc.Height || desc.Width > 0x7fffffffU || desc.Height > 0x7fffffffU) return false;
+		result = requested ? *requested : RECT{0, 0, (LONG)desc.Width, (LONG)desc.Height};
+		return result.left >= 0 && result.top >= 0 && result.right > result.left && result.bottom > result.top &&
+			(UINT)result.right <= desc.Width && (UINT)result.bottom <= desc.Height &&
+			result.left % blockSize == 0 && result.top % blockSize == 0 &&
+			(result.right % blockSize == 0 || (UINT)result.right == desc.Width) &&
+			(result.bottom % blockSize == 0 || (UINT)result.bottom == desc.Height);
+	};
+	RECT srcArea, destArea;
+	if (!region(pSrcRect, descSrc, srcArea) || !region(pDestRect, descDest, destArea)) return D3DERR_INVALIDCALL;
+	const size_t srcBlocks = (size_t(descSrc.Width) + blockSize - 1) / blockSize;
+	const size_t destBlocks = (size_t(descDest.Width) + blockSize - 1) / blockSize;
+	if (srcBlocks > 0x7fffffffU / blockBytes || destBlocks > 0x7fffffffU / blockBytes) return D3DERR_INVALIDCALL;
+	const size_t srcRowBytes = srcBlocks * blockBytes, destRowBytes = destBlocks * blockBytes;
+	const UINT srcRows = (descSrc.Height + blockSize - 1) / blockSize;
+	const UINT destRows = (descDest.Height + blockSize - 1) / blockSize;
+	descSrc.Width = srcArea.right - srcArea.left;
+	descSrc.Height = srcArea.bottom - srcArea.top;
+	descDest.Width = destArea.right - destArea.left;
+	descDest.Height = destArea.bottom - destArea.top;
+	const bool sameSize = descDest.Width == descSrc.Width && descDest.Height == descSrc.Height;
+	// GeneralsX @bugfix Codex 05/09/2026 Rectangular mip chains retain a one-pixel axis.
+	const bool halfSize = descDest.Width == (descSrc.Width > 1 ? descSrc.Width / 2 : 1) &&
+		descDest.Height == (descSrc.Height > 1 ? descSrc.Height / 2 : 1);
+	const bool supportedMipFormat = descSrc.Format == D3DFMT_A1R5G5B5 || descSrc.Format == D3DFMT_A4R4G4B4 ||
+		descSrc.Format == D3DFMT_R5G6B5 || descSrc.Format == D3DFMT_A8R8G8B8 || descSrc.Format == D3DFMT_X8R8G8B8;
+	if (!sameSize && (!supportedMipFormat || !halfSize))
+	{
+		return D3DERR_INVALIDCALL;
+	}
+	if (pSrcSurface == pDestSurface)
+	{
+		// An exact self-copy is already complete. Overlapping in-place conversion is unsupported.
+		return sameSize && srcArea.left == destArea.left && srcArea.top == destArea.top ? D3D_OK : D3DERR_INVALIDCALL;
+	}
+	struct SurfaceLock
+	{
+		LPDIRECT3DSURFACE8 surface;
+		~SurfaceLock() { if (surface) surface->UnlockRect(); }
+		HRESULT release() { LPDIRECT3DSURFACE8 held = surface; surface = NULL; return held->UnlockRect(); }
+	};
+	D3DLOCKED_RECT srcRect = {}, destRect = {};
+	hr = pSrcSurface->LockRect(&srcRect, NULL, D3DLOCK_READONLY);
+	if (FAILED(hr)) return hr;
+	SurfaceLock srcLock = {pSrcSurface};
+	hr = pDestSurface->LockRect(&destRect, NULL, 0);
+	if (FAILED(hr)) return hr;
+	SurfaceLock destLock = {pDestSurface};
+	if (!srcRect.pBits || !destRect.pBits || srcRect.Pitch <= 0 || destRect.Pitch <= 0 ||
+		size_t(srcRect.Pitch) < srcRowBytes || size_t(destRect.Pitch) < destRowBytes ||
+		srcRows > size_t(-1) / size_t(srcRect.Pitch) || destRows > size_t(-1) / size_t(destRect.Pitch) ||
+		(!sameSize && (srcRect.Pitch % blockBytes || destRect.Pitch % blockBytes))) return D3DERR_INVALIDCALL;
+	srcRect.pBits = (unsigned char*)srcRect.pBits + size_t(srcArea.top / blockSize) * srcRect.Pitch + size_t(srcArea.left / blockSize) * blockBytes;
+	destRect.pBits = (unsigned char*)destRect.pBits + size_t(destArea.top / blockSize) * destRect.Pitch + size_t(destArea.left / blockSize) * blockBytes;
+	auto finish = [&](HRESULT result) -> HRESULT {
+		const HRESULT destResult = destLock.release(), srcResult = srcLock.release();
+		return FAILED(result) ? result : FAILED(destResult) ? destResult : srcResult;
+	};
+
+	if (sameSize)
+	{
+		const size_t rowBytes = ((size_t(descSrc.Width) + blockSize - 1) / blockSize) * blockBytes;
+		const UINT rows = (descSrc.Height + blockSize - 1) / blockSize;
+		for (UINT y = 0; y < rows; ++y)
+			memcpy((unsigned char*)destRect.pBits + size_t(y) * destRect.Pitch,
+				(const unsigned char*)srcRect.pBits + size_t(y) * srcRect.Pitch, rowBytes);
+		return finish(D3D_OK);
 	}
 
 #if !defined(__APPLE__) && !defined(__EMSCRIPTEN__)
 	// GeneralsX @bugfix Antigravity 26/06/2026 Linux: GLI lacks support for A4R4G4B4/R5G6B5 formats.
 	// We use manual box filter downsampling for these formats to fix black infantry rendering.
-	if (descDest.Width == descSrc.Width / 2 && descDest.Height == descSrc.Height / 2)
+	if (halfSize)
 	{
 		if (descSrc.Format == D3DFMT_A4R4G4B4)
 		{
@@ -152,10 +227,12 @@ D3DXLoadSurfaceFromSurface(
 				{
 					uint32_t sx = x * 2;
 					uint32_t sy = y * 2;
+					uint32_t nx = sx + 1 < descSrc.Width ? sx + 1 : sx;
+					uint32_t ny = sy + 1 < descSrc.Height ? sy + 1 : sy;
 					uint16_t p00 = src[sy * srcPitch16 + sx];
-					uint16_t p10 = src[sy * srcPitch16 + sx + 1];
-					uint16_t p01 = src[(sy + 1) * srcPitch16 + sx];
-					uint16_t p11 = src[(sy + 1) * srcPitch16 + sx + 1];
+					uint16_t p10 = src[sy * srcPitch16 + nx];
+					uint16_t p01 = src[ny * srcPitch16 + sx];
+					uint16_t p11 = src[ny * srcPitch16 + nx];
 
 					// Extract and average each channel (A4 R4 G4 B4)
 					uint32_t a = (((p00 >> 12) & 0x0F) + ((p10 >> 12) & 0x0F) +
@@ -170,9 +247,7 @@ D3DXLoadSurfaceFromSurface(
 					dst[y * dstPitch16 + x] = (uint16_t)((a << 12) | (r << 8) | (g << 4) | b);
 				}
 			}
-			pDestSurface->UnlockRect();
-			pSrcSurface->UnlockRect();
-			return D3D_OK;
+			return finish(D3D_OK);
 		}
 		else if (descSrc.Format == D3DFMT_R5G6B5)
 		{
@@ -188,10 +263,12 @@ D3DXLoadSurfaceFromSurface(
 				{
 					uint32_t sx = x * 2;
 					uint32_t sy = y * 2;
+					uint32_t nx = sx + 1 < descSrc.Width ? sx + 1 : sx;
+					uint32_t ny = sy + 1 < descSrc.Height ? sy + 1 : sy;
 					uint16_t p00 = src[sy * srcPitch16 + sx];
-					uint16_t p10 = src[sy * srcPitch16 + sx + 1];
-					uint16_t p01 = src[(sy + 1) * srcPitch16 + sx];
-					uint16_t p11 = src[(sy + 1) * srcPitch16 + sx + 1];
+					uint16_t p10 = src[sy * srcPitch16 + nx];
+					uint16_t p01 = src[ny * srcPitch16 + sx];
+					uint16_t p11 = src[ny * srcPitch16 + nx];
 
 					// Extract and average each channel (R5 G6 B5)
 					uint32_t r = (((p00 >> 11) & 0x1F) + ((p11 >> 11) & 0x1F) +
@@ -204,9 +281,7 @@ D3DXLoadSurfaceFromSurface(
 					dst[y * dstPitch16 + x] = (uint16_t)((r << 11) | (g << 5) | b);
 				}
 			}
-			pDestSurface->UnlockRect();
-			pSrcSurface->UnlockRect();
-			return D3D_OK;
+			return finish(D3D_OK);
 		}
 	}
 	// Pick a compatible format
@@ -230,31 +305,32 @@ D3DXLoadSurfaceFromSurface(
 	gli::texture2d texSrc(imageFormat, gli::extent2d(descSrc.Width, descSrc.Height), 2);
 
 	// Copy the data to level 0
-	memcpy(texSrc.data(), srcRect.pBits, texSrc.size());
+	const size_t srcPackedPitch = size_t(descSrc.Width) * blockBytes;
+	for (UINT y = 0; y < descSrc.Height; ++y)
+		memcpy((unsigned char*)texSrc.data(0, 0, 0) + size_t(y) * srcPackedPitch,
+			(const unsigned char*)srcRect.pBits + size_t(y) * srcRect.Pitch, srcPackedPitch);
 	// Generate mip 1 from level 0
 	gli::texture2d mipMap = gli::generate_mipmaps(texSrc, gli::filter::FILTER_LINEAR);
 
-	if (mipMap.size(1) != destRect.Pitch * descDest.Height)
+	const size_t destPackedPitch = size_t(descDest.Width) * blockBytes;
+	if (mipMap.size(1) != destPackedPitch * descDest.Height)
 	{
 		// The generated dimension would not be the same as the destination
 		// This does not happen in the game, yet let's not allow it
-		pDestSurface->UnlockRect();
-		pSrcSurface->UnlockRect();
-		return D3DERR_INVALIDCALL;
+		return finish(D3DERR_INVALIDCALL);
 	}
 
 	// Copy mip level 1 to the destination
-	memcpy(destRect.pBits, mipMap.data(0,0,1), destRect.Pitch * descDest.Height);
+	for (UINT y = 0; y < descDest.Height; ++y)
+		memcpy((unsigned char*)destRect.pBits + size_t(y) * destRect.Pitch,
+			(const unsigned char*)mipMap.data(0, 0, 1) + size_t(y) * destPackedPitch, destPackedPitch);
 
-	pDestSurface->UnlockRect();
-	pSrcSurface->UnlockRect();
-
-	return D3D_OK;
+	return finish(D3D_OK);
 #else
 	// GeneralsX @bugfix BenderAI 07/03/2026 macOS: GLI not available due to Apple Clang ambiguity.
 	// Implement manual box filter downsampling for mipmap generation.
 	// This is critical for terrain textures - without mipmaps, terrain renders black.
-	if (descDest.Width == descSrc.Width / 2 && descDest.Height == descSrc.Height / 2)
+	if (halfSize)
 	{
 		if (descSrc.Format == D3DFMT_A1R5G5B5)
 		{
@@ -270,10 +346,12 @@ D3DXLoadSurfaceFromSurface(
 				{
 					uint32_t sx = x * 2;
 					uint32_t sy = y * 2;
+					uint32_t nx = sx + 1 < descSrc.Width ? sx + 1 : sx;
+					uint32_t ny = sy + 1 < descSrc.Height ? sy + 1 : sy;
 					uint16_t p00 = src[sy * srcPitch16 + sx];
-					uint16_t p10 = src[sy * srcPitch16 + sx + 1];
-					uint16_t p01 = src[(sy + 1) * srcPitch16 + sx];
-					uint16_t p11 = src[(sy + 1) * srcPitch16 + sx + 1];
+					uint16_t p10 = src[sy * srcPitch16 + nx];
+					uint16_t p01 = src[ny * srcPitch16 + sx];
+					uint16_t p11 = src[ny * srcPitch16 + nx];
 
 					// Extract and average each channel (A1 R5 G5 B5)
 					uint32_t r = (((p00 >> 10) & 0x1F) + ((p10 >> 10) & 0x1F) +
@@ -303,10 +381,12 @@ D3DXLoadSurfaceFromSurface(
 				{
 					uint32_t sx = x * 2;
 					uint32_t sy = y * 2;
+					uint32_t nx = sx + 1 < descSrc.Width ? sx + 1 : sx;
+					uint32_t ny = sy + 1 < descSrc.Height ? sy + 1 : sy;
 					uint32_t p00 = src[sy * srcPitch32 + sx];
-					uint32_t p10 = src[sy * srcPitch32 + sx + 1];
-					uint32_t p01 = src[(sy + 1) * srcPitch32 + sx];
-					uint32_t p11 = src[(sy + 1) * srcPitch32 + sx + 1];
+					uint32_t p10 = src[sy * srcPitch32 + nx];
+					uint32_t p01 = src[ny * srcPitch32 + sx];
+					uint32_t p11 = src[ny * srcPitch32 + nx];
 
 					uint32_t a = (((p00 >> 24) & 0xFF) + ((p10 >> 24) & 0xFF) +
 					              ((p01 >> 24) & 0xFF) + ((p11 >> 24) & 0xFF) + 2) >> 2;
@@ -335,10 +415,12 @@ D3DXLoadSurfaceFromSurface(
 				{
 					uint32_t sx = x * 2;
 					uint32_t sy = y * 2;
+					uint32_t nx = sx + 1 < descSrc.Width ? sx + 1 : sx;
+					uint32_t ny = sy + 1 < descSrc.Height ? sy + 1 : sy;
 					uint16_t p00 = src[sy * srcPitch16 + sx];
-					uint16_t p10 = src[sy * srcPitch16 + sx + 1];
-					uint16_t p01 = src[(sy + 1) * srcPitch16 + sx];
-					uint16_t p11 = src[(sy + 1) * srcPitch16 + sx + 1];
+					uint16_t p10 = src[sy * srcPitch16 + nx];
+					uint16_t p01 = src[ny * srcPitch16 + sx];
+					uint16_t p11 = src[ny * srcPitch16 + nx];
 
 					// Extract and average each channel (A4 R4 G4 B4)
 					uint32_t a = (((p00 >> 12) & 0x0F) + ((p10 >> 12) & 0x0F) +
@@ -368,10 +450,12 @@ D3DXLoadSurfaceFromSurface(
 				{
 					uint32_t sx = x * 2;
 					uint32_t sy = y * 2;
+					uint32_t nx = sx + 1 < descSrc.Width ? sx + 1 : sx;
+					uint32_t ny = sy + 1 < descSrc.Height ? sy + 1 : sy;
 					uint16_t p00 = src[sy * srcPitch16 + sx];
-					uint16_t p10 = src[sy * srcPitch16 + sx + 1];
-					uint16_t p01 = src[(sy + 1) * srcPitch16 + sx];
-					uint16_t p11 = src[(sy + 1) * srcPitch16 + sx + 1];
+					uint16_t p10 = src[sy * srcPitch16 + nx];
+					uint16_t p01 = src[ny * srcPitch16 + sx];
+					uint16_t p11 = src[ny * srcPitch16 + nx];
 
 					// Extract and average each channel (R5 G6 B5)
 					uint32_t r = (((p00 >> 11) & 0x1F) + ((p11 >> 11) & 0x1F) +
@@ -387,14 +471,10 @@ D3DXLoadSurfaceFromSurface(
 		}
 		else
 		{
-			pDestSurface->UnlockRect();
-			pSrcSurface->UnlockRect();
-			return D3DERR_INVALIDCALL;
+			return finish(D3DERR_INVALIDCALL);
 		}
 
-		pDestSurface->UnlockRect();
-		pSrcSurface->UnlockRect();
-		return D3D_OK;
+		return finish(D3D_OK);
 	}
 
 	// Non-power-of-two scaling not supported
@@ -403,9 +483,7 @@ D3DXLoadSurfaceFromSurface(
 	        descSrc.Width, descSrc.Height, descDest.Width, descDest.Height,
 	        (unsigned)descSrc.Format);
 #endif
-	pDestSurface->UnlockRect();
-	pSrcSurface->UnlockRect();
-	return D3DERR_INVALIDCALL;
+	return finish(D3DERR_INVALIDCALL);
 #endif
 }
 
@@ -427,11 +505,16 @@ D3DXFilterTexture(
 	DWORD Filter)
 {
 	HRESULT hr = D3DERR_INVALIDCALL;
+	// GeneralsX @bugfix Codex 05/09/2026 Keep one owned reference while walking mip surfaces.
+	if (!pBaseTexture)
+	{
+		return D3DERR_INVALIDCALL;
+	}
 	if (SrcLevel == D3DX_DEFAULT)
 	{
 		SrcLevel = 0;
 	}
-	else if (SrcLevel >= pBaseTexture->GetLevelCount())
+	if (SrcLevel >= pBaseTexture->GetLevelCount())
 	{
 		return D3DERR_INVALIDCALL;
 	}
@@ -444,42 +527,53 @@ D3DXFilterTexture(
 			IDirect3DTexture8 *tex = (IDirect3DTexture8 *)pBaseTexture;
 			IDirect3DSurface8 *topsurf, *mipsurf;
 			D3DSURFACE_DESC desc;
-			int i;
-
-			tex->GetLevelDesc(SrcLevel, &desc);
+			hr = tex->GetLevelDesc(SrcLevel, &desc);
+			if (FAILED(hr))
+			{
+				return hr;
+			}
 			if (Filter == D3DX_DEFAULT)
 			{
 				Filter = D3DX_FILTER_BOX;
 			}
 
-			int Level = SrcLevel + 1;
+			UINT Level = SrcLevel + 1;
 			hr = tex->GetSurfaceLevel(SrcLevel, &topsurf);
 			if (FAILED(hr))
 			{
 				return hr;
 			}
 
-			while (tex->GetSurfaceLevel(Level, &mipsurf) == D3D_OK)
+			while (Level < tex->GetLevelCount())
 			{
+				hr = tex->GetSurfaceLevel(Level, &mipsurf);
+				if (FAILED(hr))
+				{
+					topsurf->Release();
+					return hr;
+				}
 #ifdef __EMSCRIPTEN__
 				if (desc.Width >= 512)
 					if (igTraceEnabled()) fprintf(stderr, "[FILTER_PASS] level=%d top=%p mip=%p\n", Level, (void*)topsurf, (void*)mipsurf);
 #endif
 				// Copy the data
-				D3DXLoadSurfaceFromSurface(mipsurf, NULL, NULL, topsurf, NULL, NULL, Filter, 0);
+				hr = D3DXLoadSurfaceFromSurface(mipsurf, NULL, NULL, topsurf, NULL, NULL, Filter, 0);
 
-				// Release the surface
-				mipsurf->Release();
+				// The old source is finished. The new mip remains owned as the next
+				// source; releasing it here would borrow the texture's cache reference
+				// and double-release the final mip when the loop ends.
+				topsurf->Release();
+				if (FAILED(hr))
+				{
+					mipsurf->Release();
+					return hr;
+				}
 				topsurf = mipsurf;
 
 				Level++;
 			}
 
 			topsurf->Release();
-			if (FAILED(hr))
-			{
-				return hr;
-			}
 		}
 		return D3D_OK;
 	}
