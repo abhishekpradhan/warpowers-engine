@@ -20,7 +20,7 @@ python3 tools/genwebstage.py
 python3 tools/serve.py
 ```
 
-Open [the local game](http://127.0.0.1:8321). The workspace server supplies the required MIME, isolation and cache headers. Use `emcmake` when configuring: plain CMake can select the host compiler. The engine outputs are `build/wasm/GeneralsMD/GeneralsXZH.js` and `GeneralsXZH.wasm`. The workspace staging command combines them with the current dataset and web application.
+Open [the local game](http://localhost:8322). The workspace server supplies WASM MIME and cache headers. Keep the same URL for browser records and checkpoints, and reuse an existing server on that port. Use `emcmake` when configuring: plain CMake can select the host compiler. The engine outputs are `build/wasm/GeneralsMD/GeneralsXZH.js` and `GeneralsXZH.wasm`. The workspace staging command combines them with the current dataset and web application.
 
 The browser build uses SDL3 input, MiniAudio, and the D3D8-to-WebGL2 `d8web` renderer. DXVK's native compatibility headers are used during compilation, but DXVK's Vulkan libraries and MoltenVK do not run in the browser. Browser multiplayer and cross-platform deterministic replay compatibility are not established by a successful WebAssembly build.
 
