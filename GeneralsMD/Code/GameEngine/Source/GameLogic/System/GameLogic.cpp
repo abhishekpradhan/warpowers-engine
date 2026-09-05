@@ -102,6 +102,7 @@
 #include "GameLogic/Locomotor.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/Module/AIUpdate.h"
+#include "GameLogic/Module/SupplyTruckAIUpdate.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/CreateModule.h"
 #include "GameLogic/Module/DestroyModule.h"
@@ -2636,6 +2637,21 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
       drawable->onLevelStart();
       drawable = drawable->getNextDrawable();
     }
+
+		// War Powers opening haulers are placed in the map, so they never
+		// pass through SupplyCenterProductionExitUpdate's harvesting kickoff.
+		// Give only those pack templates the same native behavior on a fresh
+		// map; a checkpoint restores its own cargo and AI orders unchanged.
+		for (Object *object = getFirstObject(); object; object = object->getNextObject())
+		{
+			const AsciiString& name = object->getTemplate()->getName();
+			if (name != "WP_Porter" && name != "WPJ_Scavenger") continue;
+			AIUpdateInterface *ai = object->getAIUpdateInterface();
+			if (ai && ai->getSupplyTruckAIInterface())
+				ai->getSupplyTruckAIInterface()->setForceWantingState(TRUE);
+		}
+		extern void WPCreateReviewScene();
+		WPCreateReviewScene();
   }
 
 	//ReAllows quit menu to work during loading scene

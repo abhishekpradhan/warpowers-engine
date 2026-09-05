@@ -46,7 +46,13 @@
 #include "GameClient/Display.h"  // WarPowers @debug WP_AUTOTEST=husk
 #include "GameClient/View.h"  // WarPowers @debug WP_AUTOTEST
 #include "GameLogic/Module/ProductionUpdate.h"  // WarPowers @debug WP_AUTOTEST
+#include "GameLogic/Module/SupplyTruckAIUpdate.h"  // War Powers economy diagnostic
+#include "GameLogic/Module/SupplyWarehouseDockUpdate.h"
+#include "GameLogic/Module/SpecialPowerModule.h"
+#include "GameLogic/Module/CreateModule.h"
 #include "Common/ScoreKeeper.h"  // WarPowers @debug WP_AI_TRACE score probe
+extern void WPArmMissionDiagnosticResult(Bool victory);
+extern Int WPGetMissionDiagnosticResult();
 #include "GameLogic/SidesList.h"  // WarPowers @debug WP_AI_TRACE (BuildListInfo)
 // WarPowers @debug WP_AI_TRACE: symbolized backtrace for the named-object
 // forensics (kept out of the headers). No execinfo under emscripten.
@@ -1217,6 +1223,10 @@ void GameEngine::update()
 			}
 
 			TheGameClient->UPDATE();
+			// GeneralsX @feature Codex 05/09/2026 Refresh War Powers HUD and
+			// browser mission telemetry without changing simulation state.
+			extern void WPUpdatePlayerExperience();
+			WPUpdatePlayerExperience();
 			// WarPowers @debug WP_AUTOTEST: scripted input smoke test. Injects
 			// the same logic messages real mouse input produces: select the
 			// local command center, queue a tank, select the tank, move it,
@@ -1228,6 +1238,12 @@ void GameEngine::update()
 				// WP_AUTOTEST=build stops after the tank spawns (stages 0-2),
 				// leaving move/attack to a human at the mouse.
 				static const Bool wp_buildOnly = wp_autoEnv && strcmp(wp_autoEnv, "build") == 0;
+				// Explicit fixtures isolate actual supply transfers / power effects
+				// from construction, balance and player-facing targeting tests.
+				static const Bool wp_economyMode = wp_autoEnv && strcmp(wp_autoEnv, "economy") == 0;
+				static const Bool wp_powerMode = wp_autoEnv && strcmp(wp_autoEnv, "powers") == 0;
+				static const Bool wp_missionMode = wp_autoEnv && strcmp(wp_autoEnv, "mission") == 0;
+				static const Bool wp_missionDefeatMode = wp_autoEnv && strncmp(wp_autoEnv, "mission-defeat", 14) == 0;
 				// WP_AUTOTEST=base drives the dozer loop instead: CC -> Surveyor ->
 				// construct Power Station -> construct Vehicle Works -> build a tank
 				// from the factory. Verifies D016 construction end to end.
@@ -1320,8 +1336,316 @@ void GameEngine::update()
 					static ObjectID wp_fleet[4] = { INVALID_ID, INVALID_ID, INVALID_ID, INVALID_ID };
 					static Coord3D wp_ccPos = {0,0,0};
 					const Int wp_localIdx = ThePlayerList->getLocalPlayer() ? ThePlayerList->getLocalPlayer()->getPlayerIndex() : -1;
+					// GeneralsX @feature Codex 05/09/2026 Unit/control labs use an
+					// explicit production fixture now that real tanks require a
+					// factory. The base/wedge labs still exercise dozer construction.
+					auto wp_labTankName = [&]() -> const char* {
+						Object* cc = TheGameLogic->findObjectByID(wp_ccId);
+						return cc && cc->getTemplate()->getName() == "WPJ_CommandPost" ? "WPJ_Mongrel" : "WP_Tank";
+					};
+					auto wp_prepareUnitLab = [&]() {
+						Player* owner = ThePlayerList->getLocalPlayer();
+						if (!owner) return;
+						const Bool jackal = strcmp(wp_labTankName(), "WPJ_Mongrel") == 0;
+						const char* fixtures[] = { jackal ? "WPJ_ChopShop" : "WP_VehiclePlant", jackal ? nullptr : "WP_PowerArray" };
+						for (Int fi = 0; fi < 2; ++fi) {
+							if (!fixtures[fi]) continue;
+							Bool exists = FALSE;
+							for (Object* object = TheGameLogic->getFirstObject(); object; object = object->getNextObject())
+								if (object->getControllingPlayer() == owner && object->getTemplate()->getName() == fixtures[fi]) { exists = TRUE; break; }
+							if (exists) continue;
+							const ThingTemplate* fixture = TheThingFactory->findTemplate(fixtures[fi]);
+							Object* object = fixture ? TheThingFactory->newObject(fixture, owner->getDefaultTeam()) : nullptr;
+							if (!object) continue;
+							Coord3D position = wp_ccPos;
+							position.x += 130.0f + 90.0f * fi;
+							position.y -= 100.0f;
+							position.z = TheTerrainLogic->getGroundHeight(position.x, position.y);
+							object->setPosition(&position);
+							TheAI->pathfinder()->addObjectToPathfindMap(object);
+							fprintf(stderr, "[WP_AUTO] UNIT_LAB_FIXTURE %s (construction tested by base/wedge)\n", fixtures[fi]);
+						}
+					};
 
-					if (wp_defeatMode)
+					// GeneralsX @feature Codex 05/09/2026 Authored-map regression lab.
+					// Fixtures bypass construction/combat/time, but never set objective
+					// counters or dispatch victory/defeat. The shipped map scripts must
+					// advance stages and deliver the normal match-result transition.
+					if (wp_missionMode || wp_missionDefeatMode)
+					{
+						static UnsignedInt nextCheck = 90;
+						static UnsignedInt resultDeadline = 0;
+						static Int fixtureIndex = 0;
+						Player* owner = ThePlayerList->getLocalPlayer();
+						const AsciiString map = TheGameState->getPristineMapName();
+						auto counterValue = [&](const char* name) -> Int {
+							const TCounter* value = TheScriptEngine->getCounter(name);
+							return value ? value->value : -999;
+						};
+						auto named = [&](const char* name) -> Object* {
+							for (Object* obj = TheGameLogic->getFirstObject(); obj; obj = obj->getNextObject())
+								if (obj->getName() == name && !obj->isEffectivelyDead()) return obj;
+							return nullptr;
+						};
+						auto check = [&](Bool valid, const char* detail) -> Bool {
+							fprintf(stderr, "[WP_AUTO] MISSION_CHECK %s map=%s phase=%u stage=%d progress=%d: %s\n",
+								valid ? "PASS" : "FAIL", map.str(), wp_stage,
+								counterValue("WP_ObjectiveStage"), counterValue("WP_ObjectiveProgress"), detail);
+							fflush(stderr);
+							if (!valid) wp_stage = 99;
+							return valid;
+						};
+						auto fixture = [&](const char* name) {
+							Object* cc = named("PlayerCC");
+							const ThingTemplate* tt = TheThingFactory->findTemplate(name);
+							Object* obj = cc && tt && owner ? TheThingFactory->newObject(tt, owner->getDefaultTeam()) : nullptr;
+							if (!check(obj != nullptr, "create explicit prerequisite fixture")) return;
+							Coord3D position = *cc->getPosition();
+							position.x += 75.0f + (fixtureIndex % 3) * 60.0f;
+							position.y -= 90.0f + (fixtureIndex / 3) * 45.0f;
+							position.z = TheTerrainLogic->getGroundHeight(position.x, position.y);
+							++fixtureIndex;
+							obj->setPosition(&position);
+							for (BehaviorModule** module = obj->getBehaviorModules(); *module; ++module)
+								if ((*module)->getCreate()) (*module)->getCreate()->onBuildComplete();
+							TheAI->pathfinder()->addObjectToPathfindMap(obj);
+							fprintf(stderr, "[WP_AUTO] MISSION_FIXTURE template=%s id=%u construction=bypassed\n", name, (unsigned)obj->getID());
+							fflush(stderr);
+						};
+						auto destroyTarget = [&](const char* name) {
+							Object* target = named(name);
+							if (!check(target != nullptr, "named target exists before injected lethal damage")) return;
+							fprintf(stderr, "[WP_AUTO] MISSION_FIXTURE destroy=%s combat=bypassed\n", name);
+							fflush(stderr);
+							target->kill();
+						};
+						auto expireTimer = [&]() {
+							if (!check(counterValue("WP_ObjectiveTimer") > 0, "authored countdown was running")) return;
+							ScriptAction* action = newInstance(ScriptAction)(ScriptAction::SET_MILLISECOND_TIMER);
+							action->setNextAction(nullptr);
+							action->getParameter(0)->friend_setString("WP_ObjectiveTimer");
+							action->getParameter(1)->friend_setReal(0.0f);
+							TheScriptEngine->friend_executeAction(action);
+							deleteInstance(action);
+							fprintf(stderr, "[WP_AUTO] MISSION_FIXTURE expire=WP_ObjectiveTimer elapsed-time=bypassed\n");
+							fflush(stderr);
+						};
+						auto expectResult = [&](const char* result) {
+							if (wp_stage == 99) return;
+							WPArmMissionDiagnosticResult(strcmp(result, "victory") == 0);
+							resultDeadline = wp_f + 150;
+							fprintf(stderr, "[WP_AUTO] MISSION_EXPECT result=%s map=%s; awaiting actual map-script match result\n", result, map.str());
+							fflush(stderr);
+							wp_stage = 90;
+						};
+						if (wp_stage < 99 && wp_f >= nextCheck)
+						{
+							nextCheck = wp_f + 60;
+							const Bool training = strstr(map.str(), "WPTraining") != nullptr;
+							const Bool first = strstr(map.str(), "WPOp01") != nullptr;
+							const Bool sabotage = strstr(map.str(), "WPOp02") != nullptr;
+							const Bool hold = strstr(map.str(), "WPOp03") != nullptr;
+							const Bool finale = strstr(map.str(), "WPOp04") != nullptr;
+							const Bool rampart = strstr(map.str(), "WPChallengeM") != nullptr;
+							const Bool takeover = strstr(map.str(), "WPChallengeJ") != nullptr;
+							const Int observedResult = WPGetMissionDiagnosticResult();
+							if (observedResult != 0)
+							{
+								check(observedResult == 1, "actual native match result observed");
+								wp_stage = 99;
+							}
+							else if (wp_stage == 90)
+							{
+								if (wp_f >= resultDeadline) check(FALSE, "map did not produce its expected result within five seconds");
+							}
+							else if (!check(training || first || sabotage || hold || finale || rampart || takeover, "supported authored mission")) {}
+							else if (wp_stage == 0 && !check(counterValue("WP_ObjectiveStage") == 0, "mission begins at stage zero without completion")) {}
+							else if (wp_missionDefeatMode)
+							{
+								if (strcmp(wp_autoEnv, "mission-defeat-hq") == 0) destroyTarget("PlayerCC");
+								else if (hold || rampart) destroyTarget("AlliedRelay");
+								else if (takeover) expireTimer();
+								else destroyTarget("PlayerCC");
+								expectResult("defeat");
+							}
+							else if (training)
+							{
+								if (check(counterValue("WP_ObjectiveStage") == (Int)wp_stage, "training advances only after its actual prerequisites"))
+								{
+									if (wp_stage == 0) fixture("WP_Fabricator");
+									else if (wp_stage == 1) { fixture("WP_Exchange"); fixture("WP_PowerArray"); fixture("WP_Porter"); }
+									else if (wp_stage == 2) { fixture("WP_VehiclePlant"); fixture("WP_Tank"); fixture("WP_Tank"); }
+									else if (wp_stage == 3) fixture("WP_Vigil");
+									else { destroyTarget("EnemyCC"); expectResult("victory"); }
+									if (wp_stage < 90) ++wp_stage;
+								}
+							}
+							else if (first)
+							{
+								if (wp_stage == 0) { fixture("WP_Exchange"); fixture("WP_VehiclePlant"); if (wp_stage != 99) wp_stage = 1; }
+								else if (check(counterValue("WP_ObjectiveStage") == 1, "foothold objective completed natively"))
+								{
+									if (wp_stage == 1) { destroyTarget("EnemyCC"); if (wp_stage != 99) wp_stage = 2; }
+									else { check(named("ObjectiveRelay") != nullptr, "HQ destruction alone did not win"); destroyTarget("ObjectiveRelay"); expectResult("victory"); }
+								}
+							}
+							else if (sabotage)
+							{
+								if (check(counterValue("WP_ObjectiveProgress") == (Int)wp_stage, "partial sabotage does not complete the mission"))
+								{
+									if (wp_stage == 0) { destroyTarget("EnemyCC"); destroyTarget("SupplyOfficeA"); }
+									else if (wp_stage == 1) destroyTarget("SupplyOfficeB");
+									else { destroyTarget("GridSubstation"); expectResult("victory"); }
+									if (wp_stage < 90) ++wp_stage;
+								}
+							}
+							else if (hold || rampart)
+							{
+								if (wp_stage == 0) { expireTimer(); if (rampart) expectResult("victory"); else if (wp_stage != 99) wp_stage = 1; }
+								else if (check(counterValue("WP_ObjectiveStage") == 1 && named("AlliedRelay") != nullptr, "relay held; counterattack still required")) { destroyTarget("EnemyCC"); expectResult("victory"); }
+							}
+							else if (finale)
+							{
+								if (wp_stage == 0) { destroyTarget("EnemyCC"); destroyTarget("AirDefense1"); if (wp_stage != 99) wp_stage = 1; }
+								else if (check(counterValue("WP_ObjectiveStage") == 0 && counterValue("WP_ObjectiveProgress") == 1, "HQ plus one air-defense site does not win")) { destroyTarget("AirDefense2"); expectResult("victory"); }
+							}
+							else if (takeover && check(counterValue("WP_ObjectiveTimer") > 0, "headquarters is destroyed before the deadline")) { destroyTarget("EnemyCC"); expectResult("victory"); }
+						}
+					}
+					else if (wp_economyMode || wp_powerMode)
+					{
+						static ObjectID depotId = INVALID_ID, cacheId = INVALID_ID, haulerId = INVALID_ID;
+						static ObjectID techId = INVALID_ID, targetId = INVALID_ID;
+						static UnsignedInt startFrame = 0;
+						static Int initialMoney = 0, initialBoxes = 0, maxCargo = 0, initialTroops = 0;
+						static Real initialHealth = 0.0f;
+						static Bool jackal = FALSE;
+						Player* owner = ThePlayerList->getLocalPlayer();
+						auto spawnFixture = [&](const char* name, Player* player, Coord3D position) -> Object* {
+							const ThingTemplate* tt = TheThingFactory->findTemplate(name);
+							Object* obj = tt && player ? TheThingFactory->newObject(tt, player->getDefaultTeam()) : nullptr;
+							if (obj) {
+								position.z = TheTerrainLogic->getGroundHeight(position.x, position.y);
+								obj->setPosition(&position);
+								TheAI->pathfinder()->addObjectToPathfindMap(obj);
+								// Complete the normal native creation lifecycle. Supply
+								// depots register with resource managers only at this step.
+								for (BehaviorModule** module = obj->getBehaviorModules(); *module; ++module)
+									if ((*module)->getCreate()) (*module)->getCreate()->onBuildComplete();
+								fprintf(stderr, "[WP_AUTO] MECHANICS_FIXTURE %s id=%u (construction bypassed)\n", name, (unsigned)obj->getID());
+							}
+							return obj;
+						};
+						auto warehouse = [&](Object* cache) -> SupplyWarehouseDockUpdate* {
+							return cache ? static_cast<SupplyWarehouseDockUpdate*>(cache->findUpdateModule(NAMEKEY("SupplyWarehouseDockUpdate"))) : nullptr;
+						};
+						auto ambushTroops = [&]() -> Int {
+							Int count = 0;
+							for (Object* obj = TheGameLogic->getFirstObject(); obj; obj = obj->getNextObject())
+								if (obj->getControllingPlayer() == owner && !obj->isEffectivelyDead() &&
+									(obj->getTemplate()->getName() == "WPJ_Scrapper" || obj->getTemplate()->getName() == "WPJ_Sting")) ++count;
+							return count;
+						};
+						if (wp_stage == 0 && wp_f >= 90 && owner)
+						{
+							Object* cc = nullptr; Object* cache = nullptr; Player* enemy = nullptr;
+							for (Object* obj = TheGameLogic->getFirstObject(); obj; obj = obj->getNextObject()) {
+								if (obj->getName() == "HomeSupplyA") cache = obj;
+								if (obj->isKindOf(KINDOF_COMMANDCENTER)) {
+									if (obj->getControllingPlayer() == owner) cc = obj;
+									else if (obj->getControllingPlayer()) enemy = obj->getControllingPlayer();
+								}
+							}
+							if (!cc || (wp_economyMode && !warehouse(cache)) || (wp_powerMode && !enemy)) {
+								fprintf(stderr, "[WP_AUTO] MECHANICS FAIL: missing headquarters/cache/enemy fixture context\n");
+								wp_stage = 99;
+							} else {
+								jackal = cc->getTemplate()->getName() == "WPJ_CommandPost";
+								Coord3D position = *cc->getPosition(); position.y -= 75.0f;
+								if (!jackal) spawnFixture("WP_PowerArray", owner, position);
+								if (wp_economyMode) {
+									cacheId = cache->getID(); position = *cache->getPosition(); position.x -= 90.0f; position.y -= 35.0f;
+									Object* depot = spawnFixture(jackal ? "WPJ_Racket" : "WP_Exchange", owner, position);
+									const ThingTemplate* truck = TheThingFactory->findTemplate(jackal ? "WPJ_Scavenger" : "WP_Porter");
+									if (depot && truck) {
+										depotId = depot->getID();
+										GameMessage* select = TheMessageStream->appendMessage(GameMessage::MSG_CREATE_SELECTED_GROUP);
+										select->appendBooleanArgument(TRUE); select->appendObjectIDArgument(depotId);
+										GameMessage* queue = TheMessageStream->appendMessage(GameMessage::MSG_QUEUE_UNIT_CREATE);
+										queue->appendIntegerArgument(truck->getTemplateID()); queue->appendIntegerArgument(1);
+										fprintf(stderr, "[WP_AUTO] ECONOMY queued %s through native production\n", truck->getName().str());
+										wp_stage = 1;
+									} else wp_stage = 99;
+								} else {
+									position = *cc->getPosition(); position.x -= 80.0f;
+									Object* tech = spawnFixture(jackal ? "WPJ_Den" : "WP_Directorate", owner, position);
+									position = *cc->getPosition(); position.x += 160.0f;
+									Object* target = spawnFixture("WP_MissionRelay", enemy, position);
+									position.y += 50.0f;
+									spawnFixture(jackal ? "WPJ_Rigger" : "WP_Fabricator", owner, position);
+									if (tech && target) {
+										techId = tech->getID(); targetId = target->getID(); initialHealth = target->getBodyModule()->getHealth();
+										initialTroops = ambushTroops(); wp_stage = 1;
+									} else wp_stage = 99;
+								}
+							}
+						}
+						else if (wp_economyMode && wp_stage == 1)
+						{
+							for (Object* obj = TheGameLogic->getFirstObject(); obj; obj = obj->getNextObject())
+								if (obj->getControllingPlayer() == owner && obj->getProducerID() == depotId &&
+									obj->getTemplate()->getName() == (jackal ? "WPJ_Scavenger" : "WP_Porter")) {
+									haulerId = obj->getID(); startFrame = wp_f; initialMoney = owner->getMoney()->countMoney();
+									SupplyWarehouseDockUpdate* dock = warehouse(TheGameLogic->findObjectByID(cacheId));
+									initialBoxes = dock ? dock->getBoxesStored() : 0; wp_stage = 2;
+									fprintf(stderr, "[WP_AUTO] ECONOMY hauler spawned f=%u id=%u stock=%d money=%d\n", wp_f, (unsigned)haulerId, initialBoxes, initialMoney);
+									break;
+								}
+							if (wp_stage == 1 && wp_f >= 1800) { fprintf(stderr, "[WP_AUTO] ECONOMY FAIL: hauler production timeout\n"); wp_stage = 99; }
+						}
+						else if (wp_economyMode && wp_stage == 2)
+						{
+							Object* truck = TheGameLogic->findObjectByID(haulerId);
+							SupplyTruckAIInterface* ai = truck && truck->getAIUpdateInterface() ? truck->getAIUpdateInterface()->getSupplyTruckAIInterface() : nullptr;
+							SupplyWarehouseDockUpdate* dock = warehouse(TheGameLogic->findObjectByID(cacheId));
+							Int cargo = ai ? ai->getNumberBoxes() : 0; if (cargo > maxCargo) maxCargo = cargo;
+							if ((wp_f - startFrame) % 150 == 0) {
+								Int removed = initialBoxes - (dock ? dock->getBoxesStored() : 0);
+								Int cash = (Int)owner->getMoney()->countMoney() - initialMoney;
+								Int passive = ((wp_f - startFrame) / 150) * (jackal ? 20 : 25);
+								fprintf(stderr, "[WP_AUTO] ECONOMY f=%u elapsed=%u stockRemoved=%d cargo=%d maxCargo=%d cashDelta=%d depotPassiveApprox=%d\n",
+									wp_f, (wp_f-startFrame)/30, removed, cargo, maxCargo, cash, passive);
+								if (wp_f - startFrame >= 1800) {
+									fprintf(stderr, "[WP_AUTO] ECONOMY %s: stock transferred beyond carried boxes; cashDelta=%d (passive included)\n",
+										ai && dock && maxCargo > 0 && removed > cargo && cash > passive ? "PASS" : "FAIL", cash);
+									wp_stage = 99;
+									}
+								}
+						}
+						else if (wp_powerMode && wp_stage == 1 && wp_f >= 180)
+						{
+							Object* tech = TheGameLogic->findObjectByID(techId); Object* target = TheGameLogic->findObjectByID(targetId);
+							SpecialPowerModuleInterface* power = tech ? tech->findSpecialPowerModuleInterface(jackal ? SPECIAL_AMBUSH : SPECIAL_ARTILLERY_BARRAGE) : nullptr;
+							if (power && target) {
+								power->pauseCountdown(FALSE); power->setReadyFrame(0);
+								fprintf(stderr, "[WP_AUTO] POWERS invoking %s ready=%d at explored target id=%u (cooldown fixture)\n", power->getPowerName().str(), power->isReady(), (unsigned)targetId);
+								power->doSpecialPowerAtLocation(target->getPosition(), 0.0f, 0);
+								startFrame = wp_f; wp_stage = 2;
+							} else { fprintf(stderr, "[WP_AUTO] POWERS FAIL: missing module or target\n"); wp_stage = 99; }
+						}
+						else if (wp_powerMode && wp_stage == 2 && wp_f - startFrame >= 180)
+						{
+							Object* target = TheGameLogic->findObjectByID(targetId); Object* tech = TheGameLogic->findObjectByID(techId);
+							Real health = target && target->getBodyModule() ? target->getBodyModule()->getHealth() : 0.0f;
+							SpecialPowerModuleInterface* power = tech ? tech->findSpecialPowerModuleInterface(jackal ? SPECIAL_AMBUSH : SPECIAL_ARTILLERY_BARRAGE) : nullptr;
+							Int spawned = ambushTroops() - initialTroops;
+							Bool effect = jackal ? spawned >= 5 : health < initialHealth;
+							fprintf(stderr, "[WP_AUTO] POWERS %s: targetDamage=%.0f newAmbushUnits=%d cooldownReadyFrame=%u\n",
+								effect && power && power->getReadyFrame() > wp_f ? "PASS" : "FAIL", initialHealth-health, spawned, power ? power->getReadyFrame() : 0);
+							wp_stage = 99;
+						}
+					}
+					else if (wp_defeatMode)
 					{
 						if (wp_stage == 0 && wp_f >= 300)
 						{
@@ -1560,10 +1884,11 @@ void GameEngine::update()
 							}
 							if (wp_ccId != INVALID_ID)
 							{
+								wp_prepareUnitLab();
 								GameMessage* s0 = TheMessageStream->appendMessage(GameMessage::MSG_CREATE_SELECTED_GROUP);
 								s0->appendBooleanArgument(TRUE);
 								s0->appendObjectIDArgument(wp_ccId);
-								const ThingTemplate* tt = TheThingFactory->findTemplate("WP_Tank");
+								const ThingTemplate* tt = TheThingFactory->findTemplate(wp_labTankName());
 								if (tt)
 									for (Int q = 0; q < 4; ++q)
 									{
@@ -1579,7 +1904,7 @@ void GameEngine::update()
 						{
 							Int wp_n = 0;
 							for (Object* o = TheGameLogic->getFirstObject(); o && wp_n < 4; o = o->getNextObject())
-								if (o->getTemplate()->getName() == "WP_Tank" && !o->isEffectivelyDead() &&
+								if (o->getTemplate()->getName() == wp_labTankName() && !o->isEffectivelyDead() &&
 									o->getControllingPlayer() &&
 									o->getControllingPlayer()->getPlayerIndex() == wp_localIdx)
 									wp_stFleet[wp_n++] = o->getID();
@@ -1789,11 +2114,12 @@ void GameEngine::update()
 					}
 					else if (wp_stage == 1 && wp_f >= 120)
 					{
+						wp_prepareUnitLab();
 						// WP_AUTOTEST_UNIT overrides the fielded template (default WP_Tank)
 						// so any new unit class gets a spawn+move+shoot lab for free.
 						const char* wp_unitEnv = getenv("WP_AUTOTEST_UNIT");
 						const ThingTemplate* tt = TheThingFactory->findTemplate(
-							AsciiString(wp_unitEnv && wp_unitEnv[0] ? wp_unitEnv : "WP_Tank"));
+							AsciiString(wp_unitEnv && wp_unitEnv[0] ? wp_unitEnv : wp_labTankName()));
 						Object* wp_cc = TheGameLogic->findObjectByID(wp_ccId);
 						if (tt && wp_cc)
 						{
@@ -1824,7 +2150,7 @@ void GameEngine::update()
 						const char* wp_unitEnv2 = getenv("WP_AUTOTEST_UNIT");
 						for (Object* o = TheGameLogic->getFirstObject(); o; o = o->getNextObject())
 						{
-							if (o->getTemplate()->getName() == (wp_unitEnv2 && wp_unitEnv2[0] ? wp_unitEnv2 : "WP_Tank") &&
+							if (o->getTemplate()->getName() == (wp_unitEnv2 && wp_unitEnv2[0] ? wp_unitEnv2 : wp_labTankName()) &&
 								o->getControllingPlayer() && o->getControllingPlayer()->getPlayerIndex() == wp_localIdx)
 							{
 								wp_fleet[found] = o->getID();
@@ -1832,6 +2158,10 @@ void GameEngine::update()
 							}
 						}
 						Int need = wp_buildOnly ? 1 : 4;
+						const ThingTemplate* timedUnit = TheThingFactory->findTemplate(
+							wp_unitEnv2 && wp_unitEnv2[0] ? wp_unitEnv2 : wp_labTankName());
+						const UnsignedInt productionDeadline = 1020 + (UnsignedInt)(3 * need *
+							(timedUnit ? timedUnit->calcTimeToBuild(ThePlayerList->getLocalPlayer()) : 450));
 						if (found >= need)
 						{
 							wp_tankId = wp_fleet[0];
@@ -1842,9 +2172,9 @@ void GameEngine::update()
 							fprintf(stderr, "[WP_AUTO] f=%u fleet ready (%d tanks), selected\n", wp_f, found);
 							wp_stage = 3;
 						}
-						else if (wp_f >= 1500)
+						else if (wp_f >= productionDeadline)
 						{
-							fprintf(stderr, "[WP_AUTO] f=%u FAIL: only %d/%d tanks by frame 1500\n", wp_f, found, need);
+							fprintf(stderr, "[WP_AUTO] f=%u FAIL: only %d/%d tanks by production deadline %u\n", wp_f, found, need, productionDeadline);
 							wp_stage = 99;
 						}
 					}

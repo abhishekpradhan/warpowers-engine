@@ -1,169 +1,35 @@
-# How to contribute as a developer
+# Contributing to the War Powers engine fork
 
-To contribute, fork this repository to create your own copy that you can clone locally and push back to. You can use your fork to create pull requests for your code to be merged into this repository.
+This repository is the engine component of the private War Powers workspace. Work here is reviewed against the fork's current goals and its parent dataset. Inherited GeneralsX documentation remains useful technical context; its release, issue and pull-request destinations are not automatic destinations for this fork.
 
+## Route work to the right repository
 
-## Contribution guidelines
+- Engine and browser-runtime changes belong here. Use the parent workspace for game data, maps, art, the web application and generators.
+- DXVK source changes belong in `references/fbraz3-dxvk`, followed by an engine submodule update. Do not patch generated `build/_deps/` trees.
+- Before an authorized push or pull request, verify that its target is this fork's intended remote. Upstream remotes are references; preserve their disabled push URLs.
+- Publication, repository visibility changes, deployment, and sending upstream issues or pull requests require the owner's explicit authorization. A request to prepare or review a change does not publish it. Follow any authorization already given in the active work session.
+- Prepare generally useful fixes as focused commits with reproduction details so an authorized upstream contribution can be made separately. Keep War Powers-specific menus and mission callbacks in this fork.
 
-Prefer opening fewer high quality Pull Requests over many low quality ones. Prioritize polishing existing Pull Requests instead of creating new ones. Do not open Pull Requests as draft unless there are specific requirements that justify it, because draft Pull Requests are generally not looked at and pollute the Pull Request section.
+## Implement a focused change
 
+Read [AGENTS.md](AGENTS.md) and the applicable [.github instructions](.github/instructions/). Preserve platform isolation, deterministic simulation boundaries and existing backend paths. Shared fixes should apply to both Generals and Zero Hour where relevant; a feature depending on War Powers-specific data is not a generic retail backport.
 
-## AI code generation guidelines
+Keep behavior changes separate from broad formatting or refactoring. Follow nearby code conventions, explain user-visible changes at their implementation sites, and retain copyright and source attribution. Use the current names Meridian Combine and Jackal Front when describing War Powers content; inherited retail names remain appropriate only for retail compatibility work.
 
-Creating changes with LLM generated code is generally allowed. The author is responsible for verifying that all generated code is human readable, maintainable and logically correct. Furthermore, all generated code needs to be tested and verified. The author is not allowed to outsource the polishing of the generated code to the human code reviewers. In a Pull Request, generated code needs to be announced as such and to what extent it was polished by human intervention.
+Do not add EA assets, copied retail data, unlicensed imports, credentials or local machine configuration. Every new game asset needs the parent workspace's provenance record. Review tracked files and new diffs for sensitive data before distribution; do not rewrite shared history or remove inherited source as an incidental cleanup.
 
-### New code contributors and AI generated code
+## Validate the behavior being changed
 
-New contributors are discouraged from submitting Pull Requests with thousands of lines changed or added with the help of LLMs, because human code reviewers cannot attend such volumes at the risk of wasting precious time with potentially poorly generated code.
+Build instructions are in [README.md](README.md). For browser changes, build and stage through the complete parent workspace and exercise the affected interaction in a browser. Record the browser, tested build, input sequence and result. A native build alone does not validate the WebAssembly renderer or browser input.
 
+The `WP_AUTOTEST` hooks in `GameEngine.cpp` are focused diagnostics. `base` and `wedge` exercise construction; unit/control labs may create explicitly logged fixtures; `economy` checks native hauling and `powers` checks effects with forced readiness; `win` and `defeat` trigger result paths directly. Do not describe those as human-played balanced victories or as coverage of the entire interface. Pair them with input-driven checks when selection, layout, loading or restart behavior changes.
 
-## Code guidelines
+`WP_REVIEW_SCENE=1` creates faction asset rows on a fresh Flats map (`WPTest` or `WPTestJ`); `WP_REVIEW_SCENE=stress` adds at most 120 mixed combat units with native attack-move orders. The scene logs fixture counts, observed frame rates and WebAssembly heap capacity for 60 simulation seconds. These are controlled development fixtures, not a normal opening or an automatic visual/performance acceptance test. Pausing or background throttling affects wall-time measurements; heap capacity is not live memory usage. The Jackal Dynamo appears as an art reference even though it is not part of the player's build order.
 
-### Scope of code changes
+For save changes, distinguish successful serialization from durable IndexedDB persistence, then verify reload, restore and failure recovery. For audio or rendering changes, check the relevant native backends as well as the browser path. Use the inherited [testing notes](TESTING.md) for retail replay work with appropriately licensed local data. Do not assume inherited CI is running for this fork.
 
-Code edits only touch the lines of code that serve the intended goal of the change. Big refactors should not be combined with logical changes, because these can become very difficult to review. If a change requires a refactor, create a commit for the refactor before (or after) creating a commit for the change. A Pull Request can contain multiple commits and can be merged with **Rebase and Merge** if these commits are meant to be preserved on the main branch. Otherwise, method of merging will be **Squash and Merge**.
+## Prepare the review
 
-### Style of code changes
+Use focused commits and the [commit-message conventions](.github/instructions/git-commit.instructions.md). State the problem, resulting behavior, relevant validation and material remaining limits. Use the active fork as the review target; upstream-target examples in inherited instructions do not override the routing rules above.
 
-Code edits should fit the nearby code in ways that the code style reads consistent, unless the original code style is bad. The original game code uses c++98, or a deviation thereof, and is simple to read. Prefer not to use newer language features unless required to implement the desired change. Prefer to use newer language features when they are considerably more robust or make the code easier to understand or maintain.
-
-### Language style guide
-
-*Work in progress. Needs a maintainer. Can be built upon existing Code guidelines, such as the "Google C++ Style Guide".*
-
-### Precedence of code changes
-
-Changes to Zero Hour take precedence over Generals, if applicable. When the changed code is not shared by both titles, then the change needs to be created for Zero Hour first, and then recreated for Generals. The implementation of a change for both titles needs to be identical or as close as possible. Preferably the Generals replica of a change comes with the same Pull Request. The Generals replica can be created after the Zero Hour code review has finished.
-
-
-## Change documentation
-
-User facing changes need to be documented in code, Pull Requests and change logs. All documentation ideally is written in the present tense, and not the past.
-
-Good:
-
-> Fixes particle effect of USA Missile Defender
-
-Bad:
-
-> Fixed particle effect of USA Missile Defender
-
-When a text refers to a faction unit, structure, upgrade or similar, then the unit should be worded without any abbrevations and should be prefixed with the faction name. Valid faction names are USA, China, GLA, Boss, Civilian. Subfaction names can be appended too, for example GLA Stealth.
-
-Good:
-
-> Fixes particle effect of USA Missile Defender
-
-Bad:
-
-> Fixes particle effect of MD
-
-
-### Code documentation
-
-User facing changes need to be accompanied by comment(s) where the change is made. Maintenance related changes, such as compilation fixes, typically do not need commenting, unless the next reader can benefit from a special explanation. The comment can be put at the begin of the changed file, class, function or block. It must be clear from the change description what has changed.
-
-The expected comment format is
-
-```
-// GeneralsX @keyword author DD/MM/YYYY A meaningful description for this change.
-```
-
-The `GeneralsX` word and `@keyword` are mandatory. `author` and date can be omitted when preferred.
-
-| Keyword          | Use-case                                                    |
-|------------------|-------------------------------------------------------------|
-| @bugfix          | Fixes a bug                                                 |
-| @fix             | Fixes something, but is not a user facing bug               |
-| @build           | Addresses a compile warning or error                        |
-| @feature         | Adds something new                                          |
-| @performance     | Improves performance                                        |
-| @refactor        | Moves or rewrites code, but does not change the behaviour   |
-| @tweak           | Changes values or settings                                  |
-| @info            | Writes useful information for the next reader               |
-| @todo            | Adds a note for something left to do if really necessary    |
-
-Block comment sample
-
-```
-    // GeneralsX @bugfix JAJames 17/03/2025 Fix uninitialized memory access and add more Windows versions.
-    memset(&os_info,0,sizeof(os_info));
-```
-
-Optionally, the pull request number can be appended to the comment. This can only be done after the pull request has been created.
-
-```
-// GeneralsX @bugfix JAJames 17/03/2025 Fix uninitialized memory access and add more Windows versions. (#123)
-```
-
-### Pull request documentation
-
-The title of a new Pull Request, and/or commit(s) within, begins with a [conventional commits](https://www.conventionalcommits.org/en/v1.0.0/) tag. The tag is followed by a concise and descriptive sentence about the change and/or commit, beginning with an upper case letter and ending without a dot. The sentence ideally begins with a word that describes the action that the change takes, for example `Fix *this*`, `Change *that*`, `Add *those*`, `Refactor *thing*`.
-
-Allowed (extended) commit title types are:
-```
-bugfix:
-build:
-chore:
-ci:
-docs:
-fix:
-feat:
-perf:
-refactor:
-revert:
-style:
-test:
-tweak:
-unify:
-```
-
-For the optional scope behind the type pick a suitable word that describes the overall area that the change touches.
-
-Good:
-```
-bugfix(system): Fix uninitialized memory access in Get_OS_Info
-```
-
-Bad:
-```
-Minimal changes for successful build.
-```
-
-If the Pull Request is meant to be merged with rebase, then a note for **Merge with Rebase** should be added to the top of the text body, to help identify the correct merge action when it is ready for merge. All commits of the Pull Request need to be properly named and need the number of the Pull Request added as a suffix in parentheses. Example: **(#333)**. All commits need to be able to compile on their own without dependencies in newer commits of the same Pull Request. Prefer to create changes for **Squash and Merge**, as this will simplify things.
-
-The text body begins with links to related issue report(s) and/or Pull Request(s) if applicable.
-
-To write a link use the following format:
-
-```
-* Fixes #222
-* Closes #333
-* Relates to #555
-* Follow up for #666
-```
-
-Links are commonly used for
-
-* closing a related issue report or task when this pull request is merged
-* closing another pull request when this pull request is merged
-
-Some keywords are interpreted by GitHub. Read about it [here](https://docs.github.com/en/issues/tracking-your-work-with-issues/linking-a-pull-request-to-an-issue).
-
-The text body continues with a description of the change in appropriate detail. This serves to educate reviewers and visitors to get a good understanding of the change without the need to study and understand the associated changed files. If the change is controversial or affects gameplay in a considerable way, then a rationale text needs to be appended. The rationale explains why the given change makes sense.
-
-
-### Pull request merging rules
-
-Please be mindful when merging changes. There are pitfalls in regards to the commit title consistency.
-
-When attempting to **Squash and Merge** a Pull Request that contains a single commit, then GitHub will default generate a commit title from that single commit. Typically this is undesired, when the new commit title is meant to be kept in sync with the Pull Request title rather than the Pull Request commit title. The generated commit title may need to be adjusted before merging the Pull Request.
-
-When attempting to **Squash and Merge** a Pull Request that contains multiple commits, the GitHub will default generate a commit title from the Pull Request title. Additionally it will generate a commit description from the multiple commits that are part of the Pull Request. The generated commit description generally needs to be cleared before merging the Pull Request to keep the commit title clean.
-
-When attempting to **Rebase and Merge** a Pull Request, then all commits will transfer with the same names to the main branch. Verify that all commit titles are properly crafted, with tags where applicable, trailing Pull Request numbers in parentheses and no unnecessary commit descriptions (texts below the commit title).
-
-
-### Change log documentation
-
-*Work in progress.*
+Update the monthly [worklog](docs/WORKLOG/README.md), including its AI-generated-content disclosure when applicable. Put implementation notes in the appropriate existing documentation area rather than creating competing roadmaps. AI-assisted changes are welcome, but the contributor remains responsible for readable code, verification and an accurate account of what was tested.

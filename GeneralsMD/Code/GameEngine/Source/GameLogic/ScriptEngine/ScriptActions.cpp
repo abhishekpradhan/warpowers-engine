@@ -2597,7 +2597,10 @@ void ScriptActions::doPlayerKill(const AsciiString& playerName)
 //-------------------------------------------------------------------------------------------------
 void ScriptActions::doDisplayText(const AsciiString& displayText)
 {
-	TheInGameUI->message(displayText);
+	// GeneralsX @feature Codex 05/09/2026 War Powers web mission text has an
+	// accessible overlay; preserve the engine message on native builds.
+	extern Bool WPDisplayMissionText( const AsciiString &key );
+	if( !WPDisplayMissionText(displayText) ) TheInGameUI->message(displayText);
 }
 
 //-------------------------------------------------------------------------------------------------

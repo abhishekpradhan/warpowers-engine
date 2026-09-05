@@ -1,5 +1,15 @@
 # GeneralsX: Instructions for AI Coding Agents
 
+## War Powers fork scope
+
+This checkout is the private War Powers engine fork. The routing rules in
+[CONTRIBUTING.md](CONTRIBUTING.md) apply before the inherited upstream examples
+below: authorized changes target this fork, upstream remotes stay fetch-only,
+and an upstream issue, pull request or publication is a separate owner decision.
+Do not infer permission to send unpublished game details to upstream from an
+inherited GitHub URL or example. Follow active session authorization for normal
+fork commits and pushes. The parent workspace owns the dataset and web product.
+
 ## What I Am
 GeneralsX is a cross-platform port of Command & Conquer: Generals Zero Hour for **Linux and macOS**, porting legacy Windows DirectX 8 + Miles Sound code to a modern stack (SDL3 + DXVK + OpenAL + 64-bit). This is a **massive C++ game engine** (~500k LOC) preserving retail gameplay while modernizing the platform layer.
 
@@ -140,7 +150,7 @@ Docker is the recommended build method on Linux hosts to ensure all toolchain re
 - High-risk changes to Zero Hour
 
 ## DXVK Source of Truth (macOS)
-- Default: GitHub fork branch `generalsx-macos-v2.6` (auto-update enabled)
+- Default: the immutable remote commit configured as `DXVK_REMOTE_REF` in `cmake/dx8.cmake`; configuring the engine does not automatically select the nested checkout.
 - Local mode: `-DSAGE_DXVK_USE_LOCAL_FORK=ON`
 - **Rule**: Never edit files in `build/_deps/...` directly. Always commit fixes in fork repo first.
 

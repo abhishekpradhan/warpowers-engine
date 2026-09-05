@@ -96,6 +96,8 @@ add_link_options(
     "-sMAXIMUM_MEMORY=4294967296"
     "-sSTACK_SIZE=8388608"
     "-sEXIT_RUNTIME=0"
+    # Persistent user saves are mounted and restored by the browser shell.
+    "-lidbfs.js"
 )
 
 # NOTE: the loading-screen yield needs stack-switching. JSPI (Chrome-only, Safari

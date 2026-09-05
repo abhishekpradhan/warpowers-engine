@@ -1,106 +1,52 @@
-> **War Powers engine fork** (private): our fork of GeneralsX for the
-> [War Powers](https://github.com/abhishekpradhan/warpowers) browser RTS —
-> native macOS + Emscripten/wasm targets, zero-retail data support.
-> License: GPL-3.0 with EA's additional terms (inherited). Upstream README follows.
+# War Powers engine
 
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/fbraz3/GeneralsGameCode)
-[![GeneralsX CI](https://github.com/fbraz3/GeneralsX/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/fbraz3/GeneralsX/actions/workflows/ci.yml)
-[![GitHub Release](https://img.shields.io/github/v/release/fbraz3/GeneralsX?include_prereleases&sort=date&display_name=tag&style=flat&label=Release)](https://github.com/fbraz3/GeneralsX/releases)
+The engine fork used by [War Powers](https://github.com/abhishekpradhan/warpowers), a browser RTS with its own freely licensed game dataset. This repository carries the GeneralsX engine lineage, the Emscripten target, and the integration needed to run the War Powers menus, controls and missions.
 
-# GeneralsX - Cross-Platform Command & Conquer: Generals
+**This is a development fork, currently private.** The upstream release links below describe other projects; they are not War Powers releases. Publication, deployment and upstream submissions remain separate owner decisions.
 
-GeneralsX delivers **Linux and macOS** builds of **Command & Conquer: Generals and Zero Hour** through a single modern codebase.
+## Build the browser game
 
-## How to download
+Use the complete War Powers workspace. The WebAssembly target expects `dvijoke/d8web` beside `engine/`; this repository alone does not contain the browser renderer, boot page or game dataset.
 
-For **official releases and instructions**, visit:
+Prerequisites: an activated Emscripten SDK with `emcc` and `emcmake` on `PATH`, CMake, Ninja and Python 3. Initial configuration downloads the dependencies declared in CMake.
 
-* [GeneralsX Releases](https://github.com/fbraz3/GeneralsX/releases)  - Linux and Mac
-* [TheSuperHackers Releases](https://github.com/TheSuperHackers/GeneralsGameCode/releases) - Windows
-* [Fighter19 Releases](https://github.com/Fighter19/CnC_Generals_Zero_Hour/releases) - Original Linux-focused Zero Hour reference releases
+```sh
+git clone --recursive https://github.com/abhishekpradhan/warpowers.git
+cd warpowers/engine
+emcmake cmake --preset wasm
+cmake --build build/wasm --target GeneralsXZH.js
+cd ..
+python3 tools/genwebstage.py
+python3 tools/serve.py
+```
 
-> See our [Tutorial Docs](docs/HOWTO/README.md) for step-by-step guides.
+Open [the local game](http://127.0.0.1:8321). The workspace server supplies the required MIME, isolation and cache headers. Use `emcmake` when configuring: plain CMake can select the host compiler. The engine outputs are `build/wasm/GeneralsMD/GeneralsXZH.js` and `GeneralsXZH.wasm`. The workspace staging command combines them with the current dataset and web application.
 
-### Community Ports based on GeneralsX
+The browser build uses SDL3 input, MiniAudio, and the D3D8-to-WebGL2 `d8web` renderer. DXVK's native compatibility headers are used during compilation, but DXVK's Vulkan libraries and MoltenVK do not run in the browser. Browser multiplayer and cross-platform deterministic replay compatibility are not established by a successful WebAssembly build.
 
-* [Generals-Mac-iOS-iPad](https://github.com/ammaarreshi/Generals-Mac-iOS-iPad) - iOS port by [@ammaarreshi](https://github.com/ammaarreshi)
-* [Generals-Android](https://github.com/fadi-labib/Generals-Android) - Android port by [@fadi-labib](https://github.com/fadi-labib)
-* [GeneralsXWeb](https://github.com/meerzulee/GeneralsXWeb) - Web port by [@meerzulee](https://github.com/meerzulee)
-* [wasm-generals](https://github.com/origami-ltd/wasm-generals) - WebAssembly + WebGPU browser port by [@ebellumat](https://github.com/ebellumat), playable at [generals.wasm.com.br](https://generals.wasm.com.br)
+## Native development
 
-## 💖 Support This Project
+Native builds are useful for engine diagnostics and asset inspection. Start with the inherited [macOS build guide](docs/BUILD/MACOS.md) or [Linux build guide](docs/BUILD/LINUX.md) for toolchain setup. Some inherited installation and replay instructions assume separately owned retail game files; they do not describe the War Powers dataset.
 
-The optional sponsorship link exists to help cover the maintenance costs specific to GeneralsX: Linux/macOS integration, project-specific adaptation work, testing infrastructure, packaging, tooling, release work, and documentation.
+For native macOS work against the DXVK checkout pinned by this repository, configure from the engine directory:
 
-- **[Sponsor on GitHub](https://github.com/sponsors/fbraz3)**
+```sh
+cmake --preset macos-vulkan -DSAGE_DXVK_USE_LOCAL_FORK=ON
+cmake --build build/macos-vulkan --target z_generals
+```
 
-Your support specifically helps with:
+The local-fork option matters: without it, [cmake/dx8.cmake](cmake/dx8.cmake) fetches its configured upstream DXVK commit instead of consuming `references/fbraz3-dxvk`. Edit that source checkout, never generated files under `build/_deps/`. See the [DXVK fork README](references/fbraz3-dxvk/README.md) for its integration boundary.
 
-- **Integration, Adaptation and Enhancements** - Merging reference work, resolving incompatibilities, and carrying project-specific fixes needed for supported platforms
-- **Testing Infrastructure** - Validation across Linux and macOS, plus exploratory work needed to keep future platform paths viable
-- **Packaging & Releases** - AppImage, Flatpak, macOS bundles, CI pipeline
-- **Documentation & Maintenance** - Build guides, installation instructions, developer resources, and ongoing repository upkeep
+## What belongs here
 
-## Where does the GeneralsX name come from?
+Engine fixes, browser integration, input/rendering/audio behavior and War Powers engine callbacks belong in this fork. Unit rules, models, textures, maps, mission metadata, web UI and asset generators belong in the parent War Powers workspace. Keep shared platform fixes separate from pack-specific behavior so useful fixes can be reviewed for upstream contribution later.
 
-There are two reasons for this name:
+[CONTRIBUTING.md](CONTRIBUTING.md) describes fork routing, validation and review. [AGENTS.md](AGENTS.md) contains implementation constraints. The [worklog](docs/WORKLOG/README.md) distinguishes current fork work from inherited upstream history. Existing [replay instructions](TESTING.md) and [runtime flags](docs/ETC/COMMAND_LINE_PARAMETERS.md) remain references, not evidence that this fork has passed every upstream test.
 
-1. X = Cross - reflects the cross-platform efforts
-2. I am a big fan of the Mega Man X franchise, so this is also a tribute to that classic series.
+## Lineage and attribution
 
-## Project Goals
+This work builds on EA's released Generals / Zero Hour source, [GeneralsX](https://github.com/fbraz3/GeneralsX), [TheSuperHackers](https://github.com/TheSuperHackers/GeneralsGameCode), the [Fighter19/feliwir port](https://github.com/Fighter19/CnC_Generals_Zero_Hour), and [GeneralsXWeb](https://github.com/meerzulee/GeneralsXWeb). Their engine, platform and browser work is the foundation of this fork. Original copyright notices and history are retained.
 
-GeneralsX exists to turn upstream preservation and porting work into a practical and maintainable project for active Linux and macOS players.
+For the upstream projects' own releases and documentation, see [GeneralsX releases](https://github.com/fbraz3/GeneralsX/releases), [TheSuperHackers releases](https://github.com/TheSuperHackers/GeneralsGameCode/releases), and the inherited [tutorial index](docs/HOWTO/README.md). Those projects do not supply or endorse War Powers releases.
 
-Its main goals are:
-
-- Preserve retail gameplay behavior while modernizing the platform layer.
-- Maintain a **single codebase** with Linux and macOS as the active targets. Both Zero Hour and the Generals base game are stable and functional; bugfixes and improvements must be applied to both, while keeping a future Windows path possible.
-- Carry the adaptation work needed to make the stack function in practice across supported platforms, including repository-specific fixes when upstream constraints leave gaps.
-- Deliver reproducible builds, packaging, and release workflows that make the port usable beyond local development setups.
-- Replace the original Windows-only DirectX 8 / Miles stack with portable open-source equivalents where appropriate.
-- Keep upstream lineage clear by distinguishing foundational work from the integration, packaging, and platform support specific to GeneralsX.
-
-## How does this project relate to other community projects?
-
-GeneralsX builds on complementary community efforts with different roles.
-
-**TheSuperHackers** provides the main upstream foundation for stability, bug fixes, retail compatibility, and long-term maintenance of the original game code.
-
-**Fighter19's fork**, including major work by **feliwir**, is a key Zero Hour cross-platform reference that established much of the ecosystem groundwork used here, including SDL3 windowing, DXVK-based rendering, OpenAL audio, FFmpeg media support, filesystem modernization, and related Linux-focused portability work.
-
-While GeneralsX builds on important community work, this project also includes substantial original effort in integration, adaptation, platform-specific fixes, enhancements, testing, packaging, and ongoing maintenance.
-
-Because these projects serve different but complementary goals, not every change belongs in the same place. Improvements aligned with upstream stability or core maintenance priorities should be contributed back to TheSuperHackers, while GeneralsX keeps changes specific to cross-platform delivery, packaging, and platform integration.
-
-##  Building from Source
-
-- [ Linux Build Guide](docs/BUILD/LINUX.md)
-- [ macOS Build Guide](docs/BUILD/MACOS.md)
-
-###  Known Issues & Limitations
-
-For documented limitations and known bugs, check the [issues page](https://github.com/fbraz3/GeneralsX/issues).
-
----
-
-## 🤝 How to Contribute
-
-1. Check [current issues](https://github.com/fbraz3/GeneralsX/issues) and [GitHub discussions](https://github.com/fbraz3/GeneralsX/discussions)
-2. Read platform-specific build guides ([Windows](docs/ETC/), [macOS](docs/BUILD/MACOS.md), [Linux](docs/BUILD/LINUX.md))
-3. Submit issues or pull requests with detailed information
-
-## 🙏 Special Thanks
-
-- **[Westwood Studios](https://cnc-comm.com/westwood-studios)** for creating the legendary Command & Conquer series
-- **[EA Games](https://www.ea.com/)** for Command & Conquer: Generals, which continues to inspire gaming communities
-- **[TheSuperHackers / Xezon](https://github.com/TheSuperHackers/GeneralsGameCode)** and contributors for the upstream stability, bug fixes, and code modernization that form the foundation of GeneralsX
-- **[Fighter19](https://github.com/Fighter19)** for the cross-platform port that pioneered SDL3 windowing, DXVK graphics, and MinGW build support on Linux
-- **[feliwir](https://github.com/feliwir)** for the foundational cross-platform systems implemented in Fighter19's fork: OpenAL audio, FFmpeg video decoding, C++17 filesystem, and Freetype/Fontconfig text rendering
-- **All contributors and sponsors** for helping to make this game truly cross-platform and accessible worldwide
-
-## 📄 License
-
-See the [LICENSE](./LICENSE.md) file for details.
-
-EA has not endorsed and does not support this product. All trademarks are the property of their respective owners.
+The inherited [LICENSE.md](LICENSE.md) contains GPL version 3 and EA's additional terms; it is unchanged. Component licenses remain with their respective code. This source release does not grant redistribution rights to EA game assets, and War Powers does not include or require them. EA does not endorse or support this fork.
