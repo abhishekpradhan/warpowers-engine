@@ -869,23 +869,13 @@ static const WPMapEntry s_wpMaps[] = {
 	{ "WP:MapChallengeM", "WP:MapChallengeMDesc", "Maps\\WPChallengeM\\WPChallengeM.map", nullptr, "WPMapPreviewRange", 3 },
 	{ "WP:MapChallengeJ", "WP:MapChallengeJDesc", nullptr, "Maps\\WPChallengeJ\\WPChallengeJ.map", "WPMapPreviewRidge", 3 },
 };
+// The first five entries are skirmish layouts; the remaining order matches operations.json.
+static const Int s_wpFirstMissionIndex = 5;
 static Int s_wpMapIdx = 0;
 static NameKeyType wpMapPrevID = NAMEKEY_INVALID;
 static NameKeyType wpMapNextID = NAMEKEY_INVALID;
 static NameKeyType wpModeIDs[4];
 static const char *wpModeNames[] = {"Skirmish", "Training", "Operation", "Challenge"};
-static const char *wpMissionIDs[] = {"training", "op01", "op02", "op03", "op04", "challenge-meridian", "challenge-jackal"};
-
-static Bool wpMissionUnlocked()
-{
-#ifdef __EMSCRIPTEN__
-	if( s_wpMapIdx >= 5 )
-		return EM_ASM_INT({
-			return !Module.isMissionUnlocked || Module.isMissionUnlocked(UTF8ToString($0)) ? 1 : 0;
-		}, wpMissionIDs[s_wpMapIdx - 5]) != 0;
-#endif
-	return TRUE;
-}
 
 static void wpPersistMapChoice()
 {
@@ -913,9 +903,23 @@ static void wpSkirmishRefreshLabels( void )
 		preview->winSetEnabledImage( 0, TheMappedImageCollection->findImageByName(entry.preview) );
 	GameWindow *meridian = TheWindowManager->winGetWindowFromId( nullptr, wpDeployMeridianID );
 	GameWindow *jackal = TheWindowManager->winGetWindowFromId( nullptr, wpDeployJackalID );
-	const Bool unlocked = wpMissionUnlocked();
-	if( meridian ) meridian->winEnable( entry.mer != nullptr && unlocked );
-	if( jackal ) jackal->winEnable( entry.jak != nullptr && unlocked );
+	// GeneralsX @tweak Codex 05/09/2026 All scenarios are open; show only the factions authored for this map.
+	if( meridian )
+	{
+		meridian->winHide( entry.mer == nullptr );
+		meridian->winEnable( entry.mer != nullptr );
+	}
+	if( jackal )
+	{
+		jackal->winHide( entry.jak == nullptr );
+		jackal->winEnable( entry.jak != nullptr );
+	}
+	GameWindow *meridianBrief = TheWindowManager->winGetWindowFromId( nullptr,
+		TheNameKeyGenerator->nameToKey("WPSkirmish.wnd:MeridianBrief") );
+	GameWindow *jackalBrief = TheWindowManager->winGetWindowFromId( nullptr,
+		TheNameKeyGenerator->nameToKey("WPSkirmish.wnd:JackalBrief") );
+	if( meridianBrief ) meridianBrief->winHide( entry.mer == nullptr );
+	if( jackalBrief ) jackalBrief->winHide( entry.jak == nullptr );
 	for( Int mode = 0; mode < 4; ++mode )
 	{
 		GameWindow *button = TheWindowManager->winGetWindowFromId( nullptr, wpModeIDs[mode] );
@@ -928,7 +932,8 @@ static void wpSkirmishRefreshLabels( void )
 		}
 	}
 	wpHudText( "WPSkirmish.wnd:ObjectiveHint", TheGameText->fetch(
-		!unlocked ? "WP:MissionLocked" : entry.mode == 0 ? "WP:HQObjective" : "WP:MapLockedFaction") );
+		entry.mer && entry.jak ? "WP:HQObjective" :
+		entry.mer ? "WP:ScenarioFactionMeridian" : "WP:ScenarioFactionJackal") );
 	// GadgetStaticTextSetText, not winSetText: STATICTEXT caches its
 	// render string in the gadget data - bare winSetText leaves the drawn
 	// text stale/empty.
@@ -977,9 +982,8 @@ void WPSkirmishInit( WindowLayout *layout, void *userData )
 		catch (e) { return 1; }
 	}, (int)(ARRAY_SIZE(s_wpDiffs) - 1));
 #endif
-	wpSkirmishRefreshLabels();
-
 	layout->hide( FALSE );
+	wpSkirmishRefreshLabels();
 	layout->bringForward();
 }
 
@@ -1015,9 +1019,9 @@ WindowMsgHandledType WPSkirmishSystem( GameWindow *window, UnsignedInt msg,
 			// takes the real file path; the short form the -file flag accepts is
 			// expanded by CommandLine.cpp's (file-static) converter, which this
 			// path never runs through. Short form here = extent-0 empty world.
-			if( controlID == wpDeployMeridianID && wpMissionUnlocked() )
+			if( controlID == wpDeployMeridianID && s_wpMaps[s_wpMapIdx].mer )
 				wpStartMap( s_wpMaps[s_wpMapIdx].mer );
-			else if( controlID == wpDeployJackalID && wpMissionUnlocked() )
+			else if( controlID == wpDeployJackalID && s_wpMaps[s_wpMapIdx].jak )
 				wpStartMap( s_wpMaps[s_wpMapIdx].jak );
 			else if( controlID == wpMapPrevID || controlID == wpMapNextID )
 			{
@@ -1058,9 +1062,9 @@ WindowMsgHandledType WPSkirmishSystem( GameWindow *window, UnsignedInt msg,
 // behind an active battle. Index follows data/operations.json mission order.
 extern "C" EMSCRIPTEN_KEEPALIVE int wpShowMission( int mission )
 {
-	if( mission < 0 || mission >= (int)ARRAY_SIZE(wpMissionIDs) || !TheShell ||
+	if( mission < 0 || mission >= (int)ARRAY_SIZE(s_wpMaps) - s_wpFirstMissionIndex || !TheShell ||
 		!TheGameLogic || TheGameLogic->isInGame() ) return 0;
-	s_wpMapIdx = mission + 5;
+	s_wpMapIdx = mission + s_wpFirstMissionIndex;
 	wpPersistMapChoice();
 	if( s_wpDeploymentLayout && TheShell->top() == s_wpDeploymentLayout ) wpSkirmishRefreshLabels();
 	else
