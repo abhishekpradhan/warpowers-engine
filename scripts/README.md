@@ -58,6 +58,8 @@ Utilities for large-scale code refactoring and fixes:
 
 ### `qa/` - Quality Assurance & Testing
 
+- `test-keyboard-modifiers.py` - Compiles the production keyboard methods against deterministic event/timer fixtures; needs Python 3 and a native C++17 compiler. Run `python3 scripts/qa/test-keyboard-modifiers.py` from the engine root. `keyboard-modifiers-fixture.cpp` is its isolated fixture, not a standalone engine target. See [CONTRIBUTING.md](../CONTRIBUTING.md) for scope and the optional failing-baseline check.
+
 #### `qa/smoke/` - Smoke Tests
 - `docker-smoke-test-zh.sh` - Quick startup validation (expects crash, checks init output)
 - `run-bundled-game.sh` - Test bundled binary after deployment

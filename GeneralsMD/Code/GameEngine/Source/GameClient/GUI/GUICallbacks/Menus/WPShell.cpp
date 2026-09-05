@@ -74,6 +74,7 @@
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/CreateModule.h"
 #include "GameLogic/Module/AIUpdate.h"
+#include "GameLogic/Module/SpecialPowerModule.h"
 #include "GameLogic/ScriptEngine.h"
 
 // GeneralsX @feature Codex 05/09/2026 Keep browser telemetry tied to the actual
@@ -119,7 +120,12 @@ static Bool s_wpOpenDeployment = FALSE;
 static WindowLayout *s_wpMainLayout = nullptr;
 static WindowLayout *s_wpDeploymentLayout = nullptr;
 static Bool s_wpReviewActive = FALSE;
+static Bool s_wpReviewScene = FALSE;
 static UnsignedInt s_wpReviewStartMS = 0, s_wpReviewReportFrame = 0;
+static UnsignedInt s_wpReviewPowerLogs = 0, s_wpReviewPowerFrame = 0;
+static ObjectID s_wpReviewPowerSelection = INVALID_ID;
+static Bool s_wpReviewPowerReady = FALSE;
+static AsciiString s_wpReviewPowerPending;
 static Bool s_wpMissionDiagnosticArmed = FALSE, s_wpMissionDiagnosticExpectedWin = FALSE;
 static Int s_wpMissionDiagnosticResult = 0;
 
@@ -142,6 +148,11 @@ void WPCreateReviewScene()
 {
 	s_wpMissionDiagnosticArmed = FALSE; // This entry point runs once per fresh map.
 	s_wpMissionDiagnosticResult = 0;
+	s_wpReviewScene = FALSE;
+	s_wpReviewPowerLogs = 0;
+	s_wpReviewPowerFrame = 0;
+	s_wpReviewPowerSelection = INVALID_ID;
+	s_wpReviewPowerPending.clear();
 	const char *mode = getenv("WP_REVIEW_SCENE");
 	if( !mode || (strcmp(mode, "1") != 0 && strcmp(mode, "stress") != 0) ) return;
 	const AsciiString map = wpCurrentMapID();
@@ -209,6 +220,7 @@ void WPCreateReviewScene()
 		fprintf(stderr, "[WP_REVIEW] stress addedArmyLimit=120 realAttackMoveOrders=%d totalFixtures=%d missing=%d\n", orders, created, missing);
 	}
 	if( TheTacticalView ) { TheTacticalView->setZoomToMax(); TheTacticalView->lookAt(&camera); }
+	s_wpReviewScene = TRUE;
 	s_wpReviewActive = TRUE; s_wpReviewStartMS = timeGetTime(); s_wpReviewReportFrame = 0;
 	fprintf(stderr, "[WP_REVIEW] enabled map=%s mode=%s; visual quality requires manual review\n", map.str(), mode);
 }
@@ -227,6 +239,27 @@ Bool WPDisplayMissionText( const AsciiString &key )
 		Module.onGameMessage({id: UTF8ToString($0), text: UTF8ToString($1), map: UTF8ToString($2)});
 		return 1;
 	}, key.str(), text.str(), map.str()) != 0;
+#else
+	return FALSE;
+#endif
+}
+
+// GeneralsX @bugfix Codex 05/09/2026 Native War Powers notices share the
+// browser notification surface so they cannot hide behind the objective HUD.
+Bool WPDisplayPlayerMessage( const UnicodeString &message )
+{
+#ifdef __EMSCRIPTEN__
+	if( !TheGameLogic || !TheGameLogic->isInGame() || !ThePlayerList ) return FALSE;
+	const Player *player = ThePlayerList->getLocalPlayer();
+	if( !player || (player->getSide() != "WP" && player->getSide() != "WPJ") ) return FALSE;
+	AsciiString text;
+	text.translate( message );
+	const AsciiString map = wpCurrentMapID();
+	return EM_ASM_INT({
+		if (typeof Module.onGameMessage !== 'function') return 0;
+		Module.onGameMessage({id: 'WP:PlayerNotice', text: UTF8ToString($0), map: UTF8ToString($1)});
+		return 1;
+	}, text.str(), map.str()) != 0;
 #else
 	return FALSE;
 #endif
@@ -255,6 +288,49 @@ static AsciiString wpControlKey( GameMessage::Type command )
 			}
 	}
 	return AsciiString::TheEmptyString;
+}
+
+// GeneralsX @feature Codex 05/09/2026 Review-only diagnostics distinguish a
+// charging/disabled power from a command button that never enters targeting.
+// Read public state only; never force readiness or invoke the command.
+static void wpReviewSelectedPower( Object *selected, const AsciiString &map, UnsignedInt frame )
+{
+	if( !s_wpReviewScene || !selected || s_wpReviewPowerLogs >= 64 ) return;
+	const AsciiString name = selected->getTemplate()->getName();
+	if( name != "WP_Directorate" && name != "WPJ_Den" ) return;
+	SpecialPowerModuleInterface *power = nullptr;
+	for( BehaviorModule **module = selected->getBehaviorModules(); *module && !power; ++module )
+		power = (*module)->getSpecialPower();
+	const CommandButton *pending = TheInGameUI ? TheInGameUI->getGUICommand() : nullptr;
+	const AsciiString pendingName = pending ? pending->getName() : AsciiString::TheEmptyString;
+	const Bool ready = power && power->isReady();
+	if( selected->getID() == s_wpReviewPowerSelection && ready == s_wpReviewPowerReady &&
+		pendingName == s_wpReviewPowerPending && frame < s_wpReviewPowerFrame + 150 ) return;
+	GameWindow *button = TheWindowManager ? TheWindowManager->winGetWindowFromId(nullptr,
+		TheNameKeyGenerator->nameToKey("ControlBar.wnd:ButtonCommand01")) : nullptr;
+	const UnsignedInt buttonStatus = button ? button->winGetStatus() : 0;
+	const CommandButton *command = button ? (const CommandButton *)GadgetButtonGetData(button) : nullptr;
+	UnsignedInt disabledMask = 0;
+	for( Int i = 0; i < DISABLED_COUNT; ++i )
+		if( selected->isDisabledByType((DisabledType)i) ) disabledMask |= 1u << i;
+	const Player *owner = selected->getControllingPlayer();
+	fprintf(stderr, "[WP_REVIEW] power frame=%u map=%s side=%s object=%s id=%u power=%s ready=%d readyFrame=%u percent=%.3f disabled=%d disabledMask=0x%x underConstruction=%d scriptDisabled=%d scriptUnpowered=%d powerProduced=%d powerConsumed=%d buttonFound=%d buttonEnabled=%d buttonHidden=%d command=%s options=0x%x pending=%s\n",
+		frame, map.str(), owner ? owner->getSide().str() : "none", name.str(), (UnsignedInt)selected->getID(),
+		power ? power->getPowerName().str() : "none", (Int)ready, power ? power->getReadyFrame() : 0,
+		power ? power->getPercentReady() : 0.0f, (Int)selected->isDisabled(), disabledMask,
+		(Int)selected->getStatusBits().test(OBJECT_STATUS_UNDER_CONSTRUCTION),
+		(Int)selected->testScriptStatusBit(OBJECT_STATUS_SCRIPT_DISABLED),
+		(Int)selected->testScriptStatusBit(OBJECT_STATUS_SCRIPT_UNPOWERED),
+		owner ? owner->getEnergy()->getProduction() : 0, owner ? owner->getEnergy()->getConsumption() : 0,
+		(Int)(button != nullptr), (Int)((buttonStatus & WIN_STATUS_ENABLED) != 0),
+		(Int)((buttonStatus & WIN_STATUS_HIDDEN) != 0), command ? command->getName().str() : "none",
+		command ? (UnsignedInt)command->getOptions() : 0, pending ? pendingName.str() : "none");
+	fflush(stderr);
+	++s_wpReviewPowerLogs;
+	s_wpReviewPowerFrame = frame;
+	s_wpReviewPowerSelection = selected->getID();
+	s_wpReviewPowerReady = ready;
+	s_wpReviewPowerPending = pendingName;
 }
 
 // GeneralsX @feature Codex 05/09/2026 Read-only player telemetry drives help
@@ -293,6 +369,7 @@ void WPUpdatePlayerExperience()
 		}
 	Drawable *drawable = inGame && TheInGameUI ? TheInGameUI->getFirstSelectedDrawable() : nullptr;
 	Object *selected = drawable ? drawable->getObject() : nullptr;
+	wpReviewSelectedPower(selected, map, frame);
 	Int selectedCount = inGame && TheInGameUI ? TheInGameUI->getSelectCount() : 0;
 	AsciiString selectedName, selectedTemplate;
 	Real health = 0.0f, maxHealth = 0.0f;
@@ -314,6 +391,37 @@ void WPUpdatePlayerExperience()
 	else if( TheGameText ) label = TheGameText->fetch("WP:SelectionHint");
 	wpHudText( "ControlBar.wnd:SelectionTitle", label );
 	wpHudText( "ControlBar.wnd:SelectionDetail", detail );
+	// GeneralsX @feature Codex 05/09/2026 Explain power availability in text;
+	// a dark command portrait alone does not communicate charge or power state.
+	UnicodeString orders = TheGameText ? TheGameText->fetch("WP:OrdersLabel") : UnicodeString::TheEmptyString;
+	if( TheGameText && selected && selectedCount == 1 && selected->getControllingPlayer() == player &&
+		(selectedTemplate == "WP_Directorate" || selectedTemplate == "WPJ_Den") &&
+		!selected->getStatusBits().test(OBJECT_STATUS_UNDER_CONSTRUCTION) )
+	{
+		SpecialPowerModuleInterface *power = nullptr;
+		for( BehaviorModule **module = selected->getBehaviorModules(); *module && !power; ++module )
+			power = (*module)->getSpecialPower();
+		if( power )
+		{
+			if( selected->isDisabledByType(DISABLED_UNDERPOWERED) ||
+				selected->isDisabledByType(DISABLED_SCRIPT_UNDERPOWERED) ||
+				selected->testScriptStatusBit(OBJECT_STATUS_SCRIPT_UNPOWERED) )
+				orders = TheGameText->fetch("WP:PowerRequired");
+			else if( selected->isDisabled() || selected->testScriptStatusBit(OBJECT_STATUS_SCRIPT_DISABLED) )
+				orders = TheGameText->fetch("WP:PowerUnavailable");
+			else if( power->isReady() )
+				orders = TheGameText->fetch("WP:PowerReady");
+			else
+			{
+				const UnsignedInt readyFrame = power->getReadyFrame();
+				const UnsignedInt remaining = readyFrame > frame ? readyFrame - frame : 0;
+				const UnsignedInt seconds = remaining / LOGICFRAMES_PER_SECOND + (remaining % LOGICFRAMES_PER_SECOND != 0);
+				if( seconds ) orders.format(TheGameText->fetch("WP:PowerRecharging"), (Int)(seconds / 60), (Int)(seconds % 60));
+				else orders = TheGameText->fetch("WP:PowerUnavailable");
+			}
+		}
+	}
+	wpHudText( "ControlBar.wnd:OrdersTitle", orders );
 	if( player )
 	{
 		UnicodeString army;
@@ -333,6 +441,7 @@ void WPUpdatePlayerExperience()
 	}
 	if( !inGame ) s_wpWebOwnsPause = FALSE;
 	if( !inGame ) s_wpReviewActive = FALSE;
+	if( !inGame ) s_wpReviewScene = FALSE;
 	if( s_wpReviewActive && frame >= s_wpReviewReportFrame + 300 )
 	{
 		const Real wallSeconds = (timeGetTime() - s_wpReviewStartMS) / 1000.0f;
@@ -635,15 +744,12 @@ void WPMainMenuInit( WindowLayout *layout, void *userData )
 	wpButtonOptionsID = TheNameKeyGenerator->nameToKey( "MainMenu.wnd:ButtonOptions" );
 	wpButtonQuitID = TheNameKeyGenerator->nameToKey( "MainMenu.wnd:ButtonQuit" );
 
-	// Build stamp doubles as the version label.
+	// GeneralsX @tweak Codex 05/09/2026 Settings exposes the staged build ID;
+	// a compiler timestamp is redundant and does not identify the game pack.
 	GameWindow *version = TheWindowManager->winGetWindowFromId( nullptr,
 		TheNameKeyGenerator->nameToKey( "MainMenu.wnd:LabelVersion" ) );
 	if( version )
-	{
-		UnicodeString stamp;
-		stamp.format( L"build %hs %hs", __DATE__, __TIME__ );
-		GadgetStaticTextSetText( version, stamp );
-	}
+		GadgetStaticTextSetText( version, UnicodeString::TheEmptyString );
 
 	layout->hide( FALSE );
 	layout->bringForward();

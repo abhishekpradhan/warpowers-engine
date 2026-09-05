@@ -22,6 +22,14 @@ Do not add EA assets, copied retail data, unlicensed imports, credentials or loc
 
 Build instructions are in [README.md](README.md). For browser changes, build and stage through the complete parent workspace and exercise the affected interaction in a browser. Record the browser, tested build, input sequence and result. A native build alone does not validate the WebAssembly renderer or browser input.
 
+For keyboard modifier ordering, run this focused regression from the engine directory with Python 3 and a native C++17 compiler (`CXX` defaults to `c++`):
+
+```sh
+python3 scripts/qa/test-keyboard-modifiers.py
+```
+
+The runner extracts and compiles the actual `Keyboard.cpp` update, repeat and translation methods with deterministic device/timer fixtures; it does not duplicate their algorithm. It checks fast chords, event ordering, modifiers held across updates, combined modifiers and repeats. Add `--baseline <revision-before-fix>` to require an earlier revision to fail those checks as a negative control. This isolates keyboard event-state behavior; SDL/browser delivery, message translation, text entry and actual group creation/recall still require runtime checks. The fixture's small type/key definitions also do not replace a full engine build.
+
 The `WP_AUTOTEST` hooks in `GameEngine.cpp` are focused diagnostics. `base` and `wedge` exercise construction; unit/control labs may create explicitly logged fixtures; `economy` checks native hauling and `powers` checks effects with forced readiness; `win` and `defeat` trigger result paths directly. Do not describe those as human-played balanced victories or as coverage of the entire interface. Pair them with input-driven checks when selection, layout, loading or restart behavior changes.
 
 `WP_REVIEW_SCENE=1` creates faction asset rows on a fresh Flats map (`WPTest` or `WPTestJ`); `WP_REVIEW_SCENE=stress` adds at most 120 mixed combat units with native attack-move orders. The scene logs fixture counts, observed frame rates and WebAssembly heap capacity for 60 simulation seconds. These are controlled development fixtures, not a normal opening or an automatic visual/performance acceptance test. Pausing or background throttling affects wall-time measurements; heap capacity is not live memory usage. The Jackal Dynamo appears as an art reference even though it is not part of the player's build order.

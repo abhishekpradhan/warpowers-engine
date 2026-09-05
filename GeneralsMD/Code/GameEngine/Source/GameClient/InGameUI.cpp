@@ -2409,6 +2409,11 @@ void InGameUI::messageColor( const RGBColor *rgbColor, UnicodeString format, ...
 //-------------------------------------------------------------------------------------------------
 void InGameUI::addMessageText( const UnicodeString& formattedMessage, const RGBColor *rgbColor )
 {
+	// GeneralsX @bugfix Codex 05/09/2026 Deliver native player notices once,
+	// above the War Powers web HUD. Other datasets/hosts keep native messages.
+	extern Bool WPDisplayPlayerMessage( const UnicodeString &message );
+	if( m_messagesOn && WPDisplayPlayerMessage(formattedMessage) ) return;
+
 	Int i;
 	Color color1 = m_messageColor1;
 	Color color2 = m_messageColor2;
