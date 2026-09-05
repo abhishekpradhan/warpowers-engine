@@ -51,6 +51,8 @@
 #include <stdint.h>
 
 #include "surfaceclass.h"
+// GeneralsX @feature Codex 05/09/2026 Opt-in generation checks run before COM surface calls, without masking invalid ownership.
+#include "SurfaceTrace.h"
 #include "formconv.h"
 #include "dx8wrapper.h"
 #include "WWMath/vector2i.h"
@@ -170,12 +172,18 @@ SurfaceClass::SurfaceClass(unsigned width, unsigned height, WW3DFormat format):
 	WWASSERT(width);
 	WWASSERT(height);
 	D3DSurface = DX8Wrapper::_Create_DX8_Surface(width, height, format);
+#ifdef __EMSCRIPTEN__
+	Igroteka_TraceSurfaceOwner(this, D3DSurface, SURFACE_TRACE_BIND);
+#endif
 }
 
 SurfaceClass::SurfaceClass(const char *filename):
 	D3DSurface(nullptr)
 {
 	D3DSurface = DX8Wrapper::_Create_DX8_Surface(filename);
+#ifdef __EMSCRIPTEN__
+	Igroteka_TraceSurfaceOwner(this, D3DSurface, SURFACE_TRACE_BIND);
+#endif
 	SurfaceDescription desc;
 	Get_Description(desc);
 	SurfaceFormat=desc.Format;
@@ -193,6 +201,9 @@ SurfaceClass::SurfaceClass(IDirect3DSurface8 *d3d_surface)	:
 SurfaceClass::~SurfaceClass()
 {
 	if (D3DSurface) {
+#ifdef __EMSCRIPTEN__
+		Igroteka_TraceSurfaceOwner(this, D3DSurface, SURFACE_TRACE_RELEASE);
+#endif
 		D3DSurface->Release();
 		D3DSurface = nullptr;
 	}
@@ -717,7 +728,13 @@ void SurfaceClass::Attach (IDirect3DSurface8 *surface)
 	//	Lock a reference onto the object
 	//
 	if (D3DSurface != nullptr) {
+#ifdef __EMSCRIPTEN__
+		Igroteka_TraceSurfaceOwner(this, D3DSurface, SURFACE_TRACE_VALIDATE);
+#endif
 		D3DSurface->AddRef ();
+#ifdef __EMSCRIPTEN__
+		Igroteka_TraceSurfaceOwner(this, D3DSurface, SURFACE_TRACE_BIND);
+#endif
 	}
 }
 
@@ -743,6 +760,9 @@ void SurfaceClass::Detach ()
 	//	Release the hold we have on the D3D object
 	//
 	if (D3DSurface != nullptr) {
+#ifdef __EMSCRIPTEN__
+		Igroteka_TraceSurfaceOwner(this, D3DSurface, SURFACE_TRACE_RELEASE);
+#endif
 		D3DSurface->Release ();
 	}
 

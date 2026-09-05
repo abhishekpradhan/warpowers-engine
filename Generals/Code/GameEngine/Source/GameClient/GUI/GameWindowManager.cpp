@@ -34,6 +34,7 @@
 #include "Common/Debug.h"
 #include "Common/Language.h"
 #include "GameClient/Display.h"
+#include "SurfaceTrace.h"
 #include "GameClient/GameWindowManager.h"
 #include "GameClient/GameWindow.h"
 #include "GameClient/Mouse.h"
@@ -112,6 +113,10 @@ void GameWindowManager::processDestroyList()
 		if( m_grabWindow == doDestroy )
 			m_grabWindow = nullptr;
 
+		// GeneralsX @feature Codex 05/09/2026 Capture the owner before text teardown in opt-in surface diagnostics.
+#ifdef __EMSCRIPTEN__
+		Igroteka_TraceSurfaceWindow(doDestroy->winGetInstanceData()->m_decoratedNameString.str());
+#endif
 		// send the destroy message to the window we're about to kill
 		winSendSystemMsg( doDestroy, GWM_DESTROY, 0, 0 );
 
@@ -119,6 +124,9 @@ void GameWindowManager::processDestroyList()
 
 		// free the memory
 		deleteInstance(doDestroy);
+#ifdef __EMSCRIPTEN__
+		Igroteka_TraceSurfaceWindow(nullptr);
+#endif
 
 	}
 

@@ -16,6 +16,11 @@
 #include <cstdio>
 #include <cstring>
 #include <vector>
+#include <array>
+#include <cstdlib>
+#include <unordered_map>
+#include <emscripten/emscripten.h>
+#include "../../Core/Libraries/Include/SurfaceTrace.h"
 
 namespace {
 
@@ -55,6 +60,88 @@ inline const dw::RECT* cvt(const RECT* v) { return reinterpret_cast<const dw::RE
 inline dw::D3DSURFACE_DESC* cvt(D3DSURFACE_DESC* v) { return reinterpret_cast<dw::D3DSURFACE_DESC*>(v); }
 
 class BridgeDevice;
+
+// GeneralsX @feature Codex 05/09/2026 Diagnose stale outer COM surfaces before virtual dispatch.
+// Disabled by default. The live registry exists only during an explicitly traced session;
+// recent retirement records and ordinary logging are bounded, and errors never suppress Release.
+bool surfaceTraceEnabled() {
+    static const bool enabled = [] {
+        const char *value = std::getenv("WP_SURFACE_TRACE");
+        return (value && *value && *value != '0') || EM_ASM_INT({
+            return typeof window !== 'undefined' && !!window.IG_TRACE;
+        });
+    }();
+    return enabled;
+}
+
+struct SurfaceTraceRecord {
+    unsigned long long serial = 0;
+    const void *vtable = nullptr;
+    unsigned owners = 0;
+};
+struct SurfaceOwnerRecord { const void *surface; unsigned long long serial; };
+struct RetiredSurfaceRecord {
+    const void *surface = nullptr;
+    unsigned long long serial = 0;
+    char window[128] = {};
+};
+struct SurfaceTraceState {
+    std::unordered_map<const void *, SurfaceTraceRecord> live;
+    std::unordered_map<const void *, SurfaceOwnerRecord> owners;
+    std::array<RetiredSurfaceRecord, 256> retired;
+    unsigned retiredIndex = 0;
+    unsigned normalLogs = 0;
+    unsigned long long nextSerial = 0;
+    char window[128] = {};
+};
+SurfaceTraceState &surfaceTraceState() { static SurfaceTraceState state; return state; }
+const void *surfaceVtable(const void *surface) {
+    const void *vtable = nullptr;
+    std::memcpy(&vtable, surface, sizeof(vtable));
+    return vtable;
+}
+[[noreturn]] void surfaceTraceFailure(const char *reason, const void *owner,
+                                     const void *surface, unsigned long long expected) {
+    auto &state = surfaceTraceState();
+    auto live = state.live.find(surface);
+    std::fprintf(stderr, "[WP_SURFACE] INVALID reason=%s owner=%p surface=%p expectedSerial=%llu liveSerial=%llu window=%s\n",
+        reason, owner, surface, expected, live == state.live.end() ? 0 : live->second.serial,
+        state.window);
+    for (const auto &old : state.retired) {
+        if ((expected && old.serial == expected) || (!expected && old.surface == surface))
+            std::fprintf(stderr, "[WP_SURFACE] retired surface=%p serial=%llu window=%s\n",
+                old.surface, old.serial, old.window);
+    }
+    std::fflush(stderr);
+    emscripten_log(EM_LOG_ERROR | EM_LOG_C_STACK | EM_LOG_DEMANGLE, "[WP_SURFACE] stopping at first invalid ownership");
+    std::abort();
+}
+void registerSurface(const void *surface) {
+    if (!surfaceTraceEnabled()) return;
+    auto &state = surfaceTraceState();
+    if (state.live.find(surface) != state.live.end())
+        surfaceTraceFailure("duplicate-allocation", nullptr, surface, 0);
+    SurfaceTraceRecord record;
+    record.serial = ++state.nextSerial;
+    record.vtable = surfaceVtable(surface);
+    state.live.emplace(surface, record);
+    if (state.normalLogs++ < 8) {
+        std::fprintf(stderr, "[WP_SURFACE] allocated surface=%p serial=%llu\n", surface, record.serial);
+        std::fflush(stderr);
+    }
+}
+void retireSurface(const void *surface) {
+    if (!surfaceTraceEnabled()) return;
+    auto &state = surfaceTraceState();
+    auto live = state.live.find(surface);
+    if (live == state.live.end()) surfaceTraceFailure("unregistered-destruction", nullptr, surface, 0);
+    if (live->second.owners) surfaceTraceFailure("destroyed-with-live-owners", nullptr, surface, live->second.serial);
+    auto &old = state.retired[state.retiredIndex++ % state.retired.size()];
+    old.surface = surface;
+    old.serial = live->second.serial;
+    std::snprintf(old.window, sizeof(old.window), "%s", state.window);
+    state.live.erase(live);
+}
 
 // ---------------------------------------------------------------------------
 // Common refcount plumbing
@@ -159,8 +246,8 @@ private:
 
 class BridgeSurface final : public BridgeUnknown<IDirect3DSurface8> {
 public:
-    BridgeSurface(dw::IDirect3DSurface8* inner, BridgeDevice* dev) : m_inner(inner), m_dev(dev) {}
-    ~BridgeSurface() override { m_inner->Release(); }
+    BridgeSurface(dw::IDirect3DSurface8* inner, BridgeDevice* dev) : m_inner(inner), m_dev(dev) { registerSurface(this); }
+    ~BridgeSurface() override { retireSurface(this); m_inner->Release(); }
 
     HRESULT STDMETHODCALLTYPE GetDevice(IDirect3DDevice8** dev) override;
     HRESULT STDMETHODCALLTYPE SetPrivateData(REFGUID, const void*, DWORD, DWORD) override { return D3D_OK; }
@@ -789,6 +876,32 @@ constexpr D3DDISPLAYMODE BridgeD3D8::kModes[];
 
 }  // namespace
 
+extern "C" void Igroteka_TraceSurfaceOwner(const void *owner, const void *surface, SurfaceTraceOperation operation) {
+    if (!surfaceTraceEnabled() || !surface) return;
+    auto &state = surfaceTraceState();
+    auto binding = state.owners.find(owner);
+    const unsigned long long expected = binding == state.owners.end() ? 0 : binding->second.serial;
+    auto live = state.live.find(surface);
+    if (live == state.live.end()) surfaceTraceFailure("not-live", owner, surface, expected);
+    if (surfaceVtable(surface) != live->second.vtable) surfaceTraceFailure("vtable-changed", owner, surface, expected);
+    if (operation == SURFACE_TRACE_VALIDATE) return;
+    if (operation == SURFACE_TRACE_BIND) {
+        if (binding != state.owners.end()) surfaceTraceFailure("owner-already-bound", owner, surface, expected);
+        state.owners.emplace(owner, SurfaceOwnerRecord{surface, live->second.serial});
+        ++live->second.owners;
+    } else {
+        if (binding == state.owners.end() || binding->second.surface != surface || expected != live->second.serial)
+            surfaceTraceFailure("owner-generation-mismatch", owner, surface, expected);
+        if (!live->second.owners) surfaceTraceFailure("owner-count-zero", owner, surface, expected);
+        --live->second.owners;
+        state.owners.erase(binding);
+    }
+}
+extern "C" void Igroteka_TraceSurfaceWindow(const char *name) {
+    if (!surfaceTraceEnabled()) return;
+    auto &state = surfaceTraceState();
+    std::snprintf(state.window, sizeof(state.window), "%s", name ? name : "");
+}
 // Entry point handed to DX8Wrapper on wasm in place of the dlopen'd symbol.
 extern "C" IDirect3D8* WINAPI Igroteka_Direct3DCreate8(UINT) {
     std::fprintf(stderr, "[d8web-bridge] Igroteka_Direct3DCreate8: serving d8web WebGL2 backend\n");
