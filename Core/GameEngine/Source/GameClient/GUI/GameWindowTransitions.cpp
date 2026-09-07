@@ -534,7 +534,7 @@ void GameWindowTransitionsHandler::reverse( AsciiString groupName )
 void GameWindowTransitionsHandler::remove( AsciiString groupName,  Bool skipPending )
 {
 	TransitionGroup *g = findGroup(groupName);
-	// WarPowers @bugfix Guard against unknown group names: with g == null and no pending/current
+	// WarPowers @fix 21/08/2026 Guard against unknown group names: with g == null and no pending/current
 	// group, the identity comparisons below match null == null and dereference null.
 	if(g == nullptr)
 		return;

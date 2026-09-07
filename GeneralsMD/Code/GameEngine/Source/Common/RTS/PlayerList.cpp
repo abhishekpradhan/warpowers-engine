@@ -43,6 +43,7 @@
 //-----------------------------------------------------------------------------
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
+#include "WPTrace.h"
 
 #include "Common/Errors.h"
 #include "Common/DataChunk.h"
@@ -153,15 +154,12 @@ void PlayerList::newGame()
 	{
 		Dict *d = TheSidesList->getSideInfo(i)->getDict();
 		AsciiString pname = d->getAsciiString(TheKey_playerName);
-		// WarPowers @debug IG_TRACE local-player selection forensics
+		// WarPowers @feature 24/08/2026 IG_TRACE local-player selection forensics
+		if (wpTraceEnabled())
 		{
-			static const bool wpT = getenv("IG_TRACE") && *getenv("IG_TRACE") != '0';
-			if (wpT) {
-				Bool ex = FALSE;
-				fprintf(stderr, "[WPSIDE] i=%d name='%s' human=%d\n", (int)i,
-					pname.str(), (int)d->getBool(TheKey_playerIsHuman, &ex));
-				fflush(stderr);
-			}
+			Bool ex = FALSE;
+			fprintf(stderr, "[WPSIDE] i=%d name='%s' human=%d\n", (int)i,
+				pname.str(), (int)d->getBool(TheKey_playerIsHuman, &ex));
 		}
 		if (pname.isEmpty())
 			continue;	// it's neutral, which we've already done, so skip it.

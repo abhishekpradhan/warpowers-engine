@@ -490,6 +490,15 @@ public:
 	UnsignedByte m_fogAlpha;					///< 127 means fog is half as obscuring as shroud
 	UnsignedByte m_shroudAlpha;				///< 0 makes this opaque, but they may get fancy
 
+	// WarPowers @feature 07/09/2026 Dataset switches for behaviour the fork added. Defaults
+	// keep retail data behaving as before; data/Data/INI/GameData.ini opts War Powers in.
+	AsciiString m_rallyPointModel;						///< render object drawn at every rally-point node (retail: SCMNode)
+	AsciiString m_rallyPointLineTexture;			///< texture on the rally-point line (retail: EXLaser.tga)
+	Bool m_dozerResumesAbandonedConstruction;	///< idle dozers resume nearby abandoned same-player sites on their own
+	Bool m_mapPlacedHarvestersAutoGather;			///< map-placed supply trucks start gathering when a fresh map begins
+	Bool m_commandButtonAvailabilityCues;			///< control-bar command portraits show a lock badge / brightened available state
+	std::vector<AsciiString> m_musicRotation;	///< audio events cycled as background music in menus and matches (retail: none)
+
 	// network timing values.
 	UnsignedInt m_networkFPSHistoryLength;		      	///< The number of fps history entries
 	UnsignedInt m_networkLatencyHistoryLength;      	///< The number of ping history entries.

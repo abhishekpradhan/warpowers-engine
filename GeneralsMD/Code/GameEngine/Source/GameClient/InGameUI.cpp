@@ -28,6 +28,7 @@
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
+#include "GameClient/WPShell.h"
 
 #include <stdio.h>
 
@@ -1127,7 +1128,7 @@ InGameUI::InGameUI()
 	m_pendingGUICommand = nullptr;
 
 	// allocate an array for the placement icons
-	// GeneralsX(WarPowers): m_maxLineBuildObjects is zero-default; a zero-length
+	// WarPowers @fix 23/08/2026 m_maxLineBuildObjects is zero-default; a zero-length
 	// array here makes every placement preview an out-of-bounds store that
 	// destroyPlacementIcons (loop bound 0) can never free — an immortal ghost
 	// building under every placed structure. Guarantee at least one slot.
@@ -1639,7 +1640,7 @@ void InGameUI::evaluateSoloNexus( Drawable *newlyAddedDrawable )
 void InGameUI::handleBuildPlacements()
 {
 
-	// GeneralsX(WarPowers): placement-mode safety nets.
+	// WarPowers @fix 23/08/2026 placement-mode safety nets.
 	// (1) If the source dozer died while the player was still aiming, cancel the
 	//     mode immediately instead of waiting for the next terrain click.
 	// (2) If a preview drawable ever outlives the mode (any missed exit path),
@@ -2067,7 +2068,7 @@ void InGameUI::update()
 
 	GameWindow *moneyWin = TheWindowManager->winGetWindowFromId( nullptr, moneyWindowKey );
 	GameWindow *powerWin = TheWindowManager->winGetWindowFromId( nullptr, powerWindowKey );
-	// WarPowers @fix: tolerate a ControlBar layout without these windows —
+	// WarPowers @fix 22/08/2026 tolerate a ControlBar layout without these windows —
 	// skip only the money/power readout instead of abandoning the whole
 	// update (the old early-return also silently disabled the ControlBar
 	// context system further down).
@@ -2125,7 +2126,7 @@ void InGameUI::update()
 		moneyWin->winHide(TRUE);
 		powerWin->winHide(TRUE);
 	}
-	} // WarPowers @fix end money/power guard
+	} // WarPowers @fix 22/08/2026 end money/power guard
 
 	// Update the floating Text;
 	updateFloatingText();
@@ -2409,9 +2410,8 @@ void InGameUI::messageColor( const RGBColor *rgbColor, UnicodeString format, ...
 //-------------------------------------------------------------------------------------------------
 void InGameUI::addMessageText( const UnicodeString& formattedMessage, const RGBColor *rgbColor )
 {
-	// GeneralsX @bugfix Codex 05/09/2026 Deliver native player notices once,
-	// above the War Powers web HUD. Other datasets/hosts keep native messages.
-	extern Bool WPDisplayPlayerMessage( const UnicodeString &message );
+	// WarPowers @fix 05/09/2026 Deliver native player notices once, above the
+	// War Powers web HUD. Other datasets/hosts keep native messages.
 	if( m_messagesOn && WPDisplayPlayerMessage(formattedMessage) ) return;
 
 	Int i;

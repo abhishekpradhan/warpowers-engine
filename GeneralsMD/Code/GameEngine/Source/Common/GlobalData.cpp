@@ -505,6 +505,14 @@ GlobalData* GlobalData::m_theOriginal = nullptr;
 	{ "FogAlpha",				INI::parseUnsignedByte,				nullptr,	offsetof( GlobalData, m_fogAlpha) },
 	{ "ShroudAlpha",		INI::parseUnsignedByte,				nullptr,	offsetof( GlobalData, m_shroudAlpha) },
 
+	// WarPowers @feature 07/09/2026 dataset switches (see GlobalData.h)
+	{ "RallyPointModel",											INI::parseAsciiString,	nullptr,	offsetof( GlobalData, m_rallyPointModel ) },
+	{ "RallyPointLineTexture",								INI::parseAsciiString,	nullptr,	offsetof( GlobalData, m_rallyPointLineTexture ) },
+	{ "DozerResumesAbandonedConstruction",		INI::parseBool,					nullptr,	offsetof( GlobalData, m_dozerResumesAbandonedConstruction ) },
+	{ "MapPlacedHarvestersAutoGather",				INI::parseBool,					nullptr,	offsetof( GlobalData, m_mapPlacedHarvestersAutoGather ) },
+	{ "CommandButtonAvailabilityCues",				INI::parseBool,					nullptr,	offsetof( GlobalData, m_commandButtonAvailabilityCues ) },
+	{ "MusicRotation",												INI::parseAsciiStringVector,	nullptr,	offsetof( GlobalData, m_musicRotation ) },
+
 	{ "HotKeyTextColor",										INI::parseColorInt,					nullptr,	offsetof( GlobalData, m_hotKeyTextColor ) },
 
 	{ "PowerBarBase",												INI::parseInt,							nullptr,	offsetof( GlobalData, m_powerBarBase) },
@@ -957,6 +965,14 @@ GlobalData::GlobalData()
 	m_clearAlpha = 255;
 	m_fogAlpha = 127;
 	m_shroudAlpha = 0;
+
+	// WarPowers @feature 07/09/2026 retail defaults for the dataset switches
+	m_rallyPointModel = "SCMNode";
+	m_rallyPointLineTexture = "EXLaser.tga";
+	m_dozerResumesAbandonedConstruction = FALSE;
+	m_mapPlacedHarvestersAutoGather = FALSE;
+	m_commandButtonAvailabilityCues = FALSE;
+	m_musicRotation.clear();
 
 	m_powerBarBase = 7;
 	m_powerBarIntervals = 3;

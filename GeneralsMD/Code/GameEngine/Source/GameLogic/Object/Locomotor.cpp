@@ -30,6 +30,7 @@
 
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
+#include "WPTrace.h"
 
 #include <climits>	// For INT_MAX on Linux
 #define DEFINE_SURFACECATEGORY_NAMES
@@ -1109,10 +1110,9 @@ void Locomotor::locoUpdate_moveTowardsPosition(Object* obj, const Coord3D& goalP
 
 	handleBehaviorZ(obj, physics, goalPos);
 
-	// WarPowers @debug IG_TRACE aircraft movement forensics
+	// WarPowers @feature 25/08/2026 IG_TRACE aircraft movement forensics
 	{
-		static const bool wpT = getenv("IG_TRACE") && *getenv("IG_TRACE") != '0';
-		if (wpT && (m_template->m_surfaces & LOCOMOTORSURFACE_AIR) &&
+		if (wpTraceEnabled() && (m_template->m_surfaces & LOCOMOTORSURFACE_AIR) &&
 			(TheGameLogic->getFrame() % 30) == 0)
 		{
 			const Coord3D *p = obj->getPosition();

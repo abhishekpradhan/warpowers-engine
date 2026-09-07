@@ -87,6 +87,14 @@ else()
 endif()
 
 include(cmake/config.cmake)
+
+# WarPowers @refactor 07/09/2026 Developer-only autotest/clicktest harness
+# (GeneralsMD/Code/GameEngine/Source/WarPowers/WPHarness.cpp). OFF by default
+# so the shipped build carries none of it; the `wasm-harness` preset turns it
+# on. The definition is applied per source file in the GameEngine and
+# GameEngineDevice CMakeLists, never target-wide.
+option(WP_HARNESS "Compile the War Powers autotest/clicktest harness" OFF)
+add_feature_info(WP_HARNESS WP_HARNESS "War Powers autotest/clicktest harness (developer builds only)")
 include(cmake/gamespy.cmake)
 include(cmake/lzhl.cmake)
 include(cmake/stb.cmake)

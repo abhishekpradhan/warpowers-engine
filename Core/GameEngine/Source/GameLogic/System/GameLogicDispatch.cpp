@@ -29,6 +29,7 @@
 
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
+#include "WPTrace.h"
 
 #include "Common/CRCDebug.h"
 #include "Common/FramePacer.h"
@@ -85,7 +86,7 @@
 
 #include "GameNetwork/NetworkInterface.h"
 
-// WarPowers @feature menu curtain: TRUE from the moment a match exit is
+// WarPowers @feature 24/08/2026 menu curtain: TRUE from the moment a match exit is
 // committed until the next surface (main menu or new match) is ready;
 // W3DDisplay paints the frame black while set, hiding the teardown frames
 // (pause-dim gone, world dying, engine reset) that read as flicker.
@@ -264,7 +265,7 @@ void GameLogic::clearGameData( Bool showScoreScreen )
 	}
 
 	setClearingGameData( TRUE );
-	g_wpMenuCurtain = TRUE;  // WarPowers @feature menu curtain
+	g_wpMenuCurtain = TRUE;  // WarPowers @feature 24/08/2026 menu curtain
 
 //	m_background = TheWindowManager->winCreateLayout("Menus/BlankWindow.wnd");
 //	DEBUG_ASSERTCRASH(m_background,("We Couldn't Load Menus/BlankWindow.wnd"));
@@ -354,13 +355,9 @@ void GameLogic::prepareNewGame( GameMode gameMode, GameDifficulty diff, Int rank
 		TheWritableGlobalData->m_pendingFile.clear();
 	}
 
-	// WarPowers @debug IG_TRACE menu-start forensics
-	{
-		static const bool wpTrace = getenv("IG_TRACE") && *getenv("IG_TRACE") != '0';
-		if (wpTrace)
-			fprintf(stderr, "[WPSHELL] prepareNewGame mode=%d mapName='%s'\n",
-				(int)gameMode, TheGlobalData->m_mapName.str());
-	}
+	// WarPowers @feature 24/08/2026 IG_TRACE menu-start forensics
+	WP_TRACE("[WPSHELL] prepareNewGame mode=%d mapName='%s'\n",
+		(int)gameMode, TheGlobalData->m_mapName.str());
 	m_rankPointsToAddAtGameStart = rankPoints;
 	DEBUG_LOG(("GameLogic::prepareNewGame() - m_rankPointsToAddAtGameStart = %d", m_rankPointsToAddAtGameStart));
 

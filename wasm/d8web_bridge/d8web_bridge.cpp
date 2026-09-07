@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (c) 2026 GeneralsXWeb contributors and The War Powers authors
+//
 // Igroteka wasm — COM bridge: DXVK/mingw d3d8.h interfaces over the d8web core.
 //
 // The engine compiles against DXVK's d3d8 headers and obtains the API through a
@@ -21,6 +24,7 @@
 #include <unordered_map>
 #include <emscripten/emscripten.h>
 #include "../../Core/Libraries/Include/SurfaceTrace.h"
+#include "../../Core/Libraries/Include/WPTrace.h"
 
 namespace {
 
@@ -61,16 +65,12 @@ inline dw::D3DSURFACE_DESC* cvt(D3DSURFACE_DESC* v) { return reinterpret_cast<dw
 
 class BridgeDevice;
 
-// GeneralsX @feature Codex 05/09/2026 Diagnose stale outer COM surfaces before virtual dispatch.
-// Disabled by default. The live registry exists only during an explicitly traced session;
-// recent retirement records and ordinary logging are bounded, and errors never suppress Release.
+// WarPowers @feature 05/09/2026 Diagnose stale outer COM surfaces before virtual dispatch.
+// Disabled by default (WP_SURFACE_TRACE=1 or IG_TRACE=1). The live registry exists only
+// during an explicitly traced session; recent retirement records and ordinary logging are
+// bounded, and errors never suppress Release.
 bool surfaceTraceEnabled() {
-    static const bool enabled = [] {
-        const char *value = std::getenv("WP_SURFACE_TRACE");
-        return (value && *value && *value != '0') || EM_ASM_INT({
-            return typeof window !== 'undefined' && !!window.IG_TRACE;
-        });
-    }();
+    static const bool enabled = wpEnvEnabled("WP_SURFACE_TRACE") || wpTraceEnabled();
     return enabled;
 }
 
@@ -311,7 +311,19 @@ public:
     BridgeDevice(dw::IDirect3DDevice8* inner, IDirect3D8* parent, UINT bbWidth, UINT bbHeight)
         : m_inner(inner), m_parent(parent), m_bbWidth(bbWidth ? bbWidth : 1024),
           m_bbHeight(bbHeight ? bbHeight : 768) {}
-    ~BridgeDevice() override { m_inner->Release(); }
+    ~BridgeDevice() override {
+        // WarPowers @fix 07/09/2026 release everything the device owns: the bound
+        // textures (see SetTexture), the lazily created back/depth stand-ins, the
+        // inner device, then the parent reference taken in BridgeD3D8::CreateDevice.
+        for (auto*& tex : m_boundTextures) {
+            if (tex) tex->Release();
+            tex = nullptr;
+        }
+        if (m_backBuffer) m_backBuffer->Release();
+        if (m_depthSurface) m_depthSurface->Release();
+        m_inner->Release();
+        if (m_parent) m_parent->Release();
+    }
 
     // --- cooperative/status ---
     HRESULT STDMETHODCALLTYPE TestCooperativeLevel() override { return D3D_OK; }
@@ -320,6 +332,7 @@ public:
     HRESULT STDMETHODCALLTYPE GetDirect3D(IDirect3D8** out) override {
         if (!out) return D3DERR_INVALIDCALL;
         *out = m_parent;
+        if (m_parent) m_parent->AddRef();  // COM: the caller owns the returned reference
         return D3D_OK;
     }
     HRESULT STDMETHODCALLTYPE GetDeviceCaps(D3DCAPS8* caps) override;
@@ -464,6 +477,10 @@ public:
     HRESULT STDMETHODCALLTYPE EndScene() override { return m_inner->EndScene(); }
     HRESULT STDMETHODCALLTYPE Clear(DWORD count, const D3DRECT*, DWORD flags, D3DCOLOR color,
                                     float z, DWORD stencil) override {
+        // Known limitation: the rect list is not honoured. d8web's Clear
+        // (src/frontend/device.cpp) ignores rects and clears the whole target,
+        // so a sub-rectangle clear would clear everything; the bridge forwards
+        // no rects to keep that explicit.
         return m_inner->Clear(count, nullptr, flags, color, z, stencil);
     }
 
@@ -534,7 +551,14 @@ public:
         return D3D_OK;
     }
     HRESULT STDMETHODCALLTYPE SetTexture(DWORD stage, IDirect3DBaseTexture8* tex) override {
-        if (stage < 8) m_boundTextures[stage] = tex;
+        // WarPowers @fix 07/09/2026 D3D8 semantics: the device holds a reference to
+        // every bound texture. Caching a raw pointer let GetTexture AddRef (and the
+        // next SetTexture read) a texture the engine had already released.
+        if (stage < 8 && m_boundTextures[stage] != tex) {
+            if (tex) tex->AddRef();
+            if (m_boundTextures[stage]) m_boundTextures[stage]->Release();
+            m_boundTextures[stage] = tex;
+        }
         dw::IDirect3DBaseTexture8* inner = nullptr;
         if (tex && tex->GetType() == D3DRTYPE_TEXTURE)
             inner = static_cast<BridgeTexture*>(tex)->inner();
@@ -686,7 +710,7 @@ HRESULT STDMETHODCALLTYPE BridgeTexture::GetDevice(IDirect3DDevice8** dev) {
 }
 HRESULT STDMETHODCALLTYPE BridgeTexture::GetSurfaceLevel(UINT level, IDirect3DSurface8** out) {
     if (!out) return D3DERR_INVALIDCALL;
-    // GeneralsX @bugfix Codex 05/09/2026 Document the cache's actual ownership.
+    // WarPowers @fix 05/09/2026 Document the cache's actual ownership.
     // The cache owns one reference and every successful query returns another.
     // Callers must keep that reference until their final use. The old mip filter
     // borrowed a released reference and consumed the cache's final reference;

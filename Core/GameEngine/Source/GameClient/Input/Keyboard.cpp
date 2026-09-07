@@ -174,7 +174,7 @@ void Keyboard::updateKeys()
 
 		}
 
-		// GeneralsX @bugfix Codex 05/09/2026 Preserve modifiers at this event,
+		// WarPowers @fix 05/09/2026 Preserve modifiers at this event,
 		// before a later release in the same input batch can change them.
 		BitSet( m_keys[ index ].state, m_modifiers );
 
@@ -221,7 +221,7 @@ Bool Keyboard::checkKeyRepeat()
 			{
 				// Add key to this frame
 				m_keys[ index ].key = (UnsignedByte)key;
-				// GeneralsX @bugfix Codex 05/09/2026 Repeats are synthesized now,
+				// WarPowers @fix 05/09/2026 Repeats are synthesized now,
 				// so they use the current modifiers rather than an earlier keydown.
 				m_keys[ index ].state = KEY_STATE_DOWN | KEY_STATE_AUTOREPEAT | m_modifiers;
 				m_keys[ index ].status = KeyboardIO::STATUS_UNUSED;

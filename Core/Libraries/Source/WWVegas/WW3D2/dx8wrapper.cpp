@@ -51,6 +51,7 @@
 #endif
 
 #include "dx8wrapper.h"
+#include "WPTrace.h"
 // GeneralsX @build BenderAI 10/02/2026 - Need LoadLibrary/GetProcAddress/FreeLibrary for dynamic loading
 #ifndef _WIN32
 #include "module_compat.h"
@@ -590,23 +591,23 @@ bool DX8Wrapper::Init(void * hwnd, bool lite)
 		// Igroteka @build 06/07/2026 wasm: no dynamic linking in the browser. The
 		// d8web bridge (D3D8→WebGL2) is statically linked; use its factory directly
 		// (declared at file scope above).
-		fprintf(stderr, "DEBUG: DX8Wrapper::Init() - using statically linked d8web bridge\n");
+		WP_TRACE("DEBUG: DX8Wrapper::Init() - using statically linked d8web bridge\n");
 		D3D8Lib = (HMODULE)1;  // sentinel: never dereferenced, only null-checked/freed
 		Direct3DCreate8Ptr = Igroteka_Direct3DCreate8;
 #elif defined(_WIN32)
 		D3D8Lib = LoadLibrary("D3D8.DLL");
 #elif defined(__APPLE__)
-		fprintf(stderr, "DEBUG: DX8Wrapper::Init() - Loading libdxvk_d3d8.dylib (macOS)...\n");
+		WP_TRACE("DEBUG: DX8Wrapper::Init() - Loading libdxvk_d3d8.dylib (macOS)...\n");
 		D3D8Lib = LoadLibrary("libdxvk_d3d8.dylib");
-		fprintf(stderr, "DEBUG: DX8Wrapper::Init() - LoadLibrary result: %p\n", (void*)D3D8Lib);
+		WP_TRACE("DEBUG: DX8Wrapper::Init() - LoadLibrary result: %p\n", (void*)D3D8Lib);
 		if (D3D8Lib == nullptr) {
 			const char* error = dlerror();
 			fprintf(stderr, "ERROR: DX8Wrapper::Init() - dlerror(): %s\n", error ? error : "unknown");
 		}
 #else
-		fprintf(stderr, "DEBUG: DX8Wrapper::Init() - Loading libdxvk_d3d8.so (Linux)...\n");
+		WP_TRACE("DEBUG: DX8Wrapper::Init() - Loading libdxvk_d3d8.so (Linux)...\n");
 		D3D8Lib = LoadLibrary("libdxvk_d3d8.so");
-		fprintf(stderr, "DEBUG: DX8Wrapper::Init() - LoadLibrary result: %p\n", (void*)D3D8Lib);
+		WP_TRACE("DEBUG: DX8Wrapper::Init() - LoadLibrary result: %p\n", (void*)D3D8Lib);
 		if (D3D8Lib == nullptr) {
 			const char* error = dlerror();
 			fprintf(stderr, "ERROR: DX8Wrapper::Init() - dlerror(): %s\n", error ? error : "unknown");
@@ -619,7 +620,7 @@ bool DX8Wrapper::Init(void * hwnd, bool lite)
 		}
 
 #ifndef __EMSCRIPTEN__
-		fprintf(stderr, "DEBUG: DX8Wrapper::Init() - Getting Direct3DCreate8 function pointer...\n");
+		WP_TRACE("DEBUG: DX8Wrapper::Init() - Getting Direct3DCreate8 function pointer...\n");
 		Direct3DCreate8Ptr = (Direct3DCreate8Type) GetProcAddress(D3D8Lib, "Direct3DCreate8");
 #endif
 		if (Direct3DCreate8Ptr == nullptr) {
@@ -631,8 +632,8 @@ bool DX8Wrapper::Init(void * hwnd, bool lite)
 		** Create the D3D interface object
 		*/
 		WWDEBUG_SAY(("Create Direct3D8"));
-		fprintf(stderr, "DEBUG: DX8Wrapper::Init() - About to call Direct3DCreate8(D3D_SDK_VERSION=%d)\n", D3D_SDK_VERSION);
-		fprintf(stderr, "DEBUG: DX8Wrapper::Init() - Window handle: %p\n", hwnd);
+		WP_TRACE("DEBUG: DX8Wrapper::Init() - About to call Direct3DCreate8(D3D_SDK_VERSION=%d)\n", D3D_SDK_VERSION);
+		WP_TRACE("DEBUG: DX8Wrapper::Init() - Window handle: %p\n", hwnd);
 		{
 			// TheSuperHackers @bugfix xezon 13/06/2025 Front load the system dbghelp.dll to prevent
 			// the graphics driver from potentially loading the old game dbghelp.dll and then crashing the game process.
@@ -640,7 +641,7 @@ bool DX8Wrapper::Init(void * hwnd, bool lite)
 
 			D3DInterface = Direct3DCreate8Ptr(D3D_SDK_VERSION);		// TODO: handle failure cases...
 		}
-		fprintf(stderr, "DEBUG: DX8Wrapper::Init() - Direct3DCreate8 returned: %p\n", (void*)D3DInterface);
+		WP_TRACE("DEBUG: DX8Wrapper::Init() - Direct3DCreate8 returned: %p\n", (void*)D3DInterface);
 		if (D3DInterface == nullptr) {
 			fprintf(stderr, "ERROR: DX8Wrapper::Init() - Direct3DCreate8 returned NULL (DXVK failed to create D3D8 interface)\n");
 			return(false);
@@ -2052,7 +2053,7 @@ void DX8Wrapper::End_Scene(bool flip_frames)
 	}
 	DX8CALL(EndScene());
 
-	// WarPowers @feature headless frame dump: when WP_FRAME_DUMP names a .tga
+	// WarPowers @feature 22/08/2026 headless frame dump: when WP_FRAME_DUMP names a .tga
 	// path, write the backbuffer there every 60th frame. Display-independent
 	// (works with the screen locked/occluded); doubles as a visual-regression
 	// hook for automated testing.
@@ -2065,8 +2066,18 @@ void DX8Wrapper::End_Scene(bool flip_frames)
 				if (SUCCEEDED(_Get_D3D_Device8()->GetBackBuffer(0, D3DBACKBUFFER_TYPE_MONO, &wp_bb)) && wp_bb) {
 					D3DSURFACE_DESC wp_desc;
 					wp_bb->GetDesc(&wp_desc);
+					// WarPowers @fix 07/09/2026 the TGA header promises 32 bpp, so only a
+					// 32-bit backbuffer is dumped (rows are read through the locked pitch).
+					const bool wp_32bit = wp_desc.Format == D3DFMT_X8R8G8B8 || wp_desc.Format == D3DFMT_A8R8G8B8;
+					if (!wp_32bit) {
+						static bool wp_warned = false;
+						if (!wp_warned) {
+							fprintf(stderr, "WP_FRAME_DUMP: backbuffer format %u is not 32-bit, not dumping\n", (unsigned)wp_desc.Format);
+							wp_warned = true;
+						}
+					}
 					IDirect3DSurface8* wp_sys = nullptr;
-					if (SUCCEEDED(_Get_D3D_Device8()->CreateImageSurface(wp_desc.Width, wp_desc.Height, wp_desc.Format, &wp_sys)) && wp_sys) {
+					if (wp_32bit && SUCCEEDED(_Get_D3D_Device8()->CreateImageSurface(wp_desc.Width, wp_desc.Height, wp_desc.Format, &wp_sys)) && wp_sys) {
 						if (SUCCEEDED(_Get_D3D_Device8()->CopyRects(wp_bb, nullptr, 0, wp_sys, nullptr))) {
 							D3DLOCKED_RECT wp_lr;
 							if (SUCCEEDED(wp_sys->LockRect(&wp_lr, nullptr, D3DLOCK_READONLY))) {
@@ -2099,7 +2110,7 @@ void DX8Wrapper::End_Scene(bool flip_frames)
 	DX8WebBrowser::Render(0);
 #endif
 
-	// WarPowers @feature headless throttle bypass: when the window is occluded
+	// WarPowers @feature 22/08/2026 headless throttle bypass: when the window is occluded
 	// (locked screen) CAMetalLayer starves drawables and Present blocks at
 	// ~1Hz, dragging the whole sim down. WP_PRESENT_SKIP=N presents only every
 	// Nth frame so rendering and sim run at full speed; WP_FRAME_DUMP still

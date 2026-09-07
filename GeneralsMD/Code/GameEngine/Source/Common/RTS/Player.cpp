@@ -43,6 +43,8 @@
 //-----------------------------------------------------------------------------
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
+#include "WPTrace.h"
+#include "GameClient/WPShell.h"
 
 #define DEFINE_SCIENCE_AVAILABILITY_NAMES
 
@@ -2349,6 +2351,20 @@ void Player::sellEverythingUnderTheSun()
   iterateObjects( sellBuildings, nullptr );
 }
 
+
+//=============================================================================
+void Player::setCanBuildUnits(Bool canProduce)
+{
+	// WarPowers @feature 26/08/2026 WP_AI_TRACE: who toggles AI production?
+	static const bool wp_aiTrc = wpEnvEnabled("WP_AI_TRACE");
+	if (wp_aiTrc && m_canBuildUnits != canProduce)
+	{
+		fprintf(stderr, "[WPAI] setCanBuildUnits(%d) player=%s\n", (int)canProduce, m_playerName.str());
+		if (!canProduce)
+			WPPrintBacktrace();
+	}
+	m_canBuildUnits = canProduce;
+}
 
 //=============================================================================
 Bool Player::allowedToBuild(const ThingTemplate *tmplate) const

@@ -1,14 +1,32 @@
-# GeneralsX: Instructions for AI Coding Agents
+# War Powers engine: instructions for coding agents
 
 ## War Powers fork scope
 
-This checkout is the private War Powers engine fork. The routing rules in
-[CONTRIBUTING.md](CONTRIBUTING.md) apply before the inherited upstream examples
-below: authorized changes target this fork, upstream remotes stay fetch-only,
-and an upstream issue, pull request or publication is a separate owner decision.
-Do not infer permission to send unpublished game details to upstream from an
-inherited GitHub URL or example. Follow active session authorization for normal
-fork commits and pushes. The parent workspace owns the dataset and web product.
+This checkout is the War Powers engine fork of GeneralsX. Read this file
+together with [CONTRIBUTING.md](CONTRIBUTING.md) and [README.md](README.md):
+they say where a change belongs (engine here, dataset and web shell in the
+parent workspace, DXVK in its submodule), how fork changes are annotated and
+traced, and which checks to run. The body below is GeneralsX's own agent
+guide, kept close to upstream so that merges stay easy. Where it names upstream
+repositories, branches, Docker/Flatpak/AppImage packaging, smoke or replay
+scripts or release flows, it describes GeneralsX; those paths are inherited
+material that War Powers does not use or maintain. In this fork:
+
+- Changes target this repository's `main`. `upstream`, `superhackers` and
+  `generalsxweb` are fetch-only remotes with disabled push URLs; contributions
+  to those projects are separate pull requests prepared from focused commits.
+- The product target is the browser build (`wasm` and `wasm-harness` presets,
+  see README.md). Native macOS/Linux builds are development aids.
+- Annotate fork changes as `// WarPowers @fix|@feature|@refactor DD/MM/YYYY <why>`.
+  Inherited `GeneralsX @...`, `GeneralsXWeb @...` and `Igroteka @...` tags stay.
+- Diagnostics go through `Core/Libraries/Include/WPTrace.h` (`WP_TRACE`, gated
+  by `IG_TRACE`); self-tests, click tests and review scenes live in
+  `GeneralsMD/Code/GameEngine/Source/WarPowers/WPHarness.cpp` behind `WP_HARNESS`
+  and never in the production `wasm` build.
+- New files start with `SPDX-License-Identifier: GPL-3.0-or-later` and the
+  copyright line "The War Powers authors".
+- Run the four `scripts/qa/test-*.py` fixtures before handing over; browser
+  changes also need a walkthrough in a browser build.
 
 ## What I Am
 GeneralsX is a cross-platform port of Command & Conquer: Generals Zero Hour for **Linux and macOS**, porting legacy Windows DirectX 8 + Miles Sound code to a modern stack (SDL3 + DXVK + OpenAL + 64-bit). This is a **massive C++ game engine** (~500k LOC) preserving retail gameplay while modernizing the platform layer.
@@ -43,7 +61,7 @@ GeneralsX is a cross-platform port of Command & Conquer: Generals Zero Hour for 
 6. **Retail compatibility** – Original replays and mods must work
 7. **Determinism** – Rendering/audio changes must not affect gameplay logic
 8. **No band-aids** – Fix underlying issues, not symptoms
-9. **Update worklog** – Update `docs/WORKLOG/YYYY-MM-DIARY.md` before committing (see [.github/instructions/docs.instructions.md](.github/instructions/docs.instructions.md) for details)
+9. **Worklog** – `docs/WORKLOG/YYYY-MM-DIARY.md` is GeneralsX's AI-generated diary (see [.github/instructions/docs.instructions.md](.github/instructions/docs.instructions.md)); War Powers keeps it for history and does not require entries for contributions
 10. **Reference repos** – Study patterns, don't copy-paste
 11. **Backport to Generals** – Bugfixes and improvements must be backported to the Generals base game.
 
@@ -69,13 +87,29 @@ To guarantee cross-play between macOS ARM64 and Linux x86_64 without SyncCrash d
 6. **Deep CRC Memory Buffer Logging** – When a sync crash occurs and the root cause isn't obvious, the game automatically dumps a `Debug/deep_crc_YYYY-MM-DD-HH-MM-SS.bin` file containing a binary snapshot of the last 64 frames of state transfers. Use `scripts/qa/parse_deep_crc.py` to inspect these dumps and identify the exact object ID and state data that first diverged between players. Note: This requires the `RTS_BUILD_OPTION_DEEP_CRC=ON` CMake flag (which is enabled by default).
 
 ## Reference Repositories
+GeneralsX's reference checkouts; this repository's `references/` holds only the
+DXVK fork submodule and the OpenSAGE Blender plugin.
 - **fighter19-dxvk-port** – Primary graphics/platform reference (DXVK + SDL3 on Linux)
 - **jmarshall-win64-modern** – Audio reference (OpenAL implementation, Generals-only)
 - **thesuperhackers-main** – Upstream baseline for regression checks
 
 ## Build Commands
 
+### Browser (War Powers product target)
+Needs an activated Emscripten SDK; the parent workspace stages and serves the result (see README.md).
+*   **Production build**:
+    ```bash
+    emcmake cmake --preset wasm
+    cmake --build build/wasm --target GeneralsXZH.js
+    ```
+*   **Diagnostic harness build** (`WP_HARNESS=ON`, for `?autotest=`/`?review=` runs):
+    ```bash
+    emcmake cmake --preset wasm-harness
+    cmake --build build/wasm-harness --target GeneralsXZH.js
+    ```
+
 ### Linux (Docker-based)
+Inherited upstream material: Docker images, Flatpak bundles and the MinGW cross-build are GeneralsX packaging paths that War Powers does not use.
 Docker is the recommended build method on Linux hosts to ensure all toolchain requirements are met.
 
 *   **Configure Build**:
@@ -151,11 +185,11 @@ Docker is the recommended build method on Linux hosts to ensure all toolchain re
 
 ## DXVK Source of Truth (macOS)
 - Default: the immutable remote commit configured as `DXVK_REMOTE_REF` in `cmake/dx8.cmake`; configuring the engine does not automatically select the nested checkout.
-- Local mode: `-DSAGE_DXVK_USE_LOCAL_FORK=ON`
+- Local mode: `-DSAGE_DXVK_USE_LOCAL_FORK=ON` builds the submodule at `references/fbraz3-dxvk`, which keeps its upstream path name but tracks the War Powers DXVK fork (`warpowers-dxvk`, branch `main`).
 - **Rule**: Never edit files in `build/_deps/...` directly. Always commit fixes in fork repo first.
 
 ## Common Pitfalls
-- **Linux case sensitivity**: Include paths must match exact case. Use `scripts/tooling/cpp/fixIncludesCase.sh`.
+- **Linux case sensitivity**: Include paths must match exact case. Use `scripts/tooling/cpp/maintenance/fixIncludesCase.sh`.
 - **DXVK needs Vulkan**: Install `vulkan-tools`, `mesa-vulkan-drivers` or GPU drivers.
 - **-logToCon only in debug**: Available only with `RTS_BUILD_OPTION_DEBUG=ON`.
 - **SDL3 from source**: Fetched via CMake FetchContent. No system package needed.
@@ -164,6 +198,15 @@ Docker is the recommended build method on Linux hosts to ensure all toolchain re
 - **Windows executable icons (.ico)**: Windows builds embed `Generals/Code/Main/Generals.ico` and `GeneralsMD/Code/Main/Generals.ico` via `RTS.RC`. If source PNG icon assets (`assets/generalsx_icon.png` or `assets/generalsx-zh_icon.png`) are updated, regenerate the multi-resolution `.ico` files (sizes 16, 24, 32, 48, 64, 128, 256) to keep Windows executables in sync.
 
 ## Testing & Validation
+### War Powers fixture regressions (no engine build)
+```bash
+CXX=clang++ python3 scripts/qa/test-keyboard-modifiers.py
+CXX=clang++ python3 scripts/qa/test-sentence-hotkeys.py
+CXX=clang++ python3 scripts/qa/test-mip-filter.py
+CXX=clang++ python3 scripts/qa/test-surface-copy.py
+```
+The smoke, replay and GDB recipes below are inherited upstream procedures for native retail-data runs.
+
 ### Smoke test
 ```bash
 ./scripts/qa/smoke/docker-smoke-test-zh.sh linux64-deploy
@@ -183,6 +226,7 @@ mkdir -p logs && gdb -batch -ex "run -win" -ex "bt full" -ex "thread apply all b
 
 ## Branching & Sync
 ### TheSuperHackers upstream sync
+In this fork the remote is already present as `superhackers` (fetch-only, push disabled); merge on a branch here and open a pull request against this repository's `main`. Upstream's own recipe:
 ```bash
 git remote add thesuperhackers git@github.com:TheSuperHackers/GeneralsGameCode.git
 git fetch thesuperhackers
@@ -195,20 +239,19 @@ git merge thesuperhackers/main
 - Build system: merge carefully, test both versions
 
 ## Code Conventions
-- **Annotate changes**: `// GeneralsX @keyword author DD/MM/YYYY Description`
-- **Keywords**: `@bugfix` / `@feature` / `@performance` / `@refactor` / `@tweak` / `@build`
+- **Annotate changes**: `// WarPowers @fix|@feature|@refactor DD/MM/YYYY <why>` for fork changes; say why, not what
+- **Inherited annotations**: `// GeneralsX @keyword author DD/MM/YYYY Description` (keywords `@bugfix` / `@feature` / `@performance` / `@refactor` / `@tweak` / `@build`), `// GeneralsXWeb @...` and `// Igroteka @...` stay as they are
 - **Attribution**: Add upstream PR references with author and GitHub URL
 - **English only**: All code, comments, documentation
 - **No lazy code**: No empty stubs, empty catch blocks, or commented-out code
-- **Console Debug Logging**: For diagnostic/troubleshooting logs that must remain visible in release/non-debug builds (since `DEBUG_LOG` is disabled and compiled out in release builds), use `fprintf(stderr, ...)` paired with `fflush(stderr)` instead of `DEBUG_LOG` to output directly to the console.
+- **Console Debug Logging**: `DEBUG_LOG` is compiled out of release builds, so diagnostic output that must survive there goes through `Core/Libraries/Include/WPTrace.h`. `WP_TRACE(...)` prints to stderr only while `IG_TRACE` is set (the browser shell sets it with `?debug=1`); `wpEnvEnabled("WP_SOMETHING")` gates a dedicated switch. Do not add unconditional `fprintf(stderr, ...)` calls or output that fires during ordinary play.
   - ✗ *Wrong (compiled out in release builds)*:
     ```cpp
     DEBUG_LOG(("LanLobbyMenuInit - SetLocalIP ok %d.%d.%d.%d", PRINTF_IP_AS_4_INTS(IP)));
     ```
-  - ✓ *Right (will print to console in release/testing environments)*:
+  - ✓ *Right (visible in release builds when tracing is enabled)*:
     ```cpp
-    fprintf(stderr, "[LAN86] LanLobbyMenuInit SetLocalIP ok %d.%d.%d.%d\n", PRINTF_IP_AS_4_INTS(IP));
-    fflush(stderr);
+    WP_TRACE("[LAN86] LanLobbyMenuInit SetLocalIP ok %d.%d.%d.%d\n", PRINTF_IP_AS_4_INTS(IP));
     ```
 
 ## GitHub PR/Issue Formatting
@@ -227,17 +270,15 @@ git merge thesuperhackers/main
 - Primary labels: `[Linux]`, `[macOS]`, `[Linux] Pipeline: Build + Deploy + Run ZH`
 
 ## Docs Workflow
-1. Monthly diary in `docs/WORKLOG/YYYY-MM-DIARY.md` (YYYY=year, MM=month only, e.g., `2026-05-DIARY.md`), always including the standard AI-generated content disclosure note at the top
+Inherited GeneralsX workflow (see the note at the top of [.github/instructions/docs.instructions.md](.github/instructions/docs.instructions.md)); War Powers does not require diary entries or session reports.
+1. Monthly diary in `docs/WORKLOG/YYYY-MM-DIARY.md` (YYYY=year, MM=month only, e.g., `2026-05-DIARY.md`), always including the standard AI-generated content disclosure note at the top; newest entry first
 2. Active work notes in `docs/WORKDIR/` (phases/planning/reports/support/audit/lessons)
 3. Step-by-step tutorials in `docs/HOWTO/` (user-facing guides for common tasks)
 4. Never drop working docs directly under `docs/` root
 
 ## GitHub CLI Examples
 
-> [!IMPORTANT]
-> When running `gh` commands within the agent sandbox environment, if `GITHUB_TOKEN=github_pat_antigravitydummytoken` is present, it will override local credentials and cause `HTTP 401: Bad credentials`. Unset the dummy token by prepending `env -u GITHUB_TOKEN -u GH_TOKEN` to your `gh` commands.
-> 
-> Example: `env -u GITHUB_TOKEN -u GH_TOKEN gh pr create ...`
+Issues and pull requests go to this repository (engine) or the parent repository (game content, web shell); see CONTRIBUTING.md.
 
 **Create issues:**
 ```bash
@@ -266,8 +307,9 @@ printf "%s" "$body" | rg '\\n' && echo "HAS_LITERAL_BACKSLASH_N=YES" || echo "HA
 ```
 
 ## Build Presets Reference
+- **wasm** – Emscripten browser build, production (PRIMARY: War Powers product target)
+- **wasm-harness** – wasm plus `WP_HARNESS=ON` diagnostic hooks, builds under `build/wasm-harness`
 - **linux64-deploy** – GCC/Clang x86_64, Release (PRIMARY LINUX)
-- **linux64-testing** – Debug variant
 - **macos-vulkan** – macOS ARM64, RelWithDebInfo (PRIMARY MACOS)
 - **mingw-w64-i686** – MinGW cross-compile (exploratory)
 - **vc6** – Visual Studio 6, 32-bit (legacy)
@@ -277,7 +319,8 @@ printf "%s" "$body" | rg '\\n' && echo "HAS_LITERAL_BACKSLASH_N=YES" || echo "HA
 - `GeneralsMD/`: Zero Hour.
 - `Generals/`: base game.
 - `Core/`: shared libraries.
-- `references/`: fbraz3-dxvk
+- `wasm/`: browser build glue (d8web bridge, compatibility shims, unsupported `experimental/` prototype).
+- `references/`: `fbraz3-dxvk` (submodule tracking the War Powers DXVK fork) and `OpenSAGE.BlenderPlugin`.
 - `docs/WORKDIR/`: current work docs.
 - `docs/HOWTO/`: user-facing step-by-step tutorials (SagePatch config, etc.)
 - `logs/`: build/run/debug logs.
@@ -292,6 +335,7 @@ The `**` at applyTo means all files, you MUST load it everytime.
 
 | Instruction File | applyTo | Purpose |
 |---|---|---|
+| [.github/instructions/generalsx.instructions.md](.github/instructions/generalsx.instructions.md) | `**` | Points at this file as the source of truth |
 | [.github/instructions/git-commit.instructions.md](.github/instructions/git-commit.instructions.md) | `**` | Commit/PR message standards |
 | [.github/instructions/cpp-conventions.instructions.md](.github/instructions/cpp-conventions.instructions.md) | `**/*.{cpp,h,hpp,c}` | Code style, annotations, platform isolation |
 | [.github/instructions/build.instructions.md](.github/instructions/build.instructions.md) | `cmake/**,CMakeLists.txt,CMakePresets.json` | Build presets, DXVK source of truth |

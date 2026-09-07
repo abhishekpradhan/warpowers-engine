@@ -65,6 +65,21 @@ target_include_directories(z_generals PRIVATE
     ${CMAKE_CURRENT_BINARY_DIR}
 )
 
+# WarPowers @feature 07/09/2026 build id for the boot banner: wp_build_id.h is
+# regenerated on every build from `git describe --always --dirty` (or "unknown"),
+# and only rewritten when the id changes so nothing relinks needlessly.
+set(WP_BUILD_ID_HEADER "${CMAKE_CURRENT_BINARY_DIR}/wp_build_id.h")
+add_custom_target(wp_build_id
+    COMMAND ${CMAKE_COMMAND}
+        -DWP_BUILD_ID_HEADER=${WP_BUILD_ID_HEADER}
+        -DWP_SOURCE_DIR=${CMAKE_SOURCE_DIR}
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/wp_build_id.cmake
+    BYPRODUCTS ${WP_BUILD_ID_HEADER}
+    COMMENT "Refreshing War Powers build id"
+    VERBATIM
+)
+add_dependencies(z_generals wp_build_id)
+
 target_sources(z_generals PRIVATE
     $<$<BOOL:${WIN32}>:WinMain.cpp>
     $<$<BOOL:${WIN32}>:WinMain.h>

@@ -2,6 +2,13 @@
 applyTo: '**/*.md'
 ---
 
+> War Powers note: the guidelines below are inherited from GeneralsX and
+> describe that project's documentation workflow (`docs/WORKDIR/` phases and
+> session reports, the AI-generated `docs/WORKLOG/` diaries). They are kept so
+> that upstream merges stay easy; they are not asks on War Powers
+> contributors. The fork's own documentation is `README.md`, `CONTRIBUTING.md`,
+> `SECURITY.md` and `AGENTS.md`, and issues are tracked on GitHub.
+
 ## Documentation Guidelines
 
 - All documentation **MUST BE** in English
@@ -27,7 +34,7 @@ applyTo: '**/*.md'
 - **Phase planning** (`docs/WORKDIR/phases/PHASEXX_*.md`): Update `[x]` checklist at session end
 - **Technical discoveries**: Place in `docs/WORKDIR/support/` (e.g., `CRITICAL_VFS_DISCOVERY.md`)
 - **Lessons learned** (`docs/WORKDIR/lessons/LESSONS_LEARNED.md`): Key takeaways from phases and work cycles
-- **Known Issues**: Track in [GitHub Issues](https://github.com/fbraz3/GeneralsX/issues/) — do NOT create new markdown issue files
+- **Known Issues**: Track in [GitHub Issues](https://github.com/abhishekpradhan/warpowers-engine/issues) — do NOT create new markdown issue files
 
 ## Documentation Organization
 
@@ -121,7 +128,7 @@ applyTo: '**/*.md'
 
 ## Issue Tracking — GitHub is the Source of Truth
 
-**CRITICAL POLICY**: All issues, bugs, feature requests, and enhancements MUST be tracked in **GitHub Issues** (`https://github.com/fbraz3/GeneralsX/issues/`), NOT in markdown documentation.
+**CRITICAL POLICY**: All issues, bugs, feature requests, and enhancements MUST be tracked in **GitHub Issues** (`https://github.com/abhishekpradhan/warpowers-engine/issues`), NOT in markdown documentation. Game content, maps, art, missions and web-shell problems belong to the parent repository's issues (`https://github.com/abhishekpradhan/warpowers/issues`).
 
 ### Why GitHub is Source of Truth
 - **Single source**: One place to track status, assign ownership, and manage priorities

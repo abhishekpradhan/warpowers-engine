@@ -31,6 +31,7 @@
 #include <stdexcept>
 #include <cstdio>
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
+#include "WPTrace.h"
 #include "GameClient/GameClient.h"
 
 // USER INCLUDES //////////////////////////////////////////////////////////////
@@ -545,7 +546,7 @@ void GameClient::update()
 			m_intro = nullptr;
 
 			TheShell->showShellMap(TRUE);
-			// WarPowers @fix: with the WP_BOOT_MAP direct boot the match is
+			// WarPowers @fix 24/08/2026 with the WP_BOOT_MAP direct boot the match is
 			// already running when the intro state machine finishes — don't
 			// raise the main menu over it. (-file avoided this only via the
 			// initialFile guard inside showShell.)
@@ -857,14 +858,9 @@ void GameClient::updateFakeDrawables()
  */
 void GameClient::destroyDrawable( Drawable *draw )
 {
-	{
-		// WarPowers @debug IG_TRACE death-path breadcrumb
-		static int wpT = -1;
-		if (wpT < 0) { const char* e = getenv("IG_TRACE"); wpT = (e && *e && *e != '0') ? 1 : 0; }
-		if (wpT)
-			fprintf(stderr, "[DEATH] destroyDrawable tmpl=%s\n",
-				draw->getTemplate() ? draw->getTemplate()->getName().str() : "?");
-	}
+	// WarPowers @feature 23/08/2026 IG_TRACE death-path breadcrumb
+	WP_TRACE("[DEATH] destroyDrawable tmpl=%s\n",
+		draw->getTemplate() ? draw->getTemplate()->getName().str() : "?");
 
 	// remove any notion of the Drawable in the in-game user interface
 	TheInGameUI->disregardDrawable( draw );

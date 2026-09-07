@@ -29,6 +29,7 @@
 #ifndef _WIN32
 
 #include "SDL3GameEngine.h"
+#include "WPTrace.h"  // WarPowers: gate for the fork's boot traces
 // GeneralsX @build Mr. Meeseeks 16/06/2026 Make audio headers mutually exclusive to avoid redefinition conflicts
 #ifdef SAGE_USE_MINIAUDIO
 #include "MiniAudioDevice/MiniAudioManager.h"
@@ -39,15 +40,13 @@
 #include "SDL3Device/GameClient/SDL3Keyboard.h"
 #include "GameClient/Mouse.h"
 #include "GameClient/Keyboard.h"
-#include "GameClient/View.h"        // WarPowers @debug WP_CLICKTEST
-#include "GameClient/Display.h"     // WarPowers @debug WP_CLICKTEST
-#include "GameClient/InGameUI.h"    // WarPowers @debug WP_CLICKTEST
-#include "GameLogic/GameLogic.h"    // WarPowers @debug WP_CLICKTEST
-#include "GameLogic/Object.h"       // WarPowers @debug WP_CLICKTEST
-#include "Common/ThingTemplate.h"   // WarPowers @debug WP_CLICKTEST
-#include "Common/NameKeyGenerator.h"          // WarPowers @debug WP_CLICKTEST ui
-#include "Common/PlayerList.h"                // WarPowers @debug WP_CLICKTEST ui
-#include "GameLogic/Module/ProductionUpdate.h" // WarPowers @debug WP_CLICKTEST ui
+#if WP_HARNESS
+// WarPowers @refactor 07/09/2026 The WP_CLICKTEST state machine lives in
+// WarPowers/WPHarness.cpp (harness builds only); this file just fabricates
+// the SDL events for it, so it only needs the display size here.
+#include "GameClient/Display.h"
+#include "WarPowers/WPHarness.h"
+#endif
 #include "GameClient/GameWindow.h"
 #include "GameClient/GameWindowManager.h"
 #include "GameClient/Gadget.h"
@@ -171,11 +170,11 @@ SDL3GameEngine::~SDL3GameEngine()
  */
 void SDL3GameEngine::init(void)
 {
-	fprintf(stderr, "INFO: SDL3GameEngine::init() starting\n");
+	WP_TRACE("INFO: SDL3GameEngine::init() starting\n");
 
 	if (TheGlobalData && TheGlobalData->m_headless) {
 		// GeneralsX @bugfix Copilot 17/05/2026 Allow headless replay path to initialize engine subsystems without an SDL window.
-		fprintf(stderr, "INFO: SDL3GameEngine::init() headless mode - skipping SDL window binding\n");
+		WP_TRACE("INFO: SDL3GameEngine::init() headless mode - skipping SDL window binding\n");
 		m_SDLWindow = nullptr;
 		m_IsInitialized = true;
 		m_IsActive = true;
@@ -198,7 +197,7 @@ void SDL3GameEngine::init(void)
 	m_IsInitialized = true;
 	m_IsActive = true;
 
-	fprintf(stderr, "INFO: SDL3GameEngine using pre-initialized window\n");
+	WP_TRACE("INFO: SDL3GameEngine using pre-initialized window\n");
 
 	// Call parent init to initialize game subsystems
 	GameEngine::init();
@@ -218,6 +217,38 @@ void SDL3GameEngine::reset(void)
 	GameEngine::reset();
 }
 
+#if WP_HARNESS
+// WarPowers @refactor 07/09/2026 Platform half of WP_CLICKTEST: fabricates a
+// real SDL button event at the harness's internal display coordinates, scaled
+// to the window, and pushes it through SDL3Mouse::addSDLEvent so it takes the
+// exact path OS clicks take (Mouse::update -> raw messages -> translators).
+static Bool wpHarnessSendClick(void* context, Int ix, Int iy, Bool down, Real* windowX, Real* windowY)
+{
+	SDL_Window* window = static_cast<SDL_Window*>(context);
+	SDL3Mouse* mouse = TheMouse ? dynamic_cast<SDL3Mouse*>(TheMouse) : nullptr;
+	if (!window || !mouse || !TheDisplay)
+		return FALSE;
+	int winW = 0, winH = 0;
+	SDL_GetWindowSize(window, &winW, &winH);
+	const float wx = (float)ix * ((float)winW / (float)TheDisplay->getWidth());
+	const float wy = (float)iy * ((float)winH / (float)TheDisplay->getHeight());
+	SDL_Event ev;
+	memset(&ev, 0, sizeof(ev));
+	ev.type = down ? SDL_EVENT_MOUSE_BUTTON_DOWN : SDL_EVENT_MOUSE_BUTTON_UP;
+	ev.button.timestamp = SDL_GetTicksNS();
+	ev.button.windowID = SDL_GetWindowID(window);
+	ev.button.button = SDL_BUTTON_LEFT;
+	ev.button.down = down;
+	ev.button.clicks = 1;
+	ev.button.x = wx;
+	ev.button.y = wy;
+	mouse->addSDLEvent(&ev);
+	if (windowX) *windowX = wx;
+	if (windowY) *windowY = wy;
+	return TRUE;
+}
+#endif
+
 /**
  * From GameEngine: update() - per-frame update
  */
@@ -225,187 +256,13 @@ void SDL3GameEngine::update(void)
 {
 	pollSDL3Events();
 
-	// WarPowers @debug WP_CLICKTEST: self-driving mouse smoke test. Fabricates
-	// real SDL button events at the tank's projected screen position and
-	// pushes them through the exact path OS clicks take (addSDLEvent ->
-	// Mouse::update -> raw messages -> translators). Pair with
-	// WP_AUTOTEST=build so a tank exists. Env-gated.
-	{
-		static const Bool wp_click = getenv("WP_CLICKTEST") != nullptr;
-		if (wp_click && TheGameLogic && TheGameLogic->isInGame() && TheMouse && TheTacticalView && m_SDLWindow)
-		{
-			const UnsignedInt wp_f = TheGameLogic->getFrame();
-			static UnsignedInt wp_stage = 0;
-			static Coord3D wp_tankPos = {0,0,0};
-
-			SDL3Mouse* wp_mouse = dynamic_cast<SDL3Mouse*>(TheMouse);
-			auto wp_sendClick = [&](Int ix, Int iy, Bool down)
-			{
-				int winW = 0, winH = 0;
-				SDL_GetWindowSize(m_SDLWindow, &winW, &winH);
-				float wx = (float)ix * ((float)winW / (float)TheDisplay->getWidth());
-				float wy = (float)iy * ((float)winH / (float)TheDisplay->getHeight());
-				SDL_Event ev;
-				memset(&ev, 0, sizeof(ev));
-				ev.type = down ? SDL_EVENT_MOUSE_BUTTON_DOWN : SDL_EVENT_MOUSE_BUTTON_UP;
-				ev.button.timestamp = SDL_GetTicksNS();
-				ev.button.windowID = SDL_GetWindowID(m_SDLWindow);
-				ev.button.button = SDL_BUTTON_LEFT;
-				ev.button.down = down;
-				ev.button.clicks = 1;
-				ev.button.x = wx;
-				ev.button.y = wy;
-				wp_mouse->addSDLEvent(&ev);
-				fprintf(stderr, "[WP_CLICK] f=%u %s at internal (%d,%d) window (%.0f,%.0f)\n",
-					wp_f, down ? "DOWN" : "UP", ix, iy, wx, wy);
-				fflush(stderr);
-			};
-
-			static ICoord2D wp_pt = {0,0};
-			static const Bool wp_uiMode = getenv("WP_CLICKTEST") && strcmp(getenv("WP_CLICKTEST"), "ui") == 0;
-			if (wp_mouse && wp_uiMode)
-			{
-				// UI mode: human-path production — click the CC, click the
-				// build button in the ControlBar, verify the tank appears.
-				if (wp_stage == 0 && wp_f >= 120)
-				{
-					for (Object* o = TheGameLogic->getFirstObject(); o; o = o->getNextObject())
-					{
-						if (o->getTemplate()->getName() == "WP_CommandCenter" &&
-								o->getControllingPlayer() == ThePlayerList->getLocalPlayer())
-						{ wp_tankPos = *o->getPosition(); break; }
-					}
-					if (TheTacticalView->worldToScreen(&wp_tankPos, &wp_pt))
-					{
-						fprintf(stderr, "[WP_CLICK] f=%u UI: CC world (%.0f,%.0f) -> screen (%d,%d)\n",
-							wp_f, wp_tankPos.x, wp_tankPos.y, wp_pt.x, wp_pt.y);
-						wp_sendClick(wp_pt.x, wp_pt.y, TRUE);
-						wp_stage = 1;
-					}
-					else
-					{
-						static Bool wp_w2sLogged = FALSE;
-						if (!wp_w2sLogged)
-						{
-							fprintf(stderr, "[WP_CLICK] f=%u UI: worldToScreen FAILED for CC (%.0f,%.0f,%.0f) -> (%d,%d)\n",
-								wp_f, wp_tankPos.x, wp_tankPos.y, wp_tankPos.z, wp_pt.x, wp_pt.y);
-							fflush(stderr);
-							wp_w2sLogged = TRUE;
-						}
-					}
-				}
-				else if (wp_stage == 1) { wp_sendClick(wp_pt.x, wp_pt.y, FALSE); wp_stage = 2; }
-				else if (wp_stage == 2 && wp_f >= 180)
-				{
-					fprintf(stderr, "[WP_CLICK] f=%u UI: selectCount=%d\n", wp_f, (int)TheInGameUI->getSelectCount());
-					GameWindow *wp_btn = TheWindowManager->winGetWindowFromId(nullptr,
-						TheNameKeyGenerator->nameToKey("ControlBar.wnd:ButtonCommand01"));
-					if (wp_btn)
-					{
-						Int bx = 0, by = 0, bw = 0, bh = 0;
-						wp_btn->winGetScreenPosition(&bx, &by);
-						wp_btn->winGetSize(&bw, &bh);
-						fprintf(stderr, "[WP_CLICK] f=%u UI: ButtonCommand01 at (%d,%d) %dx%d hidden=%d enabled=%d\n",
-							wp_f, bx, by, bw, bh, (int)wp_btn->winIsHidden(),
-							(int)((wp_btn->winGetStatus() & WIN_STATUS_ENABLED) != 0));
-						wp_pt.x = bx + bw / 2;
-						wp_pt.y = by + bh / 2;
-						wp_sendClick(wp_pt.x, wp_pt.y, TRUE);
-						wp_stage = 3;
-					}
-					else
-					{
-						fprintf(stderr, "[WP_CLICK] f=%u UI FAIL: ButtonCommand01 window missing\n", wp_f);
-						wp_stage = 99;
-					}
-				}
-				else if (wp_stage == 3) { wp_sendClick(wp_pt.x, wp_pt.y, FALSE); wp_stage = 4; }
-				else if (wp_stage == 4 && wp_f >= 240)
-				{
-					for (Object* o = TheGameLogic->getFirstObject(); o; o = o->getNextObject())
-					{
-						if (o->getTemplate()->getName() == "WP_CommandCenter" &&
-								o->getControllingPlayer() == ThePlayerList->getLocalPlayer())
-						{
-							ProductionUpdateInterface *wp_pui = o->getProductionUpdateInterface();
-							fprintf(stderr, "[WP_CLICK] f=%u UI: CC prodQ=%d\n",
-								wp_f, wp_pui ? (int)wp_pui->getProductionCount() : -1);
-							break;
-						}
-					}
-					wp_stage = 5;
-				}
-				else if (wp_stage == 5 && wp_f >= 600)
-				{
-					Bool wp_found = FALSE;
-					for (Object* o = TheGameLogic->getFirstObject(); o; o = o->getNextObject())
-					{
-						if (o->getTemplate()->getName() == "WP_Tank")
-						{
-							fprintf(stderr, "[WP_CLICK] f=%u UI BUILD SUCCESS: tank at (%.0f,%.0f)\n",
-								wp_f, o->getPosition()->x, o->getPosition()->y);
-							wp_found = TRUE;
-							break;
-						}
-					}
-					if (!wp_found)
-						fprintf(stderr, "[WP_CLICK] f=%u UI BUILD FAIL: no tank spawned\n", wp_f);
-					wp_stage = 6;
-				}
-				fflush(stderr);
-			}
-			else if (wp_mouse)
-			{
-				if (wp_stage == 0 && wp_f >= 450)
-				{
-					// find the tank, click its screen position
-					for (Object* o = TheGameLogic->getFirstObject(); o; o = o->getNextObject())
-					{
-						if (o->getTemplate()->getName() == "WP_Tank") { wp_tankPos = *o->getPosition(); break; }
-					}
-					if (wp_tankPos.x != 0.0f && TheTacticalView->worldToScreen(&wp_tankPos, &wp_pt))
-					{
-						fprintf(stderr, "[WP_CLICK] f=%u tank world (%.0f,%.0f,%.0f) -> screen (%d,%d)\n",
-							wp_f, wp_tankPos.x, wp_tankPos.y, wp_tankPos.z, wp_pt.x, wp_pt.y);
-						wp_sendClick(wp_pt.x, wp_pt.y, TRUE);
-						wp_stage = 1;
-					}
-					else if (wp_f >= 500)
-					{
-						fprintf(stderr, "[WP_CLICK] f=%u FAIL: no tank or off-screen\n", wp_f);
-						wp_stage = 99;
-					}
-				}
-				else if (wp_stage == 1) { wp_sendClick(wp_pt.x, wp_pt.y, FALSE); wp_stage = 2; }
-				else if (wp_stage == 2 && wp_f >= 510)
-				{
-					fprintf(stderr, "[WP_CLICK] f=%u selectCount=%d\n", wp_f, (int)TheInGameUI->getSelectCount());
-					// click a ground point 100 world units east of the tank
-					Coord3D dest = wp_tankPos; dest.x += 100.0f;
-					if (TheTacticalView->worldToScreen(&dest, &wp_pt))
-					{
-						wp_sendClick(wp_pt.x, wp_pt.y, TRUE);
-						wp_stage = 3;
-					}
-					else wp_stage = 99;
-				}
-				else if (wp_stage == 3) { wp_sendClick(wp_pt.x, wp_pt.y, FALSE); wp_stage = 4; }
-				else if (wp_stage == 4 && wp_f >= 900)
-				{
-					for (Object* o = TheGameLogic->getFirstObject(); o; o = o->getNextObject())
-					{
-						if (o->getTemplate()->getName() == "WP_Tank")
-						{
-							fprintf(stderr, "[WP_CLICK] f=%u RESULT tank at (%.0f,%.0f) (started (%.0f,%.0f), move target x+100)\n",
-								wp_f, o->getPosition()->x, o->getPosition()->y, wp_tankPos.x, wp_tankPos.y);
-							break;
-						}
-					}
-					wp_stage = 5;
-				}
-			}
-		}
-	}
+#if WP_HARNESS
+	// WarPowers @refactor 07/09/2026 WP_CLICKTEST (WarPowers/WPHarness.cpp)
+	// drives the mouse through wpHarnessSendClick between the OS poll and the
+	// engine update, exactly where it ran inline before. Env-gated.
+	if (m_SDLWindow && TheMouse && dynamic_cast<SDL3Mouse*>(TheMouse) != nullptr)
+		WPHarness_ClickTest(wpHarnessSendClick, m_SDLWindow);
+#endif
 
 	GameEngine::update();
 }
@@ -415,9 +272,9 @@ void SDL3GameEngine::update(void)
  */
 void SDL3GameEngine::execute(void)
 {
-	fprintf(stderr, "INFO: SDL3GameEngine::execute() - entering main loop\n");
+	WP_TRACE("INFO: SDL3GameEngine::execute() - entering main loop\n");
 	GameEngine::execute();
-	fprintf(stderr, "INFO: SDL3GameEngine::execute() - exited main loop\n");
+	WP_TRACE("INFO: SDL3GameEngine::execute() - exited main loop\n");
 }
 
 /**
@@ -686,43 +543,43 @@ void SDL3GameEngine::handleWindowEvent(const SDL_WindowEvent& event)
 
 LocalFileSystem *SDL3GameEngine::createLocalFileSystem(void)
 {
-	fprintf(stderr, "INFO: SDL3GameEngine::createLocalFileSystem() -> StdLocalFileSystem\n");
+	WP_TRACE("INFO: SDL3GameEngine::createLocalFileSystem() -> StdLocalFileSystem\n");
 	return NEW StdLocalFileSystem;
 }
 
 ArchiveFileSystem *SDL3GameEngine::createArchiveFileSystem(void)
 {
-	fprintf(stderr, "INFO: SDL3GameEngine::createArchiveFileSystem() -> StdBIGFileSystem\n");
+	WP_TRACE("INFO: SDL3GameEngine::createArchiveFileSystem() -> StdBIGFileSystem\n");
 	return NEW StdBIGFileSystem;
 }
 
 GameLogic *SDL3GameEngine::createGameLogic(void)
 {
-	fprintf(stderr, "INFO: SDL3GameEngine::createGameLogic() -> W3DGameLogic\n");
+	WP_TRACE("INFO: SDL3GameEngine::createGameLogic() -> W3DGameLogic\n");
 	return NEW W3DGameLogic;
 }
 
 GameClient *SDL3GameEngine::createGameClient(void)
 {
-	fprintf(stderr, "INFO: SDL3GameEngine::createGameClient() -> W3DGameClient\n");
+	WP_TRACE("INFO: SDL3GameEngine::createGameClient() -> W3DGameClient\n");
 	return NEW W3DGameClient;
 }
 
 ModuleFactory *SDL3GameEngine::createModuleFactory(void)
 {
-	fprintf(stderr, "INFO: SDL3GameEngine::createModuleFactory() -> W3DModuleFactory\n");
+	WP_TRACE("INFO: SDL3GameEngine::createModuleFactory() -> W3DModuleFactory\n");
 	return NEW W3DModuleFactory;
 }
 
 ThingFactory *SDL3GameEngine::createThingFactory(void)
 {
-	fprintf(stderr, "INFO: SDL3GameEngine::createThingFactory() -> W3DThingFactory\n");
+	WP_TRACE("INFO: SDL3GameEngine::createThingFactory() -> W3DThingFactory\n");
 	return NEW W3DThingFactory;
 }
 
 FunctionLexicon *SDL3GameEngine::createFunctionLexicon(void)
 {
-	fprintf(stderr, "INFO: SDL3GameEngine::createFunctionLexicon() -> W3DFunctionLexicon\n");
+	WP_TRACE("INFO: SDL3GameEngine::createFunctionLexicon() -> W3DFunctionLexicon\n");
 	return NEW W3DFunctionLexicon;
 }
 
@@ -733,10 +590,10 @@ Radar *SDL3GameEngine::createRadar(Bool dummy)
 	// Upstream reference: Win32GameEngine headless factory behavior, TheSuperHackers/GeneralsGameCode
 	// https://github.com/TheSuperHackers/GeneralsGameCode
 	if (dummy) {
-		fprintf(stderr, "INFO: SDL3GameEngine::createRadar() -> RadarDummy (headless)\n");
+		WP_TRACE("INFO: SDL3GameEngine::createRadar() -> RadarDummy (headless)\n");
 		return NEW RadarDummy;
 	}
-	fprintf(stderr, "INFO: SDL3GameEngine::createRadar() -> W3DRadar\n");
+	WP_TRACE("INFO: SDL3GameEngine::createRadar() -> W3DRadar\n");
 	return NEW W3DRadar;
 }
 
@@ -745,10 +602,10 @@ ParticleSystemManager* SDL3GameEngine::createParticleSystemManager(Bool dummy)
 {
 	// GeneralsX @bugfix fbraz 04/05/2026 Respect headless mode and create dummy particle manager.
 	if (dummy) {
-		fprintf(stderr, "INFO: SDL3GameEngine::createParticleSystemManager() -> ParticleSystemManagerDummy (headless)\n");
+		WP_TRACE("INFO: SDL3GameEngine::createParticleSystemManager() -> ParticleSystemManagerDummy (headless)\n");
 		return NEW ParticleSystemManagerDummy;
 	}
-	fprintf(stderr, "INFO: SDL3GameEngine::createParticleSystemManager() -> W3DParticleSystemManager\n");
+	WP_TRACE("INFO: SDL3GameEngine::createParticleSystemManager() -> W3DParticleSystemManager\n");
 	return NEW W3DParticleSystemManager;
 }
 
@@ -768,7 +625,7 @@ WebBrowser *SDL3GameEngine::createWebBrowser(void)
 AudioManager *SDL3GameEngine::createAudioManager(Bool dummy)
 {
 	(void)dummy;
-	fprintf(stderr, "INFO: SDL3GameEngine::createAudioManager()\n");
+	WP_TRACE("INFO: SDL3GameEngine::createAudioManager()\n");
 
 #ifdef SAGE_USE_MINIAUDIO
 	fprintf(stderr, "INFO: Creating MiniAudio audio backend\n");

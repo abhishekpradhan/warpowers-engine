@@ -1,4 +1,7 @@
 <!doctype html>
+<!-- Part of the GeneralsXWeb WebRTC LAN prototype, kept under wasm/experimental/
+     for reference: unsupported, not built or staged by War Powers. GPL-3.0 via the
+     repository LICENSE.md; provenance and usage in README.md next to this file. -->
 <html lang="en">
 <head>
   <meta charset="utf-8">
@@ -46,20 +49,26 @@
     // WebRTC multiplayer: route the UDP-over-DataChannel bridge's logs into this
     // panel and configure which cafe room to join. Two windows on the same room
     // (?room=foo) discover each other in the in-game LAN lobby.
-    //   boot.html?room=duel&player=alice
+    //   boot.html?cafe=https://your-signalling-server&room=duel&player=alice
     window.__udplog = function(m) { log(m); };
     (function() {
       var p = new URLSearchParams(location.search);
-      window.CAFE_ENABLE = true; // dev harness always joins a lobby room
-      window.CAFE_URL  = p.get('cafe')   || 'https://cafe-nw.mrz.sh';
+      // There is no default signalling server: pass ?cafe=https://... (see
+      // README.md in this directory). Without it the page boots single-player
+      // and never opens a lobby socket.
+      window.CAFE_URL  = p.get('cafe')   || '';
+      window.CAFE_ENABLE = window.CAFE_URL.length > 0;
       window.CAFE_ROOM = p.get('room')   || 'lan';
       window.CAFE_NAME = p.get('player') || ('gx-' + Math.floor(Math.random() * 1e4));
       window.CAFE_TOKEN = p.get('token') || null; // set when testing a private room
       // Autopilot: ?host=1 auto-creates the game, ?autojoin=1 auto-joins the host.
-      // Lets Igroteka gather a party then open each tab straight into the match.
+      // Lets a party gather, then open each tab straight into the match.
       window.CAFE_AUTO = p.get('host') ? 'host' : (p.get('autojoin') ? 'join' : '');
-      log('[cafe] room=' + window.CAFE_ROOM + ' name=' + window.CAFE_NAME +
-          (window.CAFE_AUTO ? ' auto=' + window.CAFE_AUTO : ''));
+      if (window.CAFE_ENABLE)
+        log('[cafe] server=' + window.CAFE_URL + ' room=' + window.CAFE_ROOM +
+            ' name=' + window.CAFE_NAME + (window.CAFE_AUTO ? ' auto=' + window.CAFE_AUTO : ''));
+      else
+        log('[cafe] no signalling server given (?cafe=https://...); single-player boot');
     })();
 
     // Room + connection HUD (top-right). Shows the room code so players don't get

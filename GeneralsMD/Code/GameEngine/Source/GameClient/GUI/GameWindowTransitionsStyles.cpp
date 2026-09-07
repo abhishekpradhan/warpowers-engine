@@ -110,7 +110,7 @@ void FlashTransition::init( GameWindow *win )
 
 void FlashTransition::update( Int frame )
 {
-	// WarPowers @bugfix null-guard: window may have been destroyed (unlinked) mid-transition
+	// WarPowers @fix 24/08/2026 null-guard: window may have been destroyed (unlinked) mid-transition
 	if (!m_win) { m_isFinished = TRUE; return; }
 	m_drawState = -1;
 	if(frame < FLASHTRANSITION_START || frame > FLASHTRANSITION_END)
@@ -183,7 +183,7 @@ void FlashTransition::reverse()
 
 void FlashTransition::draw()
 {
-	// WarPowers @bugfix null-guard: window may have been destroyed (unlinked) mid-transition
+	// WarPowers @fix 24/08/2026 null-guard: window may have been destroyed (unlinked) mid-transition
 	if (!m_win) return;
 	switch (m_drawState)
 	{
@@ -234,7 +234,7 @@ void FlashTransition::draw()
 
 void FlashTransition::skip()
 {
-	// WarPowers @bugfix null-guard: window may have been destroyed (unlinked) mid-transition
+	// WarPowers @fix 24/08/2026 null-guard: window may have been destroyed (unlinked) mid-transition
 	if (!m_win) return;
 	update(FLASHTRANSITION_END);
 }
@@ -272,7 +272,7 @@ void ButtonFlashTransition::init( GameWindow *win )
 
 void ButtonFlashTransition::update( Int frame )
 {
-	// WarPowers @bugfix null-guard: window may have been destroyed (unlinked) mid-transition
+	// WarPowers @fix 24/08/2026 null-guard: window may have been destroyed (unlinked) mid-transition
 	if (!m_win) { m_isFinished = TRUE; return; }
 	m_drawState = -1;
 	if(frame < BUTTONFLASHTRANSITION_START || frame > BUTTONFLASHTRANSITION_END)
@@ -506,7 +506,7 @@ void ButtonFlashTransition::reverse()
 
 void ButtonFlashTransition::draw()
 {
-	// WarPowers @bugfix null-guard: window may have been destroyed (unlinked) mid-transition
+	// WarPowers @fix 24/08/2026 null-guard: window may have been destroyed (unlinked) mid-transition
 	if (!m_win) return;
 	switch (m_drawState)
 	{
@@ -614,7 +614,7 @@ void ButtonFlashTransition::draw()
 
 void ButtonFlashTransition::skip()
 {
-	// WarPowers @bugfix null-guard: window may have been destroyed (unlinked) mid-transition
+	// WarPowers @fix 24/08/2026 null-guard: window may have been destroyed (unlinked) mid-transition
 	if (!m_win) return;
 	update(BUTTONFLASHTRANSITION_END);
 }
@@ -651,7 +651,7 @@ void FadeTransition::init( GameWindow *win )
 
 void FadeTransition::update( Int frame )
 {
-	// WarPowers @bugfix null-guard: window may have been destroyed (unlinked) mid-transition
+	// WarPowers @fix 24/08/2026 null-guard: window may have been destroyed (unlinked) mid-transition
 	if (!m_win) { m_isFinished = TRUE; return; }
 	m_drawState = -1;
 	if(frame < FADETRANSITION_START || frame > FADETRANSITION_END)
@@ -701,7 +701,7 @@ void FadeTransition::reverse()
 
 void FadeTransition::draw()
 {
-	// WarPowers @bugfix null-guard: window may have been destroyed (unlinked) mid-transition
+	// WarPowers @fix 24/08/2026 null-guard: window may have been destroyed (unlinked) mid-transition
 	if (!m_win) return;
 	if(!m_win)
 		return;
@@ -759,7 +759,7 @@ void FadeTransition::draw()
 
 void FadeTransition::skip()
 {
-	// WarPowers @bugfix null-guard: window may have been destroyed (unlinked) mid-transition
+	// WarPowers @fix 24/08/2026 null-guard: window may have been destroyed (unlinked) mid-transition
 	if (!m_win) return;
 	update(FADETRANSITION_END);
 }
@@ -800,7 +800,7 @@ void ScaleUpTransition::init( GameWindow *win )
 
 void ScaleUpTransition::update( Int frame )
 {
-	// WarPowers @bugfix null-guard: window may have been destroyed (unlinked) mid-transition
+	// WarPowers @fix 24/08/2026 null-guard: window may have been destroyed (unlinked) mid-transition
 	if (!m_win) { m_isFinished = TRUE; return; }
 	m_drawState = -1;
 	if(frame < SCALEUPTRANSITION_START || frame > SCALEUPTRANSITION_END)
@@ -871,7 +871,7 @@ void ScaleUpTransition::reverse()
 
 void ScaleUpTransition::draw()
 {
-	// WarPowers @bugfix null-guard: window may have been destroyed (unlinked) mid-transition
+	// WarPowers @fix 24/08/2026 null-guard: window may have been destroyed (unlinked) mid-transition
 	if (!m_win) return;
 	if(!m_win)
 		return;
@@ -887,7 +887,7 @@ void ScaleUpTransition::draw()
 
 void ScaleUpTransition::skip()
 {
-	// WarPowers @bugfix null-guard: window may have been destroyed (unlinked) mid-transition
+	// WarPowers @fix 24/08/2026 null-guard: window may have been destroyed (unlinked) mid-transition
 	if (!m_win) return;
 	update(SCALEUPTRANSITION_END);
 }
@@ -929,7 +929,7 @@ void ScoreScaleUpTransition::init( GameWindow *win )
 
 void ScoreScaleUpTransition::update( Int frame )
 {
-	// WarPowers @bugfix null-guard: window may have been destroyed (unlinked) mid-transition
+	// WarPowers @fix 24/08/2026 null-guard: window may have been destroyed (unlinked) mid-transition
 	if (!m_win) { m_isFinished = TRUE; return; }
 	m_drawState = -1;
 	if(frame < SCORESCALEUPTRANSITION_START || frame > SCORESCALEUPTRANSITION_END)
@@ -1000,7 +1000,7 @@ void ScoreScaleUpTransition::reverse()
 
 void ScoreScaleUpTransition::draw()
 {
-	// WarPowers @bugfix null-guard: window may have been destroyed (unlinked) mid-transition
+	// WarPowers @fix 24/08/2026 null-guard: window may have been destroyed (unlinked) mid-transition
 	if (!m_win) return;
 	if(!m_win)
 		return;
@@ -1016,7 +1016,7 @@ void ScoreScaleUpTransition::draw()
 
 void ScoreScaleUpTransition::skip()
 {
-	// WarPowers @bugfix null-guard: window may have been destroyed (unlinked) mid-transition
+	// WarPowers @fix 24/08/2026 null-guard: window may have been destroyed (unlinked) mid-transition
 	if (!m_win) return;
 	update(SCORESCALEUPTRANSITION_END);
 }
@@ -1066,7 +1066,7 @@ void MainMenuScaleUpTransition::init( GameWindow *win )
 
 void MainMenuScaleUpTransition::update( Int frame )
 {
-	// WarPowers @bugfix null-guard: window may have been destroyed (unlinked) mid-transition
+	// WarPowers @fix 24/08/2026 null-guard: window may have been destroyed (unlinked) mid-transition
 	if (!m_win) { m_isFinished = TRUE; return; }
 	m_drawState = -1;
 	if(frame < MAINMENUSCALEUPTRANSITION_START || frame > MAINMENUSCALEUPTRANSITION_END)
@@ -1123,7 +1123,7 @@ void MainMenuScaleUpTransition::reverse()
 
 void MainMenuScaleUpTransition::draw()
 {
-	// WarPowers @bugfix null-guard: window may have been destroyed (unlinked) mid-transition
+	// WarPowers @fix 24/08/2026 null-guard: window may have been destroyed (unlinked) mid-transition
 	if (!m_win) return;
 	if(!m_win)
 		return;
@@ -1139,7 +1139,7 @@ void MainMenuScaleUpTransition::draw()
 
 void MainMenuScaleUpTransition::skip()
 {
-	// WarPowers @bugfix null-guard: window may have been destroyed (unlinked) mid-transition
+	// WarPowers @fix 24/08/2026 null-guard: window may have been destroyed (unlinked) mid-transition
 	if (!m_win) return;
 	update(MAINMENUSCALEUPTRANSITION_END);
 }
@@ -1191,7 +1191,7 @@ void MainMenuMediumScaleUpTransition::init( GameWindow *win )
 
 void MainMenuMediumScaleUpTransition::update( Int frame )
 {
-	// WarPowers @bugfix null-guard: window may have been destroyed (unlinked) mid-transition
+	// WarPowers @fix 24/08/2026 null-guard: window may have been destroyed (unlinked) mid-transition
 	if (!m_win) { m_isFinished = TRUE; return; }
 	m_drawState = -1;
 	if(frame < MAINMENUMEDIUMSCALEUPTRANSITION_START || frame > MAINMENUMEDIUMSCALEUPTRANSITION_END)
@@ -1249,7 +1249,7 @@ void MainMenuMediumScaleUpTransition::reverse()
 
 void MainMenuMediumScaleUpTransition::draw()
 {
-	// WarPowers @bugfix null-guard: window may have been destroyed (unlinked) mid-transition
+	// WarPowers @fix 24/08/2026 null-guard: window may have been destroyed (unlinked) mid-transition
 	if (!m_win) return;
 	if(!m_win)
 		return;
@@ -1265,7 +1265,7 @@ void MainMenuMediumScaleUpTransition::draw()
 
 void MainMenuMediumScaleUpTransition::skip()
 {
-	// WarPowers @bugfix null-guard: window may have been destroyed (unlinked) mid-transition
+	// WarPowers @fix 24/08/2026 null-guard: window may have been destroyed (unlinked) mid-transition
 	if (!m_win) return;
 	update(MAINMENUMEDIUMSCALEUPTRANSITION_END);
 }
@@ -1316,7 +1316,7 @@ void MainMenuSmallScaleDownTransition::init( GameWindow *win )
 
 void MainMenuSmallScaleDownTransition::update( Int frame )
 {
-	// WarPowers @bugfix null-guard: window may have been destroyed (unlinked) mid-transition
+	// WarPowers @fix 24/08/2026 null-guard: window may have been destroyed (unlinked) mid-transition
 	if (!m_win) { m_isFinished = TRUE; return; }
 	m_drawState = -1;
 	if(frame < MAINMENUSMALLSCALEDOWNTRANSITION_START || frame > MAINMENUSMALLSCALEDOWNTRANSITION_END)
@@ -1366,7 +1366,7 @@ void MainMenuSmallScaleDownTransition::reverse()
 
 void MainMenuSmallScaleDownTransition::draw()
 {
-	// WarPowers @bugfix null-guard: window may have been destroyed (unlinked) mid-transition
+	// WarPowers @fix 24/08/2026 null-guard: window may have been destroyed (unlinked) mid-transition
 	if (!m_win) return;
 	if(!m_win)
 		return;
@@ -1382,7 +1382,7 @@ void MainMenuSmallScaleDownTransition::draw()
 
 void MainMenuSmallScaleDownTransition::skip()
 {
-	// WarPowers @bugfix null-guard: window may have been destroyed (unlinked) mid-transition
+	// WarPowers @fix 24/08/2026 null-guard: window may have been destroyed (unlinked) mid-transition
 	if (!m_win) return;
 	update(MAINMENUSMALLSCALEDOWNTRANSITION_END);
 }
@@ -1427,7 +1427,7 @@ void TextTypeTransition::init( GameWindow *win )
 
 void TextTypeTransition::update( Int frame )
 {
-	// WarPowers @bugfix null-guard: window may have been destroyed (unlinked) mid-transition
+	// WarPowers @fix 24/08/2026 null-guard: window may have been destroyed (unlinked) mid-transition
 	if (!m_win) { m_isFinished = TRUE; return; }
 	m_drawState = -1;
 	if(frame < TEXTTYPETRANSITION_START || frame > TEXTTYPETRANSITION_END)
@@ -1489,7 +1489,7 @@ void TextTypeTransition::reverse()
 
 void TextTypeTransition::draw()
 {
-	// WarPowers @bugfix null-guard: window may have been destroyed (unlinked) mid-transition
+	// WarPowers @fix 24/08/2026 null-guard: window may have been destroyed (unlinked) mid-transition
 	if (!m_win) return;
 	if(m_drawState > TEXTTYPETRANSITION_START && m_drawState < m_frameLength)
 	{
@@ -1500,7 +1500,7 @@ void TextTypeTransition::draw()
 
 void TextTypeTransition::skip()
 {
-	// WarPowers @bugfix null-guard: window may have been destroyed (unlinked) mid-transition
+	// WarPowers @fix 24/08/2026 null-guard: window may have been destroyed (unlinked) mid-transition
 	if (!m_win) return;
 	update(TEXTTYPETRANSITION_END);
 }
@@ -1572,7 +1572,7 @@ void CountUpTransition::init( GameWindow *win )
 
 void CountUpTransition::update( Int frame )
 {
-	// WarPowers @bugfix null-guard: window may have been destroyed (unlinked) mid-transition
+	// WarPowers @fix 24/08/2026 null-guard: window may have been destroyed (unlinked) mid-transition
 	if (!m_win) { m_isFinished = TRUE; return; }
 	m_drawState = -1;
 	if(frame < COUNTUPTRANSITION_START || frame > COUNTUPTRANSITION_END)
@@ -1649,13 +1649,13 @@ void CountUpTransition::reverse()
 
 void CountUpTransition::draw()
 {
-	// WarPowers @bugfix null-guard: window may have been destroyed (unlinked) mid-transition
+	// WarPowers @fix 24/08/2026 null-guard: window may have been destroyed (unlinked) mid-transition
 	if (!m_win) return;
 }
 
 void CountUpTransition::skip()
 {
-	// WarPowers @bugfix null-guard: window may have been destroyed (unlinked) mid-transition
+	// WarPowers @fix 24/08/2026 null-guard: window may have been destroyed (unlinked) mid-transition
 	if (!m_win) return;
 	if (!m_isFinished)
 		update(COUNTUPTRANSITION_END);
@@ -1695,7 +1695,7 @@ void ScreenFadeTransition::init( GameWindow *win )
 
 void ScreenFadeTransition::update( Int frame )
 {
-	// WarPowers @bugfix null-guard: window may have been destroyed (unlinked) mid-transition
+	// WarPowers @fix 24/08/2026 null-guard: window may have been destroyed (unlinked) mid-transition
 	if (!m_win) { m_isFinished = TRUE; return; }
 	m_drawState = -1;
 	if(frame < SCREENFADETRANSITION_START || frame > SCREENFADETRANSITION_END)
@@ -1725,7 +1725,7 @@ void ScreenFadeTransition::reverse()
 
 void ScreenFadeTransition::draw()
 {
-	// WarPowers @bugfix null-guard: window may have been destroyed (unlinked) mid-transition
+	// WarPowers @fix 24/08/2026 null-guard: window may have been destroyed (unlinked) mid-transition
 	if (!m_win) return;
 	Int alpha = m_percent*255 *m_drawState;
 	if(alpha > 255)
@@ -1736,7 +1736,7 @@ void ScreenFadeTransition::draw()
 
 void ScreenFadeTransition::skip()
 {
-	// WarPowers @bugfix null-guard: window may have been destroyed (unlinked) mid-transition
+	// WarPowers @fix 24/08/2026 null-guard: window may have been destroyed (unlinked) mid-transition
 	if (!m_win) return;
 	update(SCREENFADETRANSITION_END);
 }
@@ -1794,7 +1794,7 @@ void ControlBarArrowTransition::init( GameWindow *win )
 
 void ControlBarArrowTransition::update( Int frame )
 {
-	// WarPowers @bugfix null-guard: window may have been destroyed (unlinked) mid-transition
+	// WarPowers @fix 24/08/2026 null-guard: window may have been destroyed (unlinked) mid-transition
 	if (!m_win) { m_isFinished = TRUE; return; }
 	m_drawState = -1;
 	if(frame < CONTROLBARARROWTRANSITION_START || frame > CONTROLBARARROWTRANSITION_END)
@@ -1824,7 +1824,7 @@ void ControlBarArrowTransition::reverse()
 
 void ControlBarArrowTransition::draw()
 {
-	// WarPowers @bugfix null-guard: window may have been destroyed (unlinked) mid-transition
+	// WarPowers @fix 24/08/2026 null-guard: window may have been destroyed (unlinked) mid-transition
 	if (!m_win) return;
 	if(m_drawState < CONTROLBARARROWTRANSITION_START)
 		return;
@@ -1848,7 +1848,7 @@ void ControlBarArrowTransition::draw()
 
 void ControlBarArrowTransition::skip()
 {
-	// WarPowers @bugfix null-guard: window may have been destroyed (unlinked) mid-transition
+	// WarPowers @fix 24/08/2026 null-guard: window may have been destroyed (unlinked) mid-transition
 	if (!m_win) return;
 	update(CONTROLBARARROWTRANSITION_END);
 }
@@ -1895,7 +1895,7 @@ void FullFadeTransition::init( GameWindow *win )
 
 void FullFadeTransition::update( Int frame )
 {
-	// WarPowers @bugfix null-guard: window may have been destroyed (unlinked) mid-transition
+	// WarPowers @fix 24/08/2026 null-guard: window may have been destroyed (unlinked) mid-transition
 	if (!m_win) { m_isFinished = TRUE; return; }
 	m_drawState = -1;
 	if(frame < FULLFADETRANSITION_START || frame > FULLFADETRANSITION_END)
@@ -1942,7 +1942,7 @@ void FullFadeTransition::reverse()
 
 void FullFadeTransition::draw()
 {
-	// WarPowers @bugfix null-guard: window may have been destroyed (unlinked) mid-transition
+	// WarPowers @fix 24/08/2026 null-guard: window may have been destroyed (unlinked) mid-transition
 	if (!m_win) return;
 	Int alpha;
 	if(m_drawState > (FULLFADETRANSITION_END/2))
@@ -1957,7 +1957,7 @@ void FullFadeTransition::draw()
 
 void FullFadeTransition::skip()
 {
-	// WarPowers @bugfix null-guard: window may have been destroyed (unlinked) mid-transition
+	// WarPowers @fix 24/08/2026 null-guard: window may have been destroyed (unlinked) mid-transition
 	if (!m_win) return;
 	update(FULLFADETRANSITION_END);
 }
@@ -2003,7 +2003,7 @@ void TextOnFrameTransition::init( GameWindow *win )
 
 void TextOnFrameTransition::update( Int frame )
 {
-	// WarPowers @bugfix null-guard: window may have been destroyed (unlinked) mid-transition
+	// WarPowers @fix 24/08/2026 null-guard: window may have been destroyed (unlinked) mid-transition
 	if (!m_win) { m_isFinished = TRUE; return; }
 	if(frame < TEXTONFRAMETRANSITION_START || frame > TEXTONFRAMETRANSITION_END)
 	{
@@ -2046,13 +2046,13 @@ void TextOnFrameTransition::reverse()
 
 void TextOnFrameTransition::draw()
 {
-	// WarPowers @bugfix null-guard: window may have been destroyed (unlinked) mid-transition
+	// WarPowers @fix 24/08/2026 null-guard: window may have been destroyed (unlinked) mid-transition
 	if (!m_win) return;
 }
 
 void TextOnFrameTransition::skip()
 {
-	// WarPowers @bugfix null-guard: window may have been destroyed (unlinked) mid-transition
+	// WarPowers @fix 24/08/2026 null-guard: window may have been destroyed (unlinked) mid-transition
 	if (!m_win) return;
 	if (!m_isFinished)
 		update(TEXTONFRAMETRANSITION_END);
@@ -2083,7 +2083,7 @@ void ReverseSoundTransition::init( GameWindow *win )
 
 void ReverseSoundTransition::update( Int frame )
 {
-	// WarPowers @bugfix null-guard: window may have been destroyed (unlinked) mid-transition
+	// WarPowers @fix 24/08/2026 null-guard: window may have been destroyed (unlinked) mid-transition
 	if (!m_win) { m_isFinished = TRUE; return; }
 	if(frame < REVERSESOUNDTRANSITION_START || frame > REVERSESOUNDTRANSITION_END)
 	{
@@ -2131,13 +2131,13 @@ void ReverseSoundTransition::reverse()
 
 void ReverseSoundTransition::draw()
 {
-	// WarPowers @bugfix null-guard: window may have been destroyed (unlinked) mid-transition
+	// WarPowers @fix 24/08/2026 null-guard: window may have been destroyed (unlinked) mid-transition
 	if (!m_win) return;
 }
 
 void ReverseSoundTransition::skip()
 {
-	// WarPowers @bugfix null-guard: window may have been destroyed (unlinked) mid-transition
+	// WarPowers @fix 24/08/2026 null-guard: window may have been destroyed (unlinked) mid-transition
 	if (!m_win) return;
 	if (!m_isFinished)
 		update(REVERSESOUNDTRANSITION_END);

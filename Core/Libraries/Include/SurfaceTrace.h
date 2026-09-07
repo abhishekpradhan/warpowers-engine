@@ -1,4 +1,7 @@
-// GeneralsX @feature Codex 05/09/2026 Opt-in WebAssembly surface ownership diagnostics.
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (c) 2026 The War Powers authors
+//
+// WarPowers @feature 05/09/2026 Opt-in WebAssembly surface ownership diagnostics.
 #pragma once
 
 #ifdef __EMSCRIPTEN__

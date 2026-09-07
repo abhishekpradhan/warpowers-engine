@@ -75,8 +75,15 @@ elseif(APPLE AND SAGE_USE_MOLTENVK)
 
   include(ExternalProject)
   # GeneralsX @build BenderAI 13/03/2026 Add explicit source mode to keep remote branch updates deterministic by default.
+  # War Powers: references/fbraz3-dxvk keeps its upstream path name so merges
+  # from GeneralsX stay simple, but the submodule at that path tracks the War
+  # Powers DXVK fork (https://github.com/abhishekpradhan/warpowers-dxvk, branch
+  # main), which carries the fbraz3 macOS history plus the fork's own fixes.
+  # With SAGE_DXVK_USE_LOCAL_FORK=OFF (the default) the submodule is ignored and
+  # the pinned fbraz3 commit below is cloned instead; see README.md, "Native
+  # development".
   set(DXVK_LOCAL_FORK_DIR "${CMAKE_SOURCE_DIR}/references/fbraz3-dxvk")
-  option(SAGE_DXVK_USE_LOCAL_FORK "Build DXVK from local references/fbraz3-dxvk checkout" OFF)
+  option(SAGE_DXVK_USE_LOCAL_FORK "Build DXVK from the references/fbraz3-dxvk submodule (War Powers DXVK fork) instead of the pinned remote commit" OFF)
 
   if(SAGE_DXVK_USE_LOCAL_FORK AND EXISTS "${DXVK_LOCAL_FORK_DIR}/.git")
     set(DXVK_SOURCE_DIR "${DXVK_LOCAL_FORK_DIR}")

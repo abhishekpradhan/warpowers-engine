@@ -41,28 +41,14 @@
 // #define MAINTAIN_LEGACY_FILES
 
 #ifndef __EMSCRIPTEN__
-#include <execinfo.h>  // WarPowers @debug empty-name backtrace
+#include <execinfo.h>  // WarPowers @feature 24/08/2026 empty-name backtrace
 #endif
 #include "Common/ArchiveFile.h"
 
 // Igroteka wasm: boot trace logs are off by default — thousands per boot,
-// each crossing wasm->JS. Enable with window.IG_TRACE = 1 before the engine
-// script loads (native: IG_TRACE env var).
-#ifdef __EMSCRIPTEN__
-#include <emscripten/emscripten.h>
-static bool igTraceEnabled() {
-    static const bool on = EM_ASM_INT({
-        return (typeof window !== 'undefined' && window.IG_TRACE) ? 1 : 0;
-    }) != 0;
-    return on;
-}
-#else
-#include <cstdlib>
-static bool igTraceEnabled() {
-    static const bool on = getenv("IG_TRACE") && *getenv("IG_TRACE") != '0';
-    return on;
-}
-#endif
+// each crossing wasm->JS. Enable with IG_TRACE=1 (WPTrace.h; the browser
+// shell sets it under ?debug=1).
+#include "WPTrace.h"
 #include "Common/Debug.h"
 #include "Common/file.h"
 #include "Common/FileSystem.h"
@@ -416,10 +402,10 @@ char const * GameFileClass::Set_Name( char const *filename )
 #ifdef __EMSCRIPTEN__
 	if( m_fileExists == FALSE )
 	{
-		if (igTraceEnabled())
+		if (wpTraceEnabled())
 		{
 			fprintf(stderr, "[W3DFS_MISS] '%s' (last path tried: '%s')\n", filename, m_filePath);
-			// WarPowers @debug one-shot backtrace for the per-frame empty-name
+			// WarPowers @feature 24/08/2026 one-shot backtrace for the per-frame empty-name
 			// hunt: who asks for a model called ""?
 			static Bool wpEmptyTraced = FALSE;
 			if (!wpEmptyTraced && (filename[0] == '.' || filename[0] == 0))

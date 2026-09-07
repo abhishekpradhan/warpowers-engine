@@ -29,6 +29,7 @@
 
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
+#include "WPTrace.h"
 
 #include "Common/RandomValue.h"
 #include "GameClient/Shell.h"
@@ -319,8 +320,8 @@ void Shell::hide( Bool hide )
 void Shell::push( AsciiString filename, Bool shutdownImmediate )
 {
 	// GeneralsX @feature BenderAI 18/02/2026 Debug logging for shell push
-	fprintf(stderr, "DEBUG: Shell::push() called with filename='%s'\n", filename.str());
-	fflush(stderr);
+	// WarPowers @fix 07/09/2026 opt-in (IG_TRACE): this printed on every boot.
+	WP_TRACE("DEBUG: Shell::push() called with filename='%s'\n", filename.str());
 
 	// sanity
 	if( filename.isEmpty() )
@@ -343,8 +344,7 @@ void Shell::push( AsciiString filename, Bool shutdownImmediate )
 
 		DEBUG_LOG(( "Unable to load screen '%s', max '%d' reached",
 								filename.str(), MAX_SHELL_STACK ));
-		fprintf(stderr, "DEBUG: Shell::push() failed - max stack reached\n");
-		fflush(stderr);
+		WP_TRACE("DEBUG: Shell::push() failed - max stack reached\n");
 		return;
 
 	}
@@ -352,8 +352,7 @@ void Shell::push( AsciiString filename, Bool shutdownImmediate )
 	// set a push as pending with the layout name passed in
 	m_pendingPush = TRUE;
 	m_pendingPushName = filename;
-	fprintf(stderr, "DEBUG: Shell::push() marked as pending, will load '%s' next frame\n", filename.str());
-	fflush(stderr);
+	WP_TRACE("DEBUG: Shell::push() marked as pending, will load '%s' next frame\n", filename.str());
 
 	// get the top of the current stack
 	WindowLayout *currentTop = top();
@@ -680,23 +679,21 @@ void Shell::unlinkScreen( WindowLayout *screen )
 void Shell::doPush( AsciiString layoutFile )
 {
 	// GeneralsX @feature BenderAI 18/02/2026 Debug logging - actually pushing layout
-	fprintf(stderr, "DEBUG: Shell::doPush() called with layoutFile='%s'\n", layoutFile.str());
-	fflush(stderr);
+	// WarPowers @fix 07/09/2026 opt-in (IG_TRACE): this printed on every boot.
+	WP_TRACE("DEBUG: Shell::doPush() called with layoutFile='%s'\n", layoutFile.str());
 
 	if(TheGameSpyInfo)
 			GameSpyCloseAllOverlays();
 	WindowLayout *newScreen;
 
 	// create new layout and load from window manager
-	fprintf(stderr, "DEBUG: About to call TheWindowManager->winCreateLayout('%s')\n", layoutFile.str());
-	fflush(stderr);
+	WP_TRACE("DEBUG: About to call TheWindowManager->winCreateLayout('%s')\n", layoutFile.str());
 	newScreen = TheWindowManager->winCreateLayout( layoutFile );
-	fprintf(stderr, "DEBUG: winCreateLayout returned: %p\n", newScreen);
-	fflush(stderr);
+	WP_TRACE("DEBUG: winCreateLayout returned: %p\n", (void*)newScreen);
 	
 	DEBUG_ASSERTCRASH( newScreen != nullptr, ("Shell unable to load pending push layout") );
 
-	// WarPowers @fix: a missing .wnd file makes winCreateLayout return null
+	// WarPowers @fix 22/08/2026 a missing .wnd file makes winCreateLayout return null
 	// (harmless by design elsewhere); pushing it anyway null-derefs in
 	// linkScreen. Seen with Menus/ScoreScreen.wnd in the post-game path.
 	if (newScreen == nullptr)
@@ -716,8 +713,7 @@ void Shell::doPush( AsciiString layoutFile )
 	newScreen->runInit( nullptr );
 	newScreen->bringForward();
 
-	fprintf(stderr, "DEBUG: Shell::doPush() completed successfully\n");
-	fflush(stderr);
+	WP_TRACE("DEBUG: Shell::doPush() completed successfully\n");
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -779,8 +775,7 @@ void Shell::shutdownComplete( WindowLayout *screen, Bool impendingPush )
 	if( m_pendingPush )
 	{
 		// GeneralsX @feature BenderAI 18/02/2026 Debug logging - pending push being processed
-		fprintf(stderr, "DEBUG: Shell::update() - Processing pending push: '%s'\n", m_pendingPushName.str());
-		fflush(stderr);
+		WP_TRACE("DEBUG: Shell::update() - Processing pending push: '%s'\n", m_pendingPushName.str());
 
 		// do the push
 		doPush( m_pendingPushName );
@@ -788,8 +783,7 @@ void Shell::shutdownComplete( WindowLayout *screen, Bool impendingPush )
 		// no more pending pushy for you!
 		m_pendingPush = FALSE;
 		m_pendingPushName.set( "" );
-		fprintf(stderr, "DEBUG: Shell::update() - Push completed\n");
-		fflush(stderr);
+		WP_TRACE("DEBUG: Shell::update() - Push completed\n");
 
 	}
 	else if( m_pendingPop )

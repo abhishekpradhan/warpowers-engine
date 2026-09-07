@@ -113,7 +113,7 @@ void GameWindowManager::processDestroyList()
 		if( m_grabWindow == doDestroy )
 			m_grabWindow = nullptr;
 
-		// GeneralsX @feature Codex 05/09/2026 Capture the owner before text teardown in opt-in surface diagnostics.
+		// WarPowers @feature 05/09/2026 Capture the owner before text teardown in opt-in surface diagnostics.
 #ifdef __EMSCRIPTEN__
 		Igroteka_TraceSurfaceWindow(doDestroy->winGetInstanceData()->m_decoratedNameString.str());
 #endif

@@ -4,23 +4,9 @@
 #include "d3dx8core.h"
 
 // Igroteka wasm: boot trace logs are off by default — thousands per boot,
-// each crossing wasm->JS. Enable with window.IG_TRACE = 1 before the engine
-// script loads (native: IG_TRACE env var).
-#ifdef __EMSCRIPTEN__
-#include <emscripten/emscripten.h>
-static bool igTraceEnabled() {
-    static const bool on = EM_ASM_INT({
-        return (typeof window !== 'undefined' && window.IG_TRACE) ? 1 : 0;
-    }) != 0;
-    return on;
-}
-#else
-#include <cstdlib>
-static bool igTraceEnabled() {
-    static const bool on = getenv("IG_TRACE") && *getenv("IG_TRACE") != '0';
-    return on;
-}
-#endif
+// each crossing wasm->JS. Enable with IG_TRACE=1 (WPTrace.h; the browser
+// shell sets it under ?debug=1).
+#include "WPTrace.h"
 
 // GeneralsX @build felipebraz 20/06/2025 GLI causes make_vec4 ambiguity with Apple Clang (GLM version mismatch).
 // On macOS, exclude GLI and use stub implementations for the surface scaling path.
@@ -95,7 +81,7 @@ D3DXLoadSurfaceFromSurface(
 	DWORD Filter,
 	D3DCOLOR ColorKey)
 {
-	// GeneralsX @bugfix Codex 05/09/2026 Validate surface copies and retain each lock until cleanup.
+	// WarPowers @fix 05/09/2026 Validate surface copies and retain each lock until cleanup.
 	if (!pSrcSurface || !pDestSurface || pSrcPalette || pDestPalette || ColorKey)
 	{
 		return D3DERR_INVALIDCALL;
@@ -107,8 +93,7 @@ D3DXLoadSurfaceFromSurface(
 	if (FAILED(hr)) return hr;
 
 #ifdef __EMSCRIPTEN__
-	static const bool ig_trace_lsfs = getenv("IG_TRACE") && *getenv("IG_TRACE") != '0';
-	if (ig_trace_lsfs && (descSrc.Width >= 512 || descDest.Width >= 256))
+	if (wpTraceEnabled() && (descSrc.Width >= 512 || descDest.Width >= 256))
 		fprintf(stderr, "[LSFS] src=%ux%u fmt=%u dst=%ux%u fmt=%u\n",
 		        descSrc.Width, descSrc.Height, (unsigned)descSrc.Format,
 		        descDest.Width, descDest.Height, (unsigned)descDest.Format);
@@ -160,7 +145,7 @@ D3DXLoadSurfaceFromSurface(
 	descDest.Width = destArea.right - destArea.left;
 	descDest.Height = destArea.bottom - destArea.top;
 	const bool sameSize = descDest.Width == descSrc.Width && descDest.Height == descSrc.Height;
-	// GeneralsX @bugfix Codex 05/09/2026 Rectangular mip chains retain a one-pixel axis.
+	// WarPowers @fix 05/09/2026 Rectangular mip chains retain a one-pixel axis.
 	const bool halfSize = descDest.Width == (descSrc.Width > 1 ? descSrc.Width / 2 : 1) &&
 		descDest.Height == (descSrc.Height > 1 ? descSrc.Height / 2 : 1);
 	const bool supportedMipFormat = descSrc.Format == D3DFMT_A1R5G5B5 || descSrc.Format == D3DFMT_A4R4G4B4 ||
@@ -505,7 +490,7 @@ D3DXFilterTexture(
 	DWORD Filter)
 {
 	HRESULT hr = D3DERR_INVALIDCALL;
-	// GeneralsX @bugfix Codex 05/09/2026 Keep one owned reference while walking mip surfaces.
+	// WarPowers @fix 05/09/2026 Keep one owned reference while walking mip surfaces.
 	if (!pBaseTexture)
 	{
 		return D3DERR_INVALIDCALL;
@@ -554,7 +539,7 @@ D3DXFilterTexture(
 				}
 #ifdef __EMSCRIPTEN__
 				if (desc.Width >= 512)
-					if (igTraceEnabled()) fprintf(stderr, "[FILTER_PASS] level=%d top=%p mip=%p\n", Level, (void*)topsurf, (void*)mipsurf);
+					if (wpTraceEnabled()) fprintf(stderr, "[FILTER_PASS] level=%d top=%p mip=%p\n", Level, (void*)topsurf, (void*)mipsurf);
 #endif
 				// Copy the data
 				hr = D3DXLoadSurfaceFromSurface(mipsurf, NULL, NULL, topsurf, NULL, NULL, Filter, 0);

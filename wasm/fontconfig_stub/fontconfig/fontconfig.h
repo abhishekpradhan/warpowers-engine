@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later
+ * Copyright (c) 2026 GeneralsXWeb contributors and The War Powers authors */
 /* Igroteka wasm - minimal fontconfig stub.
  * The browser has no system font database; every query resolves to a font file
  * bundled into the Emscripten filesystem. Covers exactly the API surface

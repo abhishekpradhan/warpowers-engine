@@ -243,9 +243,11 @@ int main(int argc, char* argv[])
 
 	fprintf(stderr, "=================================================\n");
 	fprintf(stderr, " War Powers (GeneralsX engine)\n");
-	// WarPowers @debug build stamp so "which build is this session running" is
-	// answerable from any log or console
-	fprintf(stderr, " build %s %s\n", __DATE__, __TIME__);
+	// WarPowers @feature 24/08/2026 build stamp so "which build is this session
+	// running" is answerable from any log or console. WP_BUILD_ID is the short
+	// git revision injected by CMake (reproducible, unlike __DATE__/__TIME__).
+#include "wp_build_id.h"  // generated each build (see wp_build_id.cmake)
+	fprintf(stderr, " build %s\n", WP_BUILD_ID);
 	fprintf(stderr, " SDL3 + DXVK Build\n");
 	fprintf(stderr, "=================================================\n\n");
 
@@ -326,7 +328,7 @@ int main(int argc, char* argv[])
 		windowFlags |= SDL_WINDOW_HIGH_PIXEL_DENSITY;
 #endif
 		TheSDL3Window = SDL_CreateWindow(
-			// WarPowers @rebrand: no EA trademarks on any product surface
+			// WarPowers @feature 22/08/2026 no EA trademarks on any product surface
 			// (GPL v3 EA additional terms; the title is the browser tab on wasm)
 			"War Powers",
 			1024, 768,  // Default resolution

@@ -29,6 +29,7 @@
 
 // USER INCLUDES //////////////////////////////////////////////////////////////////////////////////
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
+#include "WPTrace.h"
 
 #include "Common/ActionManager.h"
 #include "Common/Team.h"
@@ -183,7 +184,7 @@ StateReturnType DozerActionPickActionPosState::update()
 
 	// pick a location to move to
 	//
-	// WarPowers @bugfix: never trust the stored order-time dock point. newTask
+	// WarPowers @fix 26/08/2026 never trust the stored order-time dock point. newTask
 	// computes it from the dozer's position AT ORDER TIME — often across the
 	// map, and (for fresh construction) before the site's footprint existed —
 	// so it can land unreachably close to or inside the building. The result
@@ -945,9 +946,10 @@ static Object *findObjectToRepair( Object *dozer )
 }
 
 //-------------------------------------------------------------------------------------------------
-// GeneralsX(WarPowers): a player command to a dozer cancels its build task, leaving the
-// construction site abandoned with no visible way to continue it. Idle dozers now pick up
-// nearby abandoned sites on their own (also gives "place several, dozer builds them in turn").
+// WarPowers @feature 24/08/2026 a player command to a dozer cancels its build task, leaving the
+// construction site abandoned with no visible way to continue it. When the dataset opts in
+// (GameData DozerResumesAbandonedConstruction), idle dozers pick up nearby abandoned sites on
+// their own (also gives "place several, dozer builds them in turn").
 //-------------------------------------------------------------------------------------------------
 static const Real DOZER_AUTO_RESUME_RANGE = 600.0f;		// roughly a base footprint
 static Object *findAbandonedConstructionSite( Object *dozer )
@@ -1145,11 +1147,13 @@ StateReturnType DozerPrimaryIdleState::update()
 	// we don't want to add in if we're already in the list or if
 	// we're "Effectively dead"
 	//
-	// WarPowers: re-assert membership every idle tick instead of gating on
-	// m_isMarkedAsIdle — a map-placed dozer registers during load, then
-	// InGameUI::reset clears the list while this flag stays TRUE, orphaning
-	// the dozer from the idle-worker button forever. addIdleWorker dedups.
-	if( ai->isIdle() && !dozer->isEffectivelyDead())
+	// WarPowers @fix 24/08/2026 a map-placed dozer registers during load, then
+	// InGameUI::reset clears the list while m_isMarkedAsIdle stays TRUE, orphaning
+	// the dozer from the idle-worker button forever. Re-assert a standing mark
+	// once a second (addIdleWorker deduplicates) instead of every tick.
+	const Bool reassertIdleMark = m_isMarkedAsIdle &&
+		(TheGameLogic->getFrame() % LOGICFRAMES_PER_SECOND) == 0;
+	if( ai->isIdle() && !dozer->isEffectivelyDead() && (!m_isMarkedAsIdle || reassertIdleMark) )
 	{
 		m_idlePlayerNumber = dozer->getControllingPlayer()->getPlayerIndex();
 		TheInGameUI->addIdleWorker(getMachineOwner());
@@ -1186,9 +1190,10 @@ StateReturnType DozerPrimaryIdleState::update()
 		//
 		m_idleTooLongTimestamp = TheGameLogic->getFrame();
 
-		// GeneralsX(WarPowers): abandoned construction sites come first — a build the player
-		// paid for beats housekeeping
-		Object *abandonedSite = findAbandonedConstructionSite( dozer );
+		// WarPowers @feature 24/08/2026 abandoned construction sites come first — a build the
+		// player paid for beats housekeeping (dataset opt-in, see findAbandonedConstructionSite)
+		Object *abandonedSite = TheGlobalData->m_dozerResumesAbandonedConstruction ?
+			findAbandonedConstructionSite( dozer ) : nullptr;
 		if( abandonedSite )
 		{
 
@@ -1699,37 +1704,31 @@ UpdateSleepTime DozerAIUpdate::update()
 	else
 		getObject()->setWeaponSetFlag(WEAPONSET_MINE_CLEARING_DETAIL);//maybe go clear some mines, if I feel like it
 
-	// WarPowers @bugfix: the primary machine can be left with NO current state
-	// when a new construct order lands during the previous build's completion
-	// transition (re-entrant resetToDefaultState through a state's onExit —
-	// caught live via WP_DOZER_TRACE: curTask=BUILD, target set, outer idle,
-	// current state null for 270+ frames). A stateless machine silently does
-	// nothing every frame: the paid-for site never starts, the dozer never
-	// registers idle, auto-resume never runs. Self-heal: put the machine back
-	// in its default state so the pending task's transition can fire.
+	// WarPowers @fix 25/08/2026 the primary machine was once left with NO current
+	// state when a construct order landed during the previous build's completion
+	// transition; the stale dock point behind that is fixed in
+	// DozerActionMoveToActionPos (recomputed from current positions). A stateless
+	// machine silently does nothing every frame, so if it ever recurs, say so
+	// loudly and put the machine back in its default state.
 	if( m_dozerMachine->getCurrentStateID() == INVALID_STATE_ID )
 	{
-		static const char* wp_dozHealEnv = getenv("WP_DOZER_TRACE");
-		if (wp_dozHealEnv && *wp_dozHealEnv)
-		{
-			fprintf(stderr, "[WPDOZ] f=%u id=%u primary machine had no current state - self-healing to default\n",
-				TheGameLogic->getFrame(), getObject()->getID());
-			fflush(stderr);
-		}
+		DEBUG_CRASH(("DozerAIUpdate: primary state machine has no current state (object %u)", getObject()->getID()));
+		fprintf(stderr, "WARNING: DozerAIUpdate f=%u id=%u primary state machine had no current state - reset to default\n",
+			TheGameLogic->getFrame(), getObject()->getID());
 		m_dozerMachine->resetToDefaultState();
 	}
 
 	// run our own state machine
 	m_dozerMachine->updateStateMachine();
 
-	// WarPowers @debug WP_DOZER_TRACE: task-wedge forensics. Every ~15 frames
+	// WarPowers @feature 25/08/2026 WP_DOZER_TRACE: task-wedge forensics. Every ~15 frames
 	// print the full gate state the primary machine's IDLE->BUILD transition
 	// depends on (isBuildMostImportant requires outer isIdle() + most-recent
 	// command). A pending build that never starts shows exactly which gate
 	// holds it hostage.
 	{
-		static const char* wp_dozEnv = getenv("WP_DOZER_TRACE");
-		if (wp_dozEnv && (TheGameLogic->getFrame() % 15 == 0))
+		static const bool wp_dozTrace = wpEnvEnabled("WP_DOZER_TRACE");
+		if (wp_dozTrace && (TheGameLogic->getFrame() % 15 == 0))
 		{
 			ObjectID wp_buildTarget = getTaskTarget(DOZER_TASK_BUILD);
 			if (wp_buildTarget != INVALID_ID || getCurrentTask() != DOZER_TASK_INVALID)

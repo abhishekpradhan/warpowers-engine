@@ -27,8 +27,8 @@
 // Author: John Ahlquist, Nov. 2001
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include <map>
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
+#include "WPTrace.h"
 
 #include "Common/GameEngine.h"
 #include "Common/MapObject.h"
@@ -137,15 +137,6 @@ ScriptConditions::~ScriptConditions()
 //-------------------------------------------------------------------------------------------------
 /** Init */
 //-------------------------------------------------------------------------------------------------
-// WarPowers @hardening: debounce for evaluateNamedUnitDestroyed. A single
-// anomalous frame in the named-object cache must never end the match on its
-// own; a genuinely destroyed object stays missing forever, so requiring the
-// miss to persist a few frames costs nothing real. (During the Phase 4
-// forensics this fired on what turned out to be a REAL kill — the AI's
-// recruited raiders — but the hardening stays: the cache nulls entries by
-// pointer match and one bad frame would otherwise be an instant defeat.)
-static std::map<AsciiString, UnsignedInt> s_wpNamedMissFrame;
-
 void ScriptConditions::init()
 {
 
@@ -161,10 +152,6 @@ void ScriptConditions::reset()
 
 	deleteInstance(s_transportStatuses);
 	s_transportStatuses = nullptr;
-	// WarPowers: drop named-miss debounce state from the previous match —
-	// a stale entry would make the frame-delta check underflow and turn the
-	// debounce into an instant TRUE in the next game.
-	s_wpNamedMissFrame.clear();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -304,9 +291,9 @@ Bool ScriptConditions::evaluateBridgeRepaired(Parameter *pBridgeParm)
 Bool ScriptConditions::evaluateNamedUnitDestroyed(Parameter *pUnitParm)
 {
 	Object *theUnit = TheScriptEngine->getUnitNamed( pUnitParm->getString() );
-	// WarPowers @debug WP_AI_TRACE: win/lose forensics — a spurious TRUE here
-	// ends the match (see the Phase 4 48-second phantom defeat).
-	static const char* wp_trc = getenv("WP_AI_TRACE");
+	// WarPowers @feature 26/08/2026 WP_AI_TRACE: win/lose forensics — a TRUE here
+	// ends the match.
+	static const bool wp_trc = wpEnvEnabled("WP_AI_TRACE");
 	if (wp_trc)
 		fprintf(stderr, "[WPNAMED] '%s' found=%d dead=%d didExist=%d\n",
 			pUnitParm->getString().str(), theUnit ? 1 : 0,
@@ -314,20 +301,10 @@ Bool ScriptConditions::evaluateNamedUnitDestroyed(Parameter *pUnitParm)
 			(int)TheScriptEngine->didUnitExist(pUnitParm->getString()));
 	if (theUnit)
 	{
-		s_wpNamedMissFrame.erase(pUnitParm->getString());
 		return theUnit->isEffectivelyDead();
 	}
 
 	if (TheScriptEngine->didUnitExist(pUnitParm->getString())) {
-		UnsignedInt now = TheGameLogic->getFrame();
-		std::map<AsciiString, UnsignedInt>::iterator wpIt =
-			s_wpNamedMissFrame.find(pUnitParm->getString());
-		if (wpIt == s_wpNamedMissFrame.end()) {
-			s_wpNamedMissFrame[pUnitParm->getString()] = now;
-			return false;
-		}
-		if (now - wpIt->second < 3)
-			return false;
 		return true;
 	}
 	return false; // Non existent unit is not destroyed.

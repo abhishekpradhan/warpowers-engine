@@ -37,23 +37,9 @@
 #include "render2dsentence.h"
 
 // Igroteka wasm: boot trace logs are off by default — thousands per boot,
-// each crossing wasm->JS. Enable with window.IG_TRACE = 1 before the engine
-// script loads (native: IG_TRACE env var).
-#ifdef __EMSCRIPTEN__
-#include <emscripten/emscripten.h>
-static bool igTraceEnabled() {
-    static const bool on = EM_ASM_INT({
-        return (typeof window !== 'undefined' && window.IG_TRACE) ? 1 : 0;
-    }) != 0;
-    return on;
-}
-#else
-#include <cstdlib>
-static bool igTraceEnabled() {
-    static const bool on = getenv("IG_TRACE") && *getenv("IG_TRACE") != '0';
-    return on;
-}
-#endif
+// each crossing wasm->JS. Enable with IG_TRACE=1 (WPTrace.h; the browser
+// shell sets it under ?debug=1).
+#include "WPTrace.h"
 #include "surfaceclass.h"
 #include "texture.h"
 #include "WWDebug/wwprofile.h"
@@ -776,7 +762,7 @@ void	Render2DSentenceClass::Build_Sentence_Centered (const WCHAR *text, int *hkX
 			//
 			int charWidth = 0;
 			while ((*word != 0) && (*word > L' ') && (*word != L'\n')) {
-				// GeneralsX @bugfix Codex 05/09/2026 Check the next character before skipping a hotkey marker.
+				// WarPowers @fix 05/09/2026 Check the next character before skipping a hotkey marker.
 				if( ParseHotKey && (*word == L'&') && (*(word+1) != 0) && (*(word+1) > L' ') && (*(word+1) != L'\n'))
 				{
 					// Preserve the existing inter-word spacing adjustment.
@@ -854,7 +840,7 @@ void	Render2DSentenceClass::Build_Sentence_Centered (const WCHAR *text, int *hkX
 			//
 			if(ParseHotKey && (ch == L'&') && (*text != 0) && (*text > L' ') && (*text != L'\n'))
 			{
-				// GeneralsX @bugfix Codex 05/09/2026 Locate the hotkey on its rendered line, after wrapping/centering.
+				// WarPowers @fix 05/09/2026 Locate the hotkey on its rendered line, after wrapping/centering.
 				hotKeyPosX = Cursor.X + TextureOffset.I - TextureStartX;
 				hotKeyPosY = Cursor.Y;
 				ch = *text++;
@@ -948,7 +934,7 @@ void	Render2DSentenceClass::Build_Sentence_Centered (const WCHAR *text, int *hkX
 
 		if(hkX)
 			*hkX = hotKeyPosX;
-		// GeneralsX @bugfix Codex 05/09/2026 Hotkey coordinate outputs are independently optional.
+		// WarPowers @fix 05/09/2026 Hotkey coordinate outputs are independently optional.
 		if(hkY)
 			*hkY = hotKeyPosY;
 }
@@ -1050,7 +1036,7 @@ Vector2	Render2DSentenceClass::Build_Sentence_Not_Centered (const WCHAR *text, i
 					const WCHAR *word	= text;
 					float word_width	= char_spacing;
 					while ((*word != 0) && (*word > L' ')) {
-						// GeneralsX @bugfix Codex 05/09/2026 Keep a trailing ampersand inside the string bounds.
+						// WarPowers @fix 05/09/2026 Keep a trailing ampersand inside the string bounds.
 						if(ParseHotKey && (*word == L'&') && (*(word+1) != 0) && (*(word+1) > L' ') && (*(word+1) != L'\n'))
 							*word++;
 						word_width += Font->Get_Char_Spacing (*word++);
@@ -1133,7 +1119,7 @@ Vector2	Render2DSentenceClass::Build_Sentence_Not_Centered (const WCHAR *text, i
 
 	if(hkX)
 		*hkX = hotKeyPosX;
-	// GeneralsX @bugfix Codex 05/09/2026 Hotkey coordinate outputs are independently optional.
+	// WarPowers @fix 05/09/2026 Hotkey coordinate outputs are independently optional.
 	if(hkY)
 		*hkY = hotKeyPosY;
 
@@ -1714,7 +1700,7 @@ bool
 FontCharsClass::Create_Freetype_Font (const char *font_name)
 {
 #ifdef __EMSCRIPTEN__
-	if (igTraceEnabled()) fprintf(stderr, "[FONT] Create_Freetype_Font '%s' size=%d\n", font_name, PointSize);
+	if (wpTraceEnabled()) fprintf(stderr, "[FONT] Create_Freetype_Font '%s' size=%d\n", font_name, PointSize);
 #endif
 	//
 	//	Initialize FreeType library
@@ -1722,7 +1708,7 @@ FontCharsClass::Create_Freetype_Font (const char *font_name)
 	FT_Error error = FT_Init_FreeType( &FTLibrary );
 	if ( error != 0 ) {
 #ifdef __EMSCRIPTEN__
-		if (igTraceEnabled()) fprintf(stderr, "[FONT] FT_Init_FreeType failed err=%d\n", (int)error);
+		if (wpTraceEnabled()) fprintf(stderr, "[FONT] FT_Init_FreeType failed err=%d\n", (int)error);
 #endif
 		return false;
 	}
@@ -1748,7 +1734,7 @@ FontCharsClass::Create_Freetype_Font (const char *font_name)
 	const char *font_path = Locate_Font_FontConfig( font_name );
 	if ( font_path == nullptr ) {
 #ifdef __EMSCRIPTEN__
-		if (igTraceEnabled()) fprintf(stderr, "[FONT] fontconfig found no match for '%s'\n", font_name);
+		if (wpTraceEnabled()) fprintf(stderr, "[FONT] fontconfig found no match for '%s'\n", font_name);
 #endif
 		FT_Done_FreeType( FTLibrary );
 		FTLibrary = nullptr;
@@ -1761,7 +1747,7 @@ FontCharsClass::Create_Freetype_Font (const char *font_name)
 	error = FT_New_Face( FTLibrary, font_path, 0, &FTFace );
 	if ( error != 0 ) {
 #ifdef __EMSCRIPTEN__
-		if (igTraceEnabled()) fprintf(stderr, "[FONT] FT_New_Face('%s') failed err=%d\n", font_path, (int)error);
+		if (wpTraceEnabled()) fprintf(stderr, "[FONT] FT_New_Face('%s') failed err=%d\n", font_path, (int)error);
 #endif
 		FT_Done_FreeType( FTLibrary );
 		FTLibrary = nullptr;
@@ -1774,7 +1760,7 @@ FontCharsClass::Create_Freetype_Font (const char *font_name)
 	error = FT_Set_Pixel_Sizes( FTFace, 0, font_height );
 	if ( error != 0 ) {
 #ifdef __EMSCRIPTEN__
-		if (igTraceEnabled()) fprintf(stderr, "[FONT] FT_Set_Pixel_Sizes(%d) failed err=%d\n", font_height, (int)error);
+		if (wpTraceEnabled()) fprintf(stderr, "[FONT] FT_Set_Pixel_Sizes(%d) failed err=%d\n", font_height, (int)error);
 #endif
 		FT_Done_Face( FTFace );
 		FT_Done_FreeType( FTLibrary );
@@ -1783,7 +1769,7 @@ FontCharsClass::Create_Freetype_Font (const char *font_name)
 		return false;
 	}
 #ifdef __EMSCRIPTEN__
-	if (igTraceEnabled()) fprintf(stderr, "[FONT] loaded '%s' -> %s px=%d\n", font_name, font_path, font_height);
+	if (wpTraceEnabled()) fprintf(stderr, "[FONT] loaded '%s' -> %s px=%d\n", font_name, font_path, font_height);
 #endif
 
 	//

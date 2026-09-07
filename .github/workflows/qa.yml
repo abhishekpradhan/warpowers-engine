@@ -1,0 +1,60 @@
+# War Powers engine: fast regression checks that need no engine build.
+#
+# GitHub Actions is disabled at the repository level until the public release
+# (the inherited GeneralsX workflows were removed because they consumed hosted
+# runner minutes on every push). This workflow is inert until Actions is
+# switched on in the repository settings; until then run the same commands
+# locally from the engine directory:
+#
+#   CXX=clang++ python3 scripts/qa/test-keyboard-modifiers.py
+#   CXX=clang++ python3 scripts/qa/test-sentence-hotkeys.py
+#   CXX=clang++ python3 scripts/qa/test-mip-filter.py
+#   CXX=clang++ python3 scripts/qa/test-surface-copy.py
+#
+# Each script extracts the real production methods from the engine sources,
+# compiles them with a small fixture (C++17; ASan/UBSan for the sentence and
+# surface-copy checks) and runs it. No SDL, Emscripten, browser or game data.
+
+name: QA
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fixtures:
+    name: Fixture regressions (clang, ASan/UBSan)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CXX: clang++
+    steps:
+      - name: Check out the engine
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Install clang
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends clang
+          # Older sanitizer runtimes reject the high ASLR entropy of recent
+          # runner kernels ("unexpected memory mapping"); 28 bits is safe.
+          sudo sysctl -w vm.mmap_rnd_bits=28
+          clang++ --version
+          python3 --version
+
+      - name: Keyboard modifier ordering
+        run: python3 scripts/qa/test-keyboard-modifiers.py
+
+      - name: Sentence layout and hotkeys (ASan/UBSan)
+        run: python3 scripts/qa/test-sentence-hotkeys.py
+
+      - name: D3DX mip filter ownership
+        run: python3 scripts/qa/test-mip-filter.py
+
+      - name: D3DX surface copy (ASan/UBSan)
+        run: python3 scripts/qa/test-surface-copy.py

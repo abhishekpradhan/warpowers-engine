@@ -51,7 +51,7 @@
 #include <stdint.h>
 
 #include "surfaceclass.h"
-// GeneralsX @feature Codex 05/09/2026 Opt-in generation checks run before COM surface calls, without masking invalid ownership.
+// WarPowers @feature 05/09/2026 Opt-in generation checks run before COM surface calls, without masking invalid ownership.
 #include "SurfaceTrace.h"
 #include "formconv.h"
 #include "dx8wrapper.h"

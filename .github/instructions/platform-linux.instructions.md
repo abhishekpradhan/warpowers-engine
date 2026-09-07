@@ -38,7 +38,7 @@ mkdir -p logs && gdb -batch -ex "run -win" -ex "bt full" -ex "thread apply all b
 - **CompatLib**: `GeneralsMD/Code/CompatLib/` provides Win32 API compatibility shims (`windows_compat.h`).
 - **No native POSIX calls**: use SDL3 abstractions for timers, threads, file I/O. No raw `pthread_*`, `open()`.
 - **`-logToCon`**: only available in debug builds (`RTS_BUILD_OPTION_DEBUG=ON`).
-- **Diagnostics**: prefer `fprintf(stderr, ...)` probes; capture stderr and grep targeted markers.
+- **Diagnostics**: use `WP_TRACE(...)` from `Core/Libraries/Include/WPTrace.h` (enabled with `IG_TRACE=1`); capture stderr and grep the targeted markers.
 
 ```bash
 # Recommended debug run

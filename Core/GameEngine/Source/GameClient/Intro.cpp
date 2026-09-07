@@ -111,13 +111,13 @@ void Intro::doSizzleMovie()
 
 void Intro::doPostIntro()
 {
-	// WarPowers @fix: this render freeze exists to hold the screen black
+	// WarPowers @fix 22/08/2026 this render freeze exists to hold the screen black
 	// until the shell's main menu fades in. When the shell has no screens
 	// (the -file direct-load path pops them), nothing ever clears the flag
 	// and W3DDisplay::draw skips scene rendering forever. Only arm the
 	// freeze when a shell screen is actually there to clear it.
 	//
-	// WarPowers @fix: Intro::update() lands in IntroState_Done EVERY frame
+	// WarPowers @fix 23/08/2026 Intro::update() lands in IntroState_Done EVERY frame
 	// for the rest of the session, so this must be one-shot — otherwise the
 	// freeze re-arms continuously whenever any shell screen exists (with the
 	// in-engine menu that is: always), and the first menu-started match

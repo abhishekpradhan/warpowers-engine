@@ -226,6 +226,8 @@ Int UDP::Bind(UnsignedInt IP,UnsignedShort Port)
   int status;
   UnsignedInt ipHostOrder = IP;
   UnsignedShort portHostOrder = Port;
+  (void)ipHostOrder;    // DEBUG_LOG-only below; unused in release builds
+  (void)portHostOrder;
 
   IP=htonl(IP);
   Port=htons(Port);
@@ -272,8 +274,6 @@ Int UDP::Bind(UnsignedInt IP,UnsignedShort Port)
     return(status);
   }
 
-// GeneralsX @bugfix BenderAI 13/02/2026 Use socklen_t for POSIX socket functions (fighter19 pattern)
-socklen_t namelen=sizeof(addr);
   retval=SetBlocking(FALSE);
   if (retval==-1)
     fprintf(stderr,"Couldn't set nonblocking mode!\n");

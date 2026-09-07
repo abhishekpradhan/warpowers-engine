@@ -321,7 +321,7 @@ void RTS3DScene::flagOccludedObjects(CameraClass * camera)
  */
 //=============================================================================
 // ------------------------------------------------------------------------------------------------
-/** WarPowers @debug scene census — every render object with name/class/position */
+/** WarPowers @feature 23/08/2026 scene census — every render object with name/class/position */
 // ------------------------------------------------------------------------------------------------
 void RTS3DScene::wpDumpRenderObjects()
 {
@@ -829,24 +829,37 @@ void RTS3DScene::renderOneObject(RenderInfoClass &rinfo, RenderObjClass *robj, I
 
 			if (m_customPassMode == SCENE_PASS_DEFAULT)
 			{
+#ifdef __EMSCRIPTEN__
+				// WarPowers @fix 23/08/2026 d8web has no CAMERASPACEPOSITION texgen or
+				// texture matrices, so the projected-shroud material pass cannot run
+				// there: fogged objects rendered fully lit and never-seen enemies
+				// were plainly visible. Approximate the retail look instead: fogged
+				// objects render in the dimmed fog light environment (the one ghost
+				// snapshots use) and OBJECTSHROUD_SHROUDED objects (never seen by
+				// this player) do not render at all. Native backends (DXVK) keep the
+				// retail material pass below.
 				if (ss <= OBJECTSHROUD_PARTIAL_CLEAR)
 				{
 					robj->Render(rinfo);
 				}
 				else if (ss == OBJECTSHROUD_FOGGED)
 				{
-					// GeneralsX(WarPowers): the projected-shroud material pass needs
-					// CAMERASPACEPOSITION texgen + texture matrices, which our d3d8
-					// translation layers don't implement — fogged objects rendered
-					// fully lit and never-seen enemies were plainly visible.
-					// Approximate ZH: fogged objects render in the dimmed fog light
-					// environment (the same one ghost snapshots use)...
 					rinfo.light_environment = &m_foggedLightEnv;
 					robj->Render(rinfo);
 					rinfo.light_environment = &lightEnv;
 				}
-				// ...and OBJECTSHROUD_SHROUDED (never seen by this player) does not
-				// render at all.
+#else
+				if (ss <= OBJECTSHROUD_CLEAR)
+				{
+					robj->Render(rinfo);
+				}
+				else
+				{
+					rinfo.Push_Material_Pass(m_shroudMaterialPass);
+					robj->Render(rinfo);
+					rinfo.Pop_Material_Pass();
+				}
+#endif
 			}
 			else if (m_maskMaterialPass)
 			{

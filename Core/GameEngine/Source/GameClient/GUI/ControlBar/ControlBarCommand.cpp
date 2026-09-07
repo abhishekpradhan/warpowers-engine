@@ -731,7 +731,7 @@ void ControlBar::updateContextCommand()
 		if( pu && pu->firstProduction() != nullptr )
 		{
 
-			// GeneralsX(WarPowers): keep the selected object's portrait while producing —
+			// WarPowers @feature 23/08/2026 keep the selected object's portrait while producing —
 			// our layout puts the queue strip in its own screen area, so blanking the
 			// cameo just reads as the HUD going black
 			setPortraitByObject( obj );
@@ -763,7 +763,7 @@ void ControlBar::updateContextCommand()
 	if( m_contextParent[ CP_BUILD_QUEUE ]->winIsHidden() == FALSE )
 	{
 
-		// GeneralsX(WarPowers): portrait stays up alongside the queue (see above)
+		// WarPowers @feature 23/08/2026 portrait stays up alongside the queue (see above)
 		setPortraitByObject( obj );
 
 		//
@@ -1211,7 +1211,7 @@ CommandAvailability ControlBar::getCommandAvailability( const CommandButton *com
 			}
 			if( makeType == CANMAKE_NO_MONEY )
 			{
-				// WarPowers @fix: CANT_AFFORD keeps the icon colored (ALWAYS_COLOR)
+				// WarPowers @fix 24/08/2026 CANT_AFFORD keeps the icon colored (ALWAYS_COLOR)
 				// so 'too expensive right now' reads differently from 'locked';
 				// the disabled-click deny sound (GUIClickDisabled) still plays.
 				return COMMAND_CANT_AFFORD;

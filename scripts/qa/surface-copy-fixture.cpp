@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (c) 2026 The War Powers authors
 // Deterministic surface contracts for test-surface-copy.py. The runner inserts
 // the production function, not a copied algorithm. Real GLI is optional; no GPU.
 #include <cassert>
@@ -7,6 +9,7 @@
 #include <cstring>
 #include <vector>
 #include <initializer_list>
+#include "WPTrace.h"  // the production function's IG_TRACE gate (engine Core/Libraries/Include)
 #ifdef TEST_GLI
 #include <gli/texture2d.hpp>
 #include <gli/generate_mipmaps.hpp>

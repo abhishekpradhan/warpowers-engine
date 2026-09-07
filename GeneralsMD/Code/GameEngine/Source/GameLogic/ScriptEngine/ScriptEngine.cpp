@@ -27,6 +27,8 @@
 // Author: John Ahlquist, Nov. 2001
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
+#include "GameClient/WPShell.h"
+#include "WPTrace.h"
 
 #include "Common/DataChunk.h"
 #include "Common/file.h"
@@ -7133,8 +7135,8 @@ void ScriptEngine::removeObjectFromCache( Object* pDeadObject )
 {
 	for (VecNamedRequestsIt it = m_namedObjects.begin(); it != m_namedObjects.end(); ++it) {
 		if (pDeadObject == (it->second)) {
-			// WarPowers @debug WP_AI_TRACE: who nulls a named entry?
-			static const bool wp_aiTrc = getenv("WP_AI_TRACE") != nullptr;
+			// WarPowers @feature 26/08/2026 WP_AI_TRACE: who nulls a named entry?
+			static const bool wp_aiTrc = wpEnvEnabled("WP_AI_TRACE");
 			if (wp_aiTrc)
 			{
 				fprintf(stderr, "[WPNAMED] cache null: entry='%s' dying obj=%u tmpl=%s name='%s' f=%u\n",
@@ -7142,7 +7144,6 @@ void ScriptEngine::removeObjectFromCache( Object* pDeadObject )
 					pDeadObject->getTemplate() ? pDeadObject->getTemplate()->getName().str() : "?",
 					pDeadObject->getName().str(),
 					TheGameLogic ? TheGameLogic->getFrame() : 0);
-				extern void WPPrintBacktrace();
 				WPPrintBacktrace();
 			}
 			it->second = nullptr;	// Don't remove it, cause we want to check whether we ever knew a name later

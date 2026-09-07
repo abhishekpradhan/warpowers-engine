@@ -251,7 +251,7 @@ void ControlBar::populateObserverList()
 {
 	Int currentButton = 0, i;
 
-	// WarPowers @fix: our ControlBar.wnd ships no observer widgets - and the
+	// WarPowers @fix 24/08/2026 our ControlBar.wnd ships no observer widgets - and the
 	// observer context is also where a FAILED map load lands (empty world ->
 	// neutral local player). Bail instead of winHide()ing null windows; the
 	// stderr line names the real problem.

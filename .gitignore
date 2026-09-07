@@ -94,4 +94,9 @@ references/GameClient/
 references/GameServer/
 .gstack/
 
-# WarPowers: local DXVK fork checkout (own repo, backed up separately)
+# War Powers: build trees for every preset (build/wasm, build/wasm-harness,
+# build/macos-vulkan, ...) and run logs. references/fbraz3-dxvk is a tracked
+# submodule, not an ignored checkout.
+/build/
+/logs/
+*.log

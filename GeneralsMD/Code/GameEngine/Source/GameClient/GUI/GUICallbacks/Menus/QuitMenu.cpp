@@ -29,6 +29,7 @@
 
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
+#include "GameClient/WPShell.h"
 
 #include "Common/FramePacer.h"
 #include "Common/GameEngine.h"
@@ -79,6 +80,19 @@ static NameKeyType buttonReturn = NAMEKEY_INVALID;
 static NameKeyType buttonOptions = NAMEKEY_INVALID;
 static NameKeyType buttonSaveLoad = NAMEKEY_INVALID;
 
+// WarPowers @feature 07/09/2026 a confirmation box opens over the pause menu;
+// hide the menu's buttons while it is up so the box does not draw over live
+// controls, and show them again when the box closes or the menu reopens.
+static void wpShowQuitMenuButtons( Bool show )
+{
+	GameWindow *buttons[] = { buttonRestartWin, buttonSaveLoadWin, buttonOptionsWin, buttonExitWin,
+		(TheWindowManager && buttonReturn != NAMEKEY_INVALID) ?
+			TheWindowManager->winGetWindowFromId( nullptr, buttonReturn ) : nullptr };
+	for( GameWindow *button : buttons )
+		if( button )
+			button->winHide( !show );
+}
+
 static void initGadgetsFullQuit()
 {
 	buttonExit = TheNameKeyGenerator->nameToKey( "QuitMenu.wnd:ButtonExit" );
@@ -91,6 +105,7 @@ static void initGadgetsFullQuit()
 	buttonSaveLoadWin = TheWindowManager->winGetWindowFromId( nullptr, buttonSaveLoad );
 	buttonOptionsWin = TheWindowManager->winGetWindowFromId( nullptr, buttonOptions );
 	buttonExitWin = TheWindowManager->winGetWindowFromId( nullptr, buttonExit );
+	wpShowQuitMenuButtons( TRUE );
 }
 
 static void initGadgetsNoSaveQuit()
@@ -105,7 +120,7 @@ static void initGadgetsNoSaveQuit()
 	buttonOptionsWin = TheWindowManager->winGetWindowFromId( nullptr, buttonOptions );
 	buttonSaveLoadWin = nullptr;
 	buttonExitWin = TheWindowManager->winGetWindowFromId( nullptr, buttonExit );
-
+	wpShowQuitMenuButtons( TRUE );
 }
 
 // PUBLIC FUNCTIONS ///////////////////////////////////////////////////////////////////////////////
@@ -135,8 +150,6 @@ void destroyQuitMenu()
 /**
  *  quits the program
  */
-extern Bool g_wpMenuCurtain;  // WarPowers @feature menu curtain
-
 static void exitQuitMenu()
 {
 	// Raise the curtain now: the frames between this click and the shell's
@@ -150,6 +163,8 @@ static void exitQuitMenu()
 static void noExitQuitMenu()
 {
 	quitConfirmationWindow = nullptr;
+	if( isVisible )
+		wpShowQuitMenuButtons( TRUE );
 }
 
 static void quitToDesktopQuitMenu()
@@ -494,6 +509,8 @@ WindowMsgHandledType QuitMenuSystem( GameWindow *window, UnsignedInt msg,
 			else if( controlID == buttonExit )
 			{
         quitConfirmationWindow = QuitMessageBoxYesNo(TheGameText->fetch("GUI:QuitPopupTitle"), TheGameText->fetch("GUI:QuitPopupMessage"),/*quitCallback*/exitQuitMenu,noExitQuitMenu);
+				if( quitConfirmationWindow )
+					wpShowQuitMenuButtons( FALSE );
 			}
 			else if( controlID == buttonReturn )
 			{
@@ -531,6 +548,8 @@ WindowMsgHandledType QuitMenuSystem( GameWindow *window, UnsignedInt msg,
 																			TheGameText->fetch("GUI:RestartConfirmation"),
 																			/*quitCallback*/restartMissionMenu,noExitQuitMenu);
 				}
+				if( quitConfirmationWindow )
+					wpShowQuitMenuButtons( FALSE );
 			}
 
 			break;

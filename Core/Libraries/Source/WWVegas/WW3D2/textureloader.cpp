@@ -39,6 +39,7 @@
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #include "textureloader.h"
+#include "WPTrace.h"
 #include "WWLib/mutex.h"
 #include "WWLib/thread.h"
 #include "WWDebug/wwdebug.h"
@@ -1346,19 +1347,15 @@ void TextureLoadTaskClass::Apply_Missing_Texture()
 		return;
 	}
 
-#ifndef _WIN32
-	// DIAG: log which textures fall back to the magenta placeholder
-	fprintf(stderr, "[TEX_MISSING] '%s'\n", static_cast<const char*>(Texture->Get_Full_Path()));
-#endif
+	// WarPowers @fix 07/09/2026 opt-in (IG_TRACE): which textures fall back to
+	// the magenta placeholder — this used to print per texture on every boot.
+	WP_TRACE("[TEX_MISSING] '%s'\n", static_cast<const char*>(Texture->Get_Full_Path()));
 
 	D3DTexture = MissingTexture::_Get_Missing_Texture();
 	if (D3DTexture == nullptr)
 	{
 		return;
 	}
-#ifdef __EMSCRIPTEN__
-	fprintf(stderr, "[TEX_MISSING] %s\n", Texture->Get_Full_Path().str());
-#endif
 	Apply(true);
 }
 

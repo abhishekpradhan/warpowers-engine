@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Compile the production D3DX mip filter against observable surface references.
 
 Needs Python 3 and a native C++17 compiler (CXX, default c++). No engine/GPU

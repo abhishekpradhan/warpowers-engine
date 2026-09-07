@@ -31,23 +31,9 @@
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
 // Igroteka wasm: boot trace logs are off by default — thousands per boot,
-// each crossing wasm->JS. Enable with window.IG_TRACE = 1 before the engine
-// script loads (native: IG_TRACE env var).
-#ifdef __EMSCRIPTEN__
-#include <emscripten/emscripten.h>
-static bool igTraceEnabled() {
-    static const bool on = EM_ASM_INT({
-        return (typeof window !== 'undefined' && window.IG_TRACE) ? 1 : 0;
-    }) != 0;
-    return on;
-}
-#else
-#include <cstdlib>
-static bool igTraceEnabled() {
-    static const bool on = getenv("IG_TRACE") && *getenv("IG_TRACE") != '0';
-    return on;
-}
-#endif
+// each crossing wasm->JS. Enable with IG_TRACE=1 (WPTrace.h; the browser
+// shell sets it under ?debug=1).
+#include "WPTrace.h"
 #define DEFINE_DEATH_NAMES
 
 #include "WWMath/wwmath.h"
@@ -213,7 +199,7 @@ INI::INI()
 UnsignedInt INI::loadFileDirectory( AsciiString fileDirName, INILoadType loadType, Xfer *pXfer, Bool subdirs )
 {
 	// GeneralsX @feature BenderAI 20/02/2026 Debug hang investigation
-	if (igTraceEnabled()) fprintf(stderr, "[INI] loadFileDirectory('%s') START\n", fileDirName.str());
+	if (wpTraceEnabled()) fprintf(stderr, "[INI] loadFileDirectory('%s') START\n", fileDirName.str());
 	fflush(stderr);
 	
 	UnsignedInt filesRead = 0;
@@ -233,34 +219,34 @@ UnsignedInt INI::loadFileDirectory( AsciiString fileDirName, INILoadType loadTyp
 		iniFile.concat(ext);
 	}
 
-	if (igTraceEnabled()) fprintf(stderr, "[INI] loadFileDirectory - checking iniFile: '%s'\n", iniFile.str());
+	if (wpTraceEnabled()) fprintf(stderr, "[INI] loadFileDirectory - checking iniFile: '%s'\n", iniFile.str());
 	fflush(stderr);
 	
 	if (TheFileSystem->doesFileExist(iniFile.str()))
 	{
-		if (igTraceEnabled()) fprintf(stderr, "[INI] loadFileDirectory - loading iniFile: '%s' START\n", iniFile.str());
+		if (wpTraceEnabled()) fprintf(stderr, "[INI] loadFileDirectory - loading iniFile: '%s' START\n", iniFile.str());
 		fflush(stderr);
 		filesRead += load(iniFile, loadType, pXfer);
-		if (igTraceEnabled()) fprintf(stderr, "[INI] loadFileDirectory - loading iniFile: '%s' END\n", iniFile.str());
+		if (wpTraceEnabled()) fprintf(stderr, "[INI] loadFileDirectory - loading iniFile: '%s' END\n", iniFile.str());
 		fflush(stderr);
 	}
 
 	// Load any additional ini files from a "filename" directory and its subdirectories.
-	if (igTraceEnabled()) fprintf(stderr, "[INI] loadFileDirectory - calling loadDirectory('%s') START\n", iniDir.str());
+	if (wpTraceEnabled()) fprintf(stderr, "[INI] loadFileDirectory - calling loadDirectory('%s') START\n", iniDir.str());
 	fflush(stderr);
 	filesRead += loadDirectory(iniDir, loadType, pXfer, subdirs);
-	if (igTraceEnabled()) fprintf(stderr, "[INI] loadFileDirectory - calling loadDirectory('%s') END\n", iniDir.str());
+	if (wpTraceEnabled()) fprintf(stderr, "[INI] loadFileDirectory - calling loadDirectory('%s') END\n", iniDir.str());
 	fflush(stderr);
 
 	// Expect to open and load at least one file.
 	if (filesRead == 0)
 	{
-		if (igTraceEnabled()) fprintf(stderr, "[INI] ERROR: No files read from directory '%s'\n", fileDirName.str());
+		if (wpTraceEnabled()) fprintf(stderr, "[INI] ERROR: No files read from directory '%s'\n", fileDirName.str());
 		fflush(stderr);
 		throw INI_CANT_OPEN_FILE;
 	}
 
-	if (igTraceEnabled()) fprintf(stderr, "[INI] loadFileDirectory('%s') END - filesRead=%d\n", fileDirName.str(), filesRead);
+	if (wpTraceEnabled()) fprintf(stderr, "[INI] loadFileDirectory('%s') END - filesRead=%d\n", fileDirName.str(), filesRead);
 	fflush(stderr);
 	return filesRead;
 }
@@ -273,7 +259,7 @@ UnsignedInt INI::loadFileDirectory( AsciiString fileDirName, INILoadType loadTyp
 UnsignedInt INI::loadDirectory( AsciiString dirName, INILoadType loadType, Xfer *pXfer, Bool subdirs )
 {
 	// GeneralsX @feature BenderAI 20/02/2026 Debug hang investigation
-	if (igTraceEnabled()) fprintf(stderr, "[INI] loadDirectory('%s') START\n", dirName.str());
+	if (wpTraceEnabled()) fprintf(stderr, "[INI] loadDirectory('%s') START\n", dirName.str());
 	fflush(stderr);
 	
 	UnsignedInt filesRead = 0;
@@ -281,7 +267,7 @@ UnsignedInt INI::loadDirectory( AsciiString dirName, INILoadType loadType, Xfer 
 	// sanity
 	if( dirName.isEmpty() )
 	{
-		if (igTraceEnabled()) fprintf(stderr, "[INI] ERROR: Empty directory name in loadDirectory\n");
+		if (wpTraceEnabled()) fprintf(stderr, "[INI] ERROR: Empty directory name in loadDirectory\n");
 		fflush(stderr);
 		throw INI_INVALID_DIRECTORY;
 	}
@@ -416,16 +402,16 @@ static INIFieldParseProc findFieldParse(const FieldParse* parseTable, const char
 UnsignedInt INI::load( AsciiString filename, INILoadType loadType, Xfer *pXfer )
 {
 	// GeneralsX @feature BenderAI 20/02/2026 Debug hang investigation
-	if (igTraceEnabled()) fprintf(stderr, "[INI] load('%s') START\n", filename.str());
+	if (wpTraceEnabled()) fprintf(stderr, "[INI] load('%s') START\n", filename.str());
 	fflush(stderr);
 	
 	setFPMode(); // so we have consistent Real values for GameLogic -MDC
 
 	s_xfer = pXfer;
-	if (igTraceEnabled()) fprintf(stderr, "[INI] load - calling prepFile('%s') START\n", filename.str());
+	if (wpTraceEnabled()) fprintf(stderr, "[INI] load - calling prepFile('%s') START\n", filename.str());
 	fflush(stderr);
 	prepFile(filename, loadType);
-	if (igTraceEnabled()) fprintf(stderr, "[INI] load - prepFile completed\n");
+	if (wpTraceEnabled()) fprintf(stderr, "[INI] load - prepFile completed\n");
 	fflush(stderr);
 
 	try
@@ -438,7 +424,7 @@ UnsignedInt INI::load( AsciiString filename, INILoadType loadType, Xfer *pXfer )
 		{
 			lineCount++;
 			if ((lineCount % 100) == 0) {
-				if (igTraceEnabled()) fprintf(stderr, "[INI] load - processed %d lines\n", lineCount);
+				if (wpTraceEnabled()) fprintf(stderr, "[INI] load - processed %d lines\n", lineCount);
 				fflush(stderr);
 			}
 			
@@ -497,12 +483,12 @@ UnsignedInt INI::load( AsciiString filename, INILoadType loadType, Xfer *pXfer )
 			}
 
 		}
-		if (igTraceEnabled()) fprintf(stderr, "[INI] load - processed total %d lines\n", lineCount);
+		if (wpTraceEnabled()) fprintf(stderr, "[INI] load - processed total %d lines\n", lineCount);
 		fflush(stderr);
 	}
 	catch (...)
 	{
-		if (igTraceEnabled()) fprintf(stderr, "[INI] ERROR in load('%s') - exception caught\n", filename.str());
+		if (wpTraceEnabled()) fprintf(stderr, "[INI] ERROR in load('%s') - exception caught\n", filename.str());
 		fflush(stderr);
 		unPrepFile();
 
@@ -512,7 +498,7 @@ UnsignedInt INI::load( AsciiString filename, INILoadType loadType, Xfer *pXfer )
 
 	unPrepFile();
 
-	if (igTraceEnabled()) fprintf(stderr, "[INI] load('%s') END\n", filename.str());
+	if (wpTraceEnabled()) fprintf(stderr, "[INI] load('%s') END\n", filename.str());
 	fflush(stderr);
 	return 1;
 }
@@ -924,10 +910,10 @@ void INI::parseAndTranslateLabel( INI* ini, void * /*instance*/, void *store, co
 	if( translated.isEmpty() )
 	{
 #ifdef __EMSCRIPTEN__
-		// Igroteka @build 06/07/2026 wasm: GameText lookups come back empty for
-		// labels present in the CSF (under investigation). Fall back to the raw
-		// label so boot continues; this only affects display strings.
-		fprintf(stderr, "[wasm-compat] parseAndTranslateLabel: empty fetch for '%s', using label\n", token);
+		// Igroteka @build 06/07/2026 wasm: a label with no string-table text
+		// falls back to the raw label so boot continues; display strings only.
+		// WarPowers @fix 07/09/2026 opt-in (IG_TRACE): printed per occurrence.
+		WP_TRACE("[wasm-compat] parseAndTranslateLabel: no text for '%s', using the label\n", token);
 		translated.translate(token);
 #else
 		throw INI_INVALID_DATA;
@@ -1647,9 +1633,10 @@ void INI::initFromINIMulti( void *what, const MultiIniFieldParse& parseTableList
 
 				if (!found)
 				{
-					// GeneralsX(WarPowers): unknown fields died silently in release
-					// (DEBUG_CRASH compiles out) — print loudly like unknown blocks do
-					fprintf(stderr, "FATAL: [LINE: %d - FILE: '%s'] Unknown field '%s'\n",
+					// WarPowers @fix 23/08/2026 unknown fields died silently in release
+					// (DEBUG_CRASH compiles out). Name the offender; release builds skip
+					// the field and carry on, so the wording says so.
+					fprintf(stderr, "ERROR: [LINE: %d - FILE: '%s'] Unknown field '%s' (ignored)\n",
 						INI::getLineNum(), INI::getFilename().str(), field);
 					fflush(stderr);
 					DEBUG_CRASH( ("[LINE: %d - FILE: '%s'] Unknown field '%s' in block '%s'",

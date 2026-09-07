@@ -791,7 +791,7 @@ void W3DDisplay::setup2DRenderState(TextureClass *tex, DrawImageMode mode, Bool 
 			m_2DRender->Enable_Texturing(FALSE);
 		}
 
-		// GeneralsX @feature Codex 05/09/2026 Brighten command artwork while preserving its color and alpha.
+		// WarPowers @feature 05/09/2026 Brighten command artwork while preserving its color and alpha.
 		// Restore normal modulation on other batches so the opt-in mode cannot affect later UI.
 		m_2DRender->Get_Shader()->Set_Primary_Gradient(mode == DRAW_IMAGE_BRIGHTENED ?
 			ShaderClass::GRADIENT_MODULATE2X : ShaderClass::GRADIENT_MODULATE);

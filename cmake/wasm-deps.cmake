@@ -84,7 +84,7 @@ add_link_options("-fwasm-exceptions")
 # name the C++ frame instead of "wasm-function[12345]" — the Safari
 # quit-crash hunt needed exactly that.
 add_link_options("-O1" "-g0" "--profiling-funcs")
-# GeneralsX @build Codex 05/09/2026 Leave address space for ASan shadow memory.
+# WarPowers @fix 05/09/2026 Leave address space for ASan shadow memory.
 # ASan places its shadow inside wasm32 memory; a 4GB application limit cannot
 # fit both. Ordinary release builds keep their existing 4GB ceiling.
 if(RTS_BUILD_OPTION_ASAN)
@@ -111,7 +111,15 @@ add_link_options(
 # synchronously (brief freeze) but boots everywhere.
 
 # ---- d8web: D3D8→WebGL2 translation layer + engine bridge ----
-# d8web lives in the igroteka monorepo one level up from this fork.
-add_subdirectory(${CMAKE_SOURCE_DIR}/../dvijoke/d8web d8web EXCLUDE_FROM_ALL)
+# WarPowers @refactor 07/09/2026 The renderer is vendored in the parent War
+# Powers workspace (dvijoke/d8web, one level above this repository); another
+# checkout is selected with -DWP_D8WEB_DIR=<path>. Fail with a clear message
+# instead of CMake's "add_subdirectory given source which is not an existing
+# directory" when the engine is configured outside the workspace.
+set(WP_D8WEB_DIR "${CMAKE_SOURCE_DIR}/../dvijoke/d8web" CACHE PATH "Path to the dvijoke d8web renderer sources")
+if(NOT EXISTS "${WP_D8WEB_DIR}/CMakeLists.txt")
+    message(FATAL_ERROR "d8web renderer not found at ${WP_D8WEB_DIR}: build from the War Powers workspace (git clone https://github.com/abhishekpradhan/warpowers.git; it vendors dvijoke/d8web beside engine/), or set WP_D8WEB_DIR to a d8web checkout")
+endif()
+add_subdirectory("${WP_D8WEB_DIR}" d8web EXCLUDE_FROM_ALL)
 # (the d8web_bridge target is created next to z_generals, where the engine's
 # d3d8lib interface target with the DXVK/CompatLib include set already exists)

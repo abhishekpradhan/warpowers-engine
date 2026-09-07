@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later
+ * Copyright (c) 2026 GeneralsXWeb contributors and The War Powers authors */
 /* Igroteka wasm - fontconfig stub implementation.
  * Every font query resolves to the single font bundled at /fonts/default.ttf
  * in the Emscripten virtual filesystem (packaged at build time). */

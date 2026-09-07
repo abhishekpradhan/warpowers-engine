@@ -1154,6 +1154,23 @@ add_library(z_gameengine STATIC)
 
 target_sources(z_gameengine PRIVATE ${GAMEENGINE_SRC})
 
+# WarPowers @refactor 07/09/2026 The autotest/clicktest harness is its own
+# translation unit that exists only in -DWP_HARNESS=ON builds. WP_HARNESS=1 is
+# applied per source file (not target-wide) so flipping the option recompiles
+# just the files that host the harness hooks instead of the whole engine.
+if(WP_HARNESS)
+    target_sources(z_gameengine PRIVATE
+        Include/WarPowers/WPHarness.h
+        Source/WarPowers/WPHarness.cpp
+    )
+    set_source_files_properties(
+        Source/Common/GameEngine.cpp
+        Source/GameClient/GUI/GUICallbacks/Menus/WPShell.cpp
+        Source/WarPowers/WPHarness.cpp
+        PROPERTIES COMPILE_DEFINITIONS WP_HARNESS=1
+    )
+endif()
+
 target_include_directories(z_gameengine PUBLIC
     Include
 )

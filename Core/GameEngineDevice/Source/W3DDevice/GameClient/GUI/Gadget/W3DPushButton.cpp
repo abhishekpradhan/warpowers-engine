@@ -48,8 +48,7 @@
 #include <stdlib.h>
 
 // USER INCLUDES //////////////////////////////////////////////////////////////
-#include "Common/Player.h"
-#include "Common/PlayerList.h"
+#include "Common/GlobalData.h"
 #include "GameClient/Gadget.h"
 #include "GameClient/GameWindowGlobal.h"
 #include "GameClient/GameWindowManager.h"
@@ -74,7 +73,7 @@
 
 void W3DGadgetPushButtonImageDrawThree(GameWindow *window, WinInstanceData *instData );
 void W3DGadgetPushButtonImageDrawOne(GameWindow *window, WinInstanceData *instData );
-static void drawWarPowersDisabledBadge( const ICoord2D& start, const ICoord2D& size );
+static void drawUnavailableBadge( const ICoord2D& start, const ICoord2D& size );
 
 // PRIVATE FUNCTIONS //////////////////////////////////////////////////////////
 
@@ -274,11 +273,11 @@ void W3DGadgetPushButtonDraw( GameWindow *window, WinInstanceData *instData )
 		}
 	}
 
-	// GeneralsX @tweak Codex 05/09/2026 Mark unavailable faction deployment without changing selected mode tabs.
+	// WarPowers @feature 05/09/2026 Mark unavailable faction deployment without changing selected mode tabs.
 	if( !BitIsSet( window->winGetStatus(), WIN_STATUS_ENABLED ) &&
 		(instData->m_decoratedNameString == "WPSkirmish.wnd:ButtonDeployMeridian" ||
 		 instData->m_decoratedNameString == "WPSkirmish.wnd:ButtonDeployJackal") )
-		drawWarPowersDisabledBadge( origin, size );
+		drawUnavailableBadge( origin, size );
 }
 
 
@@ -318,24 +317,26 @@ void W3DGadgetPushButtonImageDraw( GameWindow *window,
 	}
 }
 
-// GeneralsX @tweak Codex 05/09/2026 Give War Powers unavailable commands a shape cue as well as color.
-static Bool isWarPowersCommandPortrait( GameWindow *window, WinInstanceData *instData )
+// WarPowers @feature 05/09/2026 Give unavailable commands a shape cue as well as color.
+// WarPowers @refactor 07/09/2026 Opted into by the dataset (GameData
+// CommandButtonAvailabilityCues) rather than by side name, so retail data keeps
+// its stock portraits and the renderer knows nothing about factions.
+static Bool usesCommandAvailabilityCues( GameWindow *window, WinInstanceData *instData )
 {
+	if( !TheGlobalData || !TheGlobalData->m_commandButtonAvailabilityCues )
+		return FALSE;
+
 	if( !BitIsSet( window->winGetStatus(), WIN_STATUS_USE_OVERLAY_STATES ) ||
 		!GadgetButtonGetEnabledImage( window ) )
 		return FALSE;
 
 	// Empty queue slots clear overlay states; populated slots remain enabled for cancellation.
 	const AsciiString& name = instData->m_decoratedNameString;
-	if( !name.startsWith( "ControlBar.wnd:ButtonCommand" ) &&
-		!name.startsWith( "ControlBar.wnd:ButtonQueue" ) )
-		return FALSE;
-
-	Player *localPlayer = ThePlayerList ? ThePlayerList->getLocalPlayer() : nullptr;
-	return localPlayer && (localPlayer->getSide() == "WP" || localPlayer->getSide() == "WPJ");
+	return name.startsWith( "ControlBar.wnd:ButtonCommand" ) ||
+		name.startsWith( "ControlBar.wnd:ButtonQueue" );
 }
 
-static void drawWarPowersDisabledBadge( const ICoord2D& start, const ICoord2D& size )
+static void drawUnavailableBadge( const ICoord2D& start, const ICoord2D& size )
 {
 	const Int shortSide = MIN( size.x, size.y );
 	if( shortSide < 16 )
@@ -369,10 +370,10 @@ void W3DGadgetPushButtonImageDrawOne( GameWindow *window,
 {
 	const Image *image = nullptr;
 	ICoord2D size, start, end;
-	const Bool warPowersPortrait = isWarPowersCommandPortrait( window, instData );
-	const Bool warPowersDisabledCommand = warPowersPortrait && !BitIsSet( window->winGetStatus(), WIN_STATUS_ENABLED );
+	const Bool availabilityCues = usesCommandAvailabilityCues( window, instData );
+	const Bool unavailableCommand = availabilityCues && !BitIsSet( window->winGetStatus(), WIN_STATUS_ENABLED );
 	// Queue entries retain their normal appearance and progress while remaining available to cancel.
-	const Bool warPowersAvailableCommand = warPowersPortrait && !warPowersDisabledCommand &&
+	const Bool availableCommand = availabilityCues && !unavailableCommand &&
 		instData->m_decoratedNameString.startsWith( "ControlBar.wnd:ButtonCommand" );
 
 	//
@@ -452,19 +453,19 @@ void W3DGadgetPushButtonImageDrawOne( GameWindow *window,
 				}
 			}
 		}
-		// GeneralsX @tweak Codex 05/09/2026 Separate available color portraits from unavailable grayscale faces.
-		if( warPowersDisabledCommand && !BitIsSet( window->winGetStatus(), WIN_STATUS_NOT_READY ) )
+		// WarPowers @feature 05/09/2026 Separate available color portraits from unavailable grayscale faces.
+		if( unavailableCommand && !BitIsSet( window->winGetStatus(), WIN_STATUS_NOT_READY ) )
 		{
 			drawMode = Display::DRAW_IMAGE_GRAYSCALE;
 			colorMultiplier = 0xffffffff;
 		}
-		else if( warPowersAvailableCommand )
+		else if( availableCommand )
 		{
 			drawMode = Display::DRAW_IMAGE_BRIGHTENED;
 			colorMultiplier = 0xffa0a0a0; // MODULATE2X gives approximately 1.25 times the original RGB.
 		}
 		TheDisplay->drawImage( image, start.x, start.y, end.x, end.y, colorMultiplier, drawMode );
-		if( warPowersDisabledCommand )
+		if( unavailableCommand )
 		{
 			// Native grayscale ignores the vertex tint. A separate veil dims that path reliably.
 			// Recharge keeps its color and receives a lighter veil; its sweep is drawn afterwards.
@@ -474,7 +475,7 @@ void W3DGadgetPushButtonImageDrawOne( GameWindow *window,
 				TheDisplay->drawOpenRect( start.x + 1, start.y + 1, size.x - 2, size.y - 2, 1,
 					GameMakeColor(55, 62, 67, 255) );
 		}
-		else if( warPowersAvailableCommand && size.x > 4 && size.y > 4 )
+		else if( availableCommand && size.x > 4 && size.y > 4 )
 		{
 			// The available gold rim sits below text, veterancy, clocks and selected/hover overlays.
 			const Int stroke = MAX( 1, MIN(size.x, size.y) / 22 );
@@ -570,8 +571,8 @@ void W3DGadgetPushButtonImageDrawOne( GameWindow *window,
 	}
 
 	// Draw last so clocks and flashing never erase the unavailable-state marker.
-	if( warPowersDisabledCommand )
-		drawWarPowersDisabledBadge( start, size );
+	if( unavailableCommand )
+		drawUnavailableBadge( start, size );
 }
 
 

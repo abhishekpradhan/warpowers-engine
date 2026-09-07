@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (c) 2026 The War Powers authors
 // Deterministic device/timer fixture for test-keyboard-modifiers.py.
 // Production keyboard methods are inserted at the marker below by the runner.
 // This fixture checks event state, not SDL delivery or game commands.

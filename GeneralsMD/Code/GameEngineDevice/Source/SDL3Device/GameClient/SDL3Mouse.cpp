@@ -29,6 +29,7 @@
 
 // GeneralsX @bugfix BenderAI 13/02/2026 Fix include path (fighter19 pattern)
 #include "SDL3Device/GameClient/SDL3Mouse.h"
+#include "WPTrace.h"
 #include <cstdio>
 #include <cstring>
 #include <cmath>
@@ -192,7 +193,11 @@ static SDL_Surface* decodeCurFrame(const Uint8* buf, size_t len)
 	const int hotX = e[4] | (e[5] << 8);
 	const int hotY = e[6] | (e[7] << 8);
 	const Uint32 off = e[12] | (e[13] << 8) | (e[14] << 16) | ((Uint32)e[15] << 24);
-	if (off + 40 > len) return NULL;
+	// WarPowers @fix 07/09/2026 every header field is untrusted: the image
+	// offset (no 32-bit wrap), the BITMAPINFOHEADER size and the palette count
+	// (at most 256 entries) must all fit in the buffer, and the block layout is
+	// computed as sizes so no pointer is formed past the end.
+	if (off > len || len - off < 40) return NULL;
 
 	const Uint8* bih = buf + off;
 	const Uint32 biSize = bih[0] | (bih[1] << 8) | (bih[2] << 16) | ((Uint32)bih[3] << 24);
@@ -201,16 +206,20 @@ static SDL_Surface* decodeCurFrame(const Uint8* buf, size_t len)
 	const Uint16 bpp    = bih[14] | (bih[15] << 8);
 	Uint32 clrUsed      = bih[32] | (bih[33] << 8) | (bih[34] << 16) | ((Uint32)bih[35] << 24);
 	const Sint32 h = h2 / 2;  // height counts XOR + AND blocks
-	if (biSize < 40 || w <= 0 || h <= 0 || w > 256 || h > 256) return NULL;
+	if (biSize < 40 || biSize > len - off || w <= 0 || h <= 0 || w > 256 || h > 256) return NULL;
 	if (bpp != 1 && bpp != 4 && bpp != 8 && bpp != 24 && bpp != 32) return NULL;
+	if (clrUsed > 256) return NULL;
 
-	const Uint8* pal = bih + biSize;
-	Uint32 palN = (bpp <= 8) ? (clrUsed ? clrUsed : (1u << bpp)) : 0;
-	const Uint8* xorData = pal + palN * 4;
+	const Uint32 palN = (bpp <= 8) ? (clrUsed ? clrUsed : (1u << bpp)) : 0;
 	const size_t xorStride = ((size_t)w * bpp + 31) / 32 * 4;
 	const size_t andStride = ((size_t)w + 31) / 32 * 4;
-	const Uint8* andData = xorData + xorStride * h;
-	if ((size_t)(andData - buf) + andStride * h > len) return NULL;
+	const size_t palOff = (size_t)off + biSize;
+	const size_t xorOff = palOff + (size_t)palN * 4;
+	const size_t andOff = xorOff + xorStride * (size_t)h;
+	if (andOff + andStride * (size_t)h > len) return NULL;
+	const Uint8* pal = buf + palOff;
+	const Uint8* xorData = buf + xorOff;
+	const Uint8* andData = buf + andOff;
 
 	SDL_Surface* s = SDL_CreateSurface(w, h, SDL_PIXELFORMAT_RGBA32);
 	if (!s) return NULL;
@@ -222,12 +231,13 @@ static SDL_Surface* decodeCurFrame(const Uint8* buf, size_t len)
 		for (Sint32 x = 0; x < w; x++) {
 			Uint8 r = 0, g = 0, b = 0, a = 255;
 			switch (bpp) {
+				// palette indices past clrUsed have no colour: leave them black
 				case 1: { Uint32 i = (xrow[x >> 3] >> (7 - (x & 7))) & 1;
-					b = pal[i*4]; g = pal[i*4+1]; r = pal[i*4+2]; break; }
+					if (i < palN) { b = pal[i*4]; g = pal[i*4+1]; r = pal[i*4+2]; } break; }
 				case 4: { Uint32 i = (x & 1) ? (xrow[x >> 1] & 0xF) : (xrow[x >> 1] >> 4);
-					b = pal[i*4]; g = pal[i*4+1]; r = pal[i*4+2]; break; }
+					if (i < palN) { b = pal[i*4]; g = pal[i*4+1]; r = pal[i*4+2]; } break; }
 				case 8: { Uint32 i = xrow[x];
-					b = pal[i*4]; g = pal[i*4+1]; r = pal[i*4+2]; break; }
+					if (i < palN) { b = pal[i*4]; g = pal[i*4+1]; r = pal[i*4+2]; } break; }
 				case 24: b = xrow[x*3]; g = xrow[x*3+1]; r = xrow[x*3+2]; break;
 				case 32: b = xrow[x*4]; g = xrow[x*4+1]; r = xrow[x*4+2]; a = xrow[x*4+3]; break;
 			}
@@ -517,7 +527,7 @@ void SDL3Mouse::update(void)
  */
 void SDL3Mouse::initCursorResources(void)
 {
-	std::fprintf(stderr, "[cursor] initCursorResources: %d cursor slots\n", (int)NUM_MOUSE_CURSORS);
+	WP_TRACE("[cursor] initCursorResources: %d cursor slots\n", (int)NUM_MOUSE_CURSORS);
 	int loaded = 0, failed = 0, empty = 0;
 	for (Int cursor=FIRST_CURSOR; cursor<NUM_MOUSE_CURSORS; cursor++)
 	{
@@ -539,7 +549,7 @@ void SDL3Mouse::initCursorResources(void)
 			}
 		}
 	}
-	std::fprintf(stderr, "[cursor] initCursorResources done: loaded=%d failed=%d emptyName=%d\n", loaded, failed, empty);
+	WP_TRACE("[cursor] initCursorResources done: loaded=%d failed=%d emptyName=%d\n", loaded, failed, empty);
 }
 
 /**
@@ -1067,9 +1077,8 @@ void SDL3Mouse::translateEvent(UnsignedInt eventIndex, MouseIO *result)
 	result->pos.x = scaledX;
 	result->pos.y = scaledY;
 
-	// WarPowers @debug IG_TRACE mouse mapping (click-routing forensics)
-	static const bool wpTrace = getenv("IG_TRACE") && *getenv("IG_TRACE") != '0';
-	if (wpTrace && event.type != SDL_EVENT_MOUSE_MOTION) {
+	// WarPowers @feature 24/08/2026 IG_TRACE mouse mapping (click-routing forensics)
+	if (wpTraceEnabled() && event.type != SDL_EVENT_MOUSE_MOTION) {
 		SDL_Window* w = SDL_GetWindowFromID(windowID);
 		int ww = 0, wh = 0;
 		if (w) SDL_GetWindowSize(w, &ww, &wh);

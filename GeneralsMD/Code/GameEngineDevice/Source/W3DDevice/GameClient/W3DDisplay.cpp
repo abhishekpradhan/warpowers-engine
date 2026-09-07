@@ -82,6 +82,8 @@ static void drawFramerateBar();
 #include "W3DDevice/GameClient/HeightMap.h"
 #include "W3DDevice/GameClient/WorldHeightMap.h"
 #include "W3DDevice/GameClient/W3DScene.h"
+#include "GameClient/WPShell.h"
+#include "WPTrace.h"
 #include "W3DDevice/GameClient/W3DTerrainTracks.h"
 #include "W3DDevice/GameClient/W3DWater.h"
 #include "W3DDevice/GameClient/W3DVideoBuffer.h"
@@ -842,7 +844,7 @@ void W3DDisplay::setup2DRenderState(TextureClass *tex, DrawImageMode mode, Bool 
 			m_2DRender->Enable_Texturing(FALSE);
 		}
 
-		// GeneralsX @feature Codex 05/09/2026 Brighten command artwork while preserving its color and alpha.
+		// WarPowers @feature 05/09/2026 Brighten command artwork while preserving its color and alpha.
 		// Restore normal modulation on other batches so the opt-in mode cannot affect later UI.
 		m_2DRender->Get_Shader()->Set_Primary_Gradient(mode == DRAW_IMAGE_BRIGHTENED ?
 			ShaderClass::GRADIENT_MODULATE2X : ShaderClass::GRADIENT_MODULATE);
@@ -2008,7 +2010,7 @@ void W3DDisplay::draw()
 {
 	//USE_PERF_TIMER(W3DDisplay_draw)
 
-	// WarPowers @debug WP_SCENE_DUMP=<frame>: one-shot scene census at (or after)
+	// WarPowers @feature 23/08/2026 WP_SCENE_DUMP=<frame>: one-shot scene census at (or after)
 	// that logic frame — for hunting orphaned render objects
 	{
 		static const char* wpDumpEnv = getenv("WP_SCENE_DUMP");
@@ -2217,11 +2219,10 @@ AGAIN:
 		{
 			//USE_PERF_TIMER(BigAssRenderLoop)
 			static Bool couldRender = true;
-			// WarPowers @debug IG_TRACE scene-skip forensics (black-scene triage)
+			// WarPowers @feature 24/08/2026 IG_TRACE scene-skip forensics (black-scene triage)
 			{
-				static const bool wpTrace = getenv("IG_TRACE") && *getenv("IG_TRACE") != '0';
 				static unsigned wpSkipCount = 0;
-				if (wpTrace && (TheGlobalData->m_breakTheMovie || TheGlobalData->m_disableRender) && (++wpSkipCount % 120) == 1)
+				if (wpTraceEnabled() && (TheGlobalData->m_breakTheMovie || TheGlobalData->m_disableRender) && (++wpSkipCount % 120) == 1)
 					fprintf(stderr, "[WPSKIP] breakTheMovie=%d disableRender=%d count=%u\n",
 						(int)TheGlobalData->m_breakTheMovie, (int)TheGlobalData->m_disableRender, wpSkipCount);
 			}
@@ -2323,15 +2324,12 @@ AGAIN:
 					m_profilerFrameCapture->Capture(getWidth(), getHeight());
 				}
 #endif
-				// WarPowers @feature menu curtain: black out the whole frame
+				// WarPowers @feature 25/08/2026 menu curtain: black out the whole frame
 				// during the match-exit teardown window (confirm click ->
 				// next surface ready) - those frames otherwise show the
 				// un-dimmed dying world and read as flicker.
-				{
-					extern Bool g_wpMenuCurtain;
-					if (g_wpMenuCurtain)
-						drawFillRect( 0, 0, m_width, m_height, GameMakeColor( 0, 0, 0, 255 ) );
-				}
+				if (g_wpMenuCurtain)
+					drawFillRect( 0, 0, m_width, m_height, GameMakeColor( 0, 0, 0, 255 ) );
 
 				// render is all done!
 				WW3D::End_Render();

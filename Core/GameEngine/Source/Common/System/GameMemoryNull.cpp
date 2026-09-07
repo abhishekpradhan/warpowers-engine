@@ -114,7 +114,7 @@ void initMemoryManager()
 {
 	if (TheMemoryPoolFactory == nullptr && TheDynamicMemoryAllocator == nullptr)
 	{
-		// GeneralsX @build Codex 05/09/2026 Use valid type-size syntax in the ASan allocator path.
+		// WarPowers @fix 05/09/2026 Use valid type-size syntax in the ASan allocator path.
 		TheMemoryPoolFactory = new (malloc(sizeof(MemoryPoolFactory))) MemoryPoolFactory;
 		TheDynamicMemoryAllocator = new (malloc(sizeof(DynamicMemoryAllocator))) DynamicMemoryAllocator;
 

@@ -40,10 +40,12 @@ endif()
 
 # d3dx8 needs bittype.h from WWLib for Win32 types (DWORD, BYTE, UINT, etc.)
 # Add only WWLib directory (not full core_wwcommon to avoid d3d8.h conflicts from WWAudio)
-target_include_directories(d3dx8 PUBLIC 
+target_include_directories(d3dx8 PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/Include
     ${CMAKE_SOURCE_DIR}/Core/Libraries/Source/WWVegas/WWLib
 )
+# WarPowers @refactor 07/09/2026 WPTrace.h (the fork's single trace gate)
+target_include_directories(d3dx8 PRIVATE ${CMAKE_SOURCE_DIR}/Core/Libraries/Include)
 
 # Link d3dx8 to d3d8lib to get DirectX8 headers (min-dx8-sdk or DXVK)
 target_link_libraries(d3dx8 PUBLIC d3d8lib)

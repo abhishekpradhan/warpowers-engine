@@ -30,24 +30,6 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 
-// Igroteka wasm: boot trace logs are off by default — thousands per boot,
-// each crossing wasm->JS. Enable with window.IG_TRACE = 1 before the engine
-// script loads (native: IG_TRACE env var).
-#ifdef __EMSCRIPTEN__
-#include <emscripten/emscripten.h>
-static bool igTraceEnabled() {
-    static const bool on = EM_ASM_INT({
-        return (typeof window !== 'undefined' && window.IG_TRACE) ? 1 : 0;
-    }) != 0;
-    return on;
-}
-#else
-#include <cstdlib>
-static bool igTraceEnabled() {
-    static const bool on = getenv("IG_TRACE") && *getenv("IG_TRACE") != '0';
-    return on;
-}
-#endif
 
 #include "Common/Debug.h"
 #include "Common/GlobalData.h"

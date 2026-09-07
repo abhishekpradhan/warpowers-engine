@@ -27,23 +27,9 @@
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
 // Igroteka wasm: boot trace logs are off by default — thousands per boot,
-// each crossing wasm->JS. Enable with window.IG_TRACE = 1 before the engine
-// script loads (native: IG_TRACE env var).
-#ifdef __EMSCRIPTEN__
-#include <emscripten/emscripten.h>
-static bool igTraceEnabled() {
-    static const bool on = EM_ASM_INT({
-        return (typeof window !== 'undefined' && window.IG_TRACE) ? 1 : 0;
-    }) != 0;
-    return on;
-}
-#else
-#include <cstdlib>
-static bool igTraceEnabled() {
-    static const bool on = getenv("IG_TRACE") && *getenv("IG_TRACE") != '0';
-    return on;
-}
-#endif
+// each crossing wasm->JS. Enable with IG_TRACE=1 (WPTrace.h; the browser
+// shell sets it under ?debug=1).
+#include "WPTrace.h"
 
 #include "Common/SubsystemInterface.h"
 #include "Common/Xfer.h"
@@ -181,35 +167,35 @@ void SubsystemInterfaceList::initSubsystem(SubsystemInterface* sys, const char* 
 	}
 
 	// GeneralsX @feature BenderAI 20/02/2026 Debug traces for hang investigation
-	if (igTraceEnabled()) fprintf(stderr, "[SUBSYS] initSubsystem('%s') START\n", name.str());
+	if (wpTraceEnabled()) fprintf(stderr, "[SUBSYS] initSubsystem('%s') START\n", name.str());
 	fflush(stderr);
 
 	sys->setName(name);
 	
-	if (igTraceEnabled()) fprintf(stderr, "[SUBSYS] initSubsystem('%s') - About to call sys->init()\n", name.str());
+	if (wpTraceEnabled()) fprintf(stderr, "[SUBSYS] initSubsystem('%s') - About to call sys->init()\n", name.str());
 	fflush(stderr);
 	sys->init();
-	if (igTraceEnabled()) fprintf(stderr, "[SUBSYS] initSubsystem('%s') - sys->init() completed\n", name.str());
+	if (wpTraceEnabled()) fprintf(stderr, "[SUBSYS] initSubsystem('%s') - sys->init() completed\n", name.str());
 	fflush(stderr);
 
 	INI ini;
 	if (path1) {
-		if (igTraceEnabled()) fprintf(stderr, "[SUBSYS] initSubsystem('%s') - loadFileDirectory('%s') START\n", name.str(), path1);
+		if (wpTraceEnabled()) fprintf(stderr, "[SUBSYS] initSubsystem('%s') - loadFileDirectory('%s') START\n", name.str(), path1);
 		fflush(stderr);
 		ini.loadFileDirectory(path1, INI_LOAD_OVERWRITE, pXfer );
-		if (igTraceEnabled()) fprintf(stderr, "[SUBSYS] initSubsystem('%s') - loadFileDirectory('%s') DONE\n", name.str(), path1);
+		if (wpTraceEnabled()) fprintf(stderr, "[SUBSYS] initSubsystem('%s') - loadFileDirectory('%s') DONE\n", name.str(), path1);
 		fflush(stderr);
 	}
 	if (path2) {
-		if (igTraceEnabled()) fprintf(stderr, "[SUBSYS] initSubsystem('%s') - loadFileDirectory('%s') START\n", name.str(), path2);
+		if (wpTraceEnabled()) fprintf(stderr, "[SUBSYS] initSubsystem('%s') - loadFileDirectory('%s') START\n", name.str(), path2);
 		fflush(stderr);
 		ini.loadFileDirectory(path2, INI_LOAD_OVERWRITE, pXfer );
-		if (igTraceEnabled()) fprintf(stderr, "[SUBSYS] initSubsystem('%s') - loadFileDirectory('%s') DONE\n", name.str(), path2);
+		if (wpTraceEnabled()) fprintf(stderr, "[SUBSYS] initSubsystem('%s') - loadFileDirectory('%s') DONE\n", name.str(), path2);
 		fflush(stderr);
 	}
 
 	m_subsystems.push_back(sys);
-	if (igTraceEnabled()) fprintf(stderr, "[SUBSYS] initSubsystem('%s') END\n", name.str());
+	if (wpTraceEnabled()) fprintf(stderr, "[SUBSYS] initSubsystem('%s') END\n", name.str());
 	fflush(stderr);
 }
 

@@ -1,64 +1,96 @@
-name: Bug Report
-description: Report bugs or issues you've encountered while playing the game
-labels: [ "Bug", "⚠️ Triage" ]
+name: Engine bug report
+description: A problem in the War Powers engine build (browser or native). Game content, maps, art, missions and the web application belong to the parent repository.
+labels: ["bug", "triage"]
 
 body:
-- type: checkboxes
-  attributes:
-    label: Prerequisites
-    description: Please make sure you've completed the following steps before submitting an issue
-    options:
-      - label: I have searched for similar issues and confirmed this is not a duplicate
-        required: true
+  - type: markdown
+    attributes:
+      value: |
+        Engine problems (rendering, input, audio, simulation, saves, the WebAssembly build, native builds) belong here.
+        Unit rules, maps, art, missions, strings and the web application (loader, settings, operation record) are tracked in the parent repository:
+        https://github.com/abhishekpradhan/warpowers/issues
 
-- type: checkboxes
-  attributes:
-    label: Game Version
-    description: Which version(s) of the game does this bug appear in?
-    options:
-      - label: "Command & Conquer Generals"
-        required: false
-      - label: "Command & Conquer Generals: Zero Hour"
-        required: false
-      - label: "Other (please specify below)"
-        required: false
+  - type: checkboxes
+    attributes:
+      label: Before you start
+      options:
+        - label: I searched the existing issues and this is not a duplicate.
+          required: true
+        - label: The report contains no private data (saves, tokens, personal paths).
+          required: true
 
-- type: checkboxes
-  attributes:
-    label: Operating System
-    description: Which operating system(s) does this bug appear on? (Select all that apply)
-    options:
-      - label: "macOS"
-        required: false
-      - label: "Linux"
-        required: false
-      - label: "Other (please specify below)"
-        required: false
+  - type: input
+    id: build
+    attributes:
+      label: Build identifier
+      description: "Browser game: Settings, Copy diagnostics (includes the staged build ID). Native builds: the commit hash and the CMake preset."
+      placeholder: "abc123def456 (browser) or 0123abc macos-vulkan"
+    validations:
+      required: true
 
-- type: textarea
-  attributes:
-    label: Bug Description
-    description: |
-      What is the bug? What happened versus what you expected to happen?
-      Please provide a clear and detailed description.
-  validations:
-    required: true
+  - type: dropdown
+    id: target
+    attributes:
+      label: Build target
+      options:
+        - Browser (wasm preset)
+        - Browser (wasm-harness diagnostic build)
+        - Native macOS (macos-vulkan)
+        - Native Linux (linux64-*)
+        - Other (describe below)
+    validations:
+      required: true
 
-- type: textarea
-  attributes:
-    label: Reproduction Steps
-    description: How can we reproduce this bug?
-    placeholder: |
-      1. Start a new game with [specific settings]
-      2. Build/Select [specific unit/building]
-      3. Perform [specific action]
-      4. Observe [the bug]
-  validations:
-    required: true
+  - type: input
+    id: platform
+    attributes:
+      label: Browser/OS or native platform
+      placeholder: "Chrome 140 on macOS 15.6; Firefox 143 on Ubuntu 24.04; native macOS 15.6, M2"
+    validations:
+      required: true
 
-- type: textarea
-  attributes:
-    label: Additional Context
-    description: Add any relevant screenshots, video recordings, or other files here
-  validations:
-    required: false
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open Operations, Field Orientation
+        2. Select the headquarters and queue a Porter
+        3. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Include browser console errors, trace lines from a `?debug=1` run, native crash output, screenshots or a short recording where relevant.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: upstream
+    attributes:
+      label: Does it reproduce on upstream GeneralsX?
+      description: Native problems that reproduce on an unmodified GeneralsX or TheSuperHackers build should also be reported upstream so the fix reaches every port.
+      options:
+        - Not checked
+        - Yes, reproduces on upstream GeneralsX
+        - No, War Powers engine only
+        - Not applicable (browser-only code path)
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+    validations:
+      required: false

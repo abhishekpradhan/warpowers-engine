@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later
+ * Copyright (c) 2026 GeneralsXWeb contributors and The War Powers authors */
 /* Igroteka wasm - force-included libc gap shim (via -include in wasm-deps.cmake).
  * musl lacks the BSD wcslcpy/wcslcat that macOS provides natively and several
  * engine translation units call without including WWLib's stringex.h. */

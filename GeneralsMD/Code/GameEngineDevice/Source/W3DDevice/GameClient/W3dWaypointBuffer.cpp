@@ -97,10 +97,12 @@ for the bibs. */
 //=============================================================================
 W3DWaypointBuffer::W3DWaypointBuffer()
 {
-	m_waypointNodeRobj = WW3DAssetManager::Get_Instance()->Create_Render_Obj( "WPNODE01" );
+	// WarPowers @refactor 07/09/2026 rally-point art is dataset data (GameData
+	// RallyPointModel / RallyPointLineTexture); the defaults are the retail assets.
+	m_waypointNodeRobj = WW3DAssetManager::Get_Instance()->Create_Render_Obj( TheGlobalData->m_rallyPointModel.str() );
 	m_line = new SegmentedLineClass;
 
-	m_texture = WW3DAssetManager::Get_Instance()->Get_Texture( "wp_rallyline.tga" );
+	m_texture = WW3DAssetManager::Get_Instance()->Get_Texture( TheGlobalData->m_rallyPointLineTexture.str() );
 
 
   setDefaultLineStyle();

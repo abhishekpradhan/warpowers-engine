@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (c) 2026 The War Powers authors
 // Deterministic ownership fixture. The runner inserts the production mip filter.
 // Surface objects remain inspectable after an invalid final Release so baseline
 // ownership failures are reported directly, without dereferencing freed memory.

@@ -1254,7 +1254,7 @@ static void drawablePostDraw( Drawable *draw, void *userData )
 #else
 	ObjectShroudStatus ss = (!obj) ? OBJECTSHROUD_CLEAR : obj->getShroudedStatus(localPlayerIndex);
 #endif
-	// GeneralsX(WarPowers): never fog-cull the icon UI of the local player's own
+	// WarPowers @fix 23/08/2026 never fog-cull the icon UI of the local player's own
 	// objects — an abandoned construction site outside friendly vision otherwise
 	// renders translucent with NO "Constructing... N%" label and reads as a
 	// mystery ghost husk. Own-object overlays leak no intel.

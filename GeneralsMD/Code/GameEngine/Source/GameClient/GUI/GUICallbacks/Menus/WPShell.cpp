@@ -1,23 +1,10 @@
-/*
-**	Command & Conquer Generals Zero Hour(tm)
-**	Copyright 2025 Electronic Arts Inc.
-**
-**	This program is free software: you can redistribute it and/or modify
-**	it under the terms of the GNU General Public License as published by
-**	the Free Software Foundation, either version 3 of the License, or
-**	(at your option) any later version.
-**
-**	This program is distributed in the hope that it will be useful,
-**	but WITHOUT ANY WARRANTY; without even the implied warranty of
-**	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-**	GNU General Public License for more details.
-**
-**	You should have received a copy of the GNU General Public License
-**	along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*/
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (c) 2026 The War Powers authors
+//
+// Original War Powers fork code (not derived from an Electronic Arts source file).
 
 // FILE: WPShell.cpp //////////////////////////////////////////////////////////
-// WarPowers @feature In-engine shell: main menu, deployment (skirmish) menu,
+// WarPowers @feature 23/08/2026 In-engine shell: main menu, deployment (skirmish) menu,
 // options, and post-match score screen. The War Powers layouts declare these
 // callbacks; the stock EA menus (MainMenu.cpp faction flyouts, GameSpy
 // screens) stay dormant. Matches started here use the same start path as the
@@ -27,6 +14,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 #include "PreRTS.h"
+#include "WPTrace.h"
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -55,6 +43,7 @@
 #include "GameClient/View.h"
 #include "GameClient/InGameUI.h"
 #include "GameClient/GUICallbacks.h"
+#include "GameClient/WPShell.h"
 #include "GameClient/Image.h"
 #include "GameClient/GadgetPushButton.h"
 #include "GameClient/GadgetStaticText.h"
@@ -77,7 +66,7 @@
 #include "GameLogic/Module/SpecialPowerModule.h"
 #include "GameLogic/ScriptEngine.h"
 
-// GeneralsX @feature Codex 05/09/2026 Keep browser telemetry tied to the actual
+// WarPowers @feature 05/09/2026 Keep browser telemetry tied to the actual
 // map, including direct loads, restarts and restored snapshots.
 static AsciiString wpCurrentMapID()
 {
@@ -119,6 +108,8 @@ static Bool s_wpWebOwnsPause = FALSE;
 static Bool s_wpOpenDeployment = FALSE;
 static WindowLayout *s_wpMainLayout = nullptr;
 static WindowLayout *s_wpDeploymentLayout = nullptr;
+#if WP_HARNESS
+// WP_REVIEW_SCENE fixture state (test harness builds only).
 static Bool s_wpReviewActive = FALSE;
 static Bool s_wpReviewScene = FALSE;
 static UnsignedInt s_wpReviewStartMS = 0, s_wpReviewReportFrame = 0;
@@ -126,6 +117,7 @@ static UnsignedInt s_wpReviewPowerLogs = 0, s_wpReviewPowerFrame = 0;
 static ObjectID s_wpReviewPowerSelection = INVALID_ID;
 static Bool s_wpReviewPowerReady = FALSE;
 static AsciiString s_wpReviewPowerPending;
+#endif
 static Bool s_wpMissionDiagnosticArmed = FALSE, s_wpMissionDiagnosticExpectedWin = FALSE;
 static Int s_wpMissionDiagnosticResult = 0;
 
@@ -142,12 +134,14 @@ void WPArmMissionDiagnosticResult( Bool victory )
 	if( s_wpMissionDiagnosticResult != -1 ) s_wpMissionDiagnosticResult = 0;
 }
 
-// Developer-only, repeatable native asset/contact review. The regular maps,
-// simulation and campaign flow never enter this path without an explicit flag.
+// Developer-only, repeatable native asset/contact review (WP_REVIEW_SCENE=1|stress).
+// The fixture is compiled only into WP_HARNESS builds; production builds keep the
+// per-map diagnostic reset and nothing else.
 void WPCreateReviewScene()
 {
 	s_wpMissionDiagnosticArmed = FALSE; // This entry point runs once per fresh map.
 	s_wpMissionDiagnosticResult = 0;
+#if WP_HARNESS
 	s_wpReviewScene = FALSE;
 	s_wpReviewPowerLogs = 0;
 	s_wpReviewPowerFrame = 0;
@@ -223,9 +217,10 @@ void WPCreateReviewScene()
 	s_wpReviewScene = TRUE;
 	s_wpReviewActive = TRUE; s_wpReviewStartMS = timeGetTime(); s_wpReviewReportFrame = 0;
 	fprintf(stderr, "[WP_REVIEW] enabled map=%s mode=%s; visual quality requires manual review\n", map.str(), mode);
+#endif
 }
 
-// GeneralsX @feature Codex 05/09/2026 Scripted objective announcements use
+// WarPowers @feature 05/09/2026 Scripted objective announcements use
 // the accessible web event surface when available, with native fallback.
 Bool WPDisplayMissionText( const AsciiString &key )
 {
@@ -244,7 +239,7 @@ Bool WPDisplayMissionText( const AsciiString &key )
 #endif
 }
 
-// GeneralsX @bugfix Codex 05/09/2026 Native War Powers notices share the
+// WarPowers @fix 05/09/2026 Native War Powers notices share the
 // browser notification surface so they cannot hide behind the objective HUD.
 Bool WPDisplayPlayerMessage( const UnicodeString &message )
 {
@@ -290,7 +285,8 @@ static AsciiString wpControlKey( GameMessage::Type command )
 	return AsciiString::TheEmptyString;
 }
 
-// GeneralsX @feature Codex 05/09/2026 Review-only diagnostics distinguish a
+#if WP_HARNESS
+// WarPowers @feature 05/09/2026 Review-only diagnostics distinguish a
 // charging/disabled power from a command button that never enters targeting.
 // Read public state only; never force readiness or invoke the command.
 static void wpReviewSelectedPower( Object *selected, const AsciiString &map, UnsignedInt frame )
@@ -332,8 +328,16 @@ static void wpReviewSelectedPower( Object *selected, const AsciiString &map, Uns
 	s_wpReviewPowerReady = ready;
 	s_wpReviewPowerPending = pendingName;
 }
+#endif // WP_HARNESS
 
-// GeneralsX @feature Codex 05/09/2026 Read-only player telemetry drives help
+// HUD text comes from the string table (data/Data/Generals.str); an empty
+// string is the safe fallback before TheGameText exists.
+static UnicodeString wpHudLabel( const char *key )
+{
+	return TheGameText ? TheGameText->fetch( key ) : UnicodeString::TheEmptyString;
+}
+
+// WarPowers @feature 05/09/2026 Read-only player telemetry drives help
 // and mission UI; it never changes simulation counters or opponent state.
 void WPUpdatePlayerExperience()
 {
@@ -344,7 +348,7 @@ void WPUpdatePlayerExperience()
 	const AsciiString map = inGame ? wpCurrentMapID() : AsciiString::TheEmptyString;
 	const UnsignedInt frame = inGame ? TheGameLogic->getFrame() : 0;
 	Int units = 0, structures = 0, builders = 0, production = 0, income = 0, idleWorkers = 0;
-	// GeneralsX @feature Codex 05/09/2026 Report completed, living training requirements without replacing script stage authority.
+	// WarPowers @feature 05/09/2026 Report completed, living training requirements without replacing script stage authority.
 	const char *trainingNames[] = { "WP_Fabricator", "WP_Exchange", "WP_PowerArray", "WP_Porter",
 		"WP_VehiclePlant", "WP_Tank", "WP_Vigil" };
 	Int trainingCounts[ARRAY_SIZE(trainingNames)] = {};
@@ -381,7 +385,9 @@ void WPUpdatePlayerExperience()
 		}
 	Drawable *drawable = inGame && TheInGameUI ? TheInGameUI->getFirstSelectedDrawable() : nullptr;
 	Object *selected = drawable ? drawable->getObject() : nullptr;
+#if WP_HARNESS
 	wpReviewSelectedPower(selected, map, frame);
+#endif
 	Int selectedCount = inGame && TheInGameUI ? TheInGameUI->getSelectCount() : 0;
 	AsciiString selectedName, selectedTemplate;
 	Real health = 0.0f, maxHealth = 0.0f;
@@ -396,14 +402,14 @@ void WPUpdatePlayerExperience()
 			maxHealth = selected->getBodyModule()->getMaxHealth();
 		}
 		label = selected->getTemplate()->getDisplayName();
-		if( selectedCount > 1 ) label.format( L"%d UNITS SELECTED", selectedCount );
+		if( selectedCount > 1 ) label.format( wpHudLabel("WP:HudUnitsSelected"), selectedCount );
 		if( !selected->getStatusBits().test(OBJECT_STATUS_UNDER_CONSTRUCTION) )
-			detail.format( L"HEALTH  %d / %d", (Int)health, (Int)maxHealth );
+			detail.format( wpHudLabel("WP:HudHealth"), (Int)health, (Int)maxHealth );
 	}
 	else if( TheGameText ) label = TheGameText->fetch("WP:SelectionHint");
 	wpHudText( "ControlBar.wnd:SelectionTitle", label );
 	wpHudText( "ControlBar.wnd:SelectionDetail", detail );
-	// GeneralsX @feature Codex 05/09/2026 Explain power availability in text;
+	// WarPowers @feature 05/09/2026 Explain power availability in text;
 	// a dark command portrait alone does not communicate charge or power state.
 	UnicodeString orders = TheGameText ? TheGameText->fetch("WP:OrdersLabel") : UnicodeString::TheEmptyString;
 	if( TheGameText && selected && selectedCount == 1 && selected->getControllingPlayer() == player &&
@@ -438,20 +444,23 @@ void WPUpdatePlayerExperience()
 	{
 		UnicodeString army;
 		if( !selected || !selected->getStatusBits().test(OBJECT_STATUS_UNDER_CONSTRUCTION) )
-			army.format( L"%d UNITS  /  %d STRUCTURES", units, structures );
+			army.format( wpHudLabel("WP:HudArmySummary"), units, structures );
 		wpHudText( "ControlBar.wnd:ArmySummary", army );
-		UnicodeString hint;
-		AsciiString hintText;
-		hintText.format( "%sIDLE BUILDER  /  %sHEADQUARTERS",
+		// Key names are ASCII: format the narrow string, then widen it.
+		AsciiString hintFormat, hintText;
+		hintFormat.translate( wpHudLabel("WP:HudControlsHint") );
+		hintText.format( hintFormat.str(),
 			wpControlKey(GameMessage::MSG_META_SELECT_NEXT_IDLE_WORKER).str(),
 			wpControlKey(GameMessage::MSG_META_VIEW_COMMAND_CENTER).str() );
+		UnicodeString hint;
 		hint.translate( hintText );
 		wpHudText( "ControlBar.wnd:ControlsHint", hint );
 		UnicodeString power;
-		power.format( L"POWER  %d / %d", player->getEnergy()->getConsumption(), player->getEnergy()->getProduction() );
+		power.format( wpHudLabel("WP:HudPower"), player->getEnergy()->getConsumption(), player->getEnergy()->getProduction() );
 		wpHudText( "ControlBar.wnd:PowerSummary", power );
 	}
 	if( !inGame ) s_wpWebOwnsPause = FALSE;
+#if WP_HARNESS
 	if( !inGame ) s_wpReviewActive = FALSE;
 	if( !inGame ) s_wpReviewScene = FALSE;
 	if( s_wpReviewActive && frame >= s_wpReviewReportFrame + 300 )
@@ -467,6 +476,7 @@ void WPUpdatePlayerExperience()
 		s_wpReviewReportFrame = frame;
 		if( frame >= 1800 ) { s_wpReviewActive = FALSE; fprintf(stderr, "[WP_REVIEW] sampling complete; no performance or visual pass is inferred\n"); }
 	}
+#endif // WP_HARNESS
 #ifdef __EMSCRIPTEN__
 	const TCounter *stage = inGame && TheScriptEngine ? TheScriptEngine->getCounter("WP_ObjectiveStage") : nullptr;
 	const TCounter *progress = inGame && TheScriptEngine ? TheScriptEngine->getCounter("WP_ObjectiveProgress") : nullptr;
@@ -533,6 +543,8 @@ static WPMatchResult s_wpResult = { FALSE, FALSE, 0, 0, 0, 0, 0, 0 };
 void WPRecordMatchResult( Bool victory )
 {
 	s_wpResultMap = wpCurrentMapID();
+#if WP_HARNESS
+	// WarPowers @refactor 07/09/2026 mission-diagnostic verdict (WP_AUTOTEST=mission*) is harness-only.
 	const char *test = getenv("WP_AUTOTEST");
 	if( test && (strcmp(test, "mission") == 0 || strncmp(test, "mission-defeat", 14) == 0) ) {
 		const Bool expected = strcmp(test, "mission") == 0;
@@ -543,6 +555,7 @@ void WPRecordMatchResult( Bool victory )
 		s_wpMissionDiagnosticArmed = FALSE;
 		fflush(stderr);
 	}
+#endif
 	s_wpResultDifficulty = TheScriptEngine ? TheScriptEngine->getGlobalDifficulty() : DIFFICULTY_NORMAL;
 	s_wpResult.valid = TRUE;
 	s_wpResult.victory = victory;
@@ -586,33 +599,60 @@ void WPRecordMatchResult( Bool victory )
 #endif
 }
 
-#ifdef __EMSCRIPTEN__
 // ----------------------------------------------------------------------------
-// Compatibility master-volume export. The web settings surface uses the
-// independent master/channel API below for current builds.
+// Audio levels (percent). The page sets all four through wpSetAudioLevels; the
+// in-engine Options slider moves only the master, so the page's per-channel
+// levels survive. System-setting channel volumes keep mission fades' own
+// script multipliers intact on every audio backend.
 // ----------------------------------------------------------------------------
-extern "C" EMSCRIPTEN_KEEPALIVE void wpSetMasterVolume( int pct )
+static Int s_wpMasterPct = -1;   // -1: not read yet (see wpMasterPct)
+static Int s_wpMusicPct = 100, s_wpEffectsPct = 100, s_wpVoicePct = 100;
+
+static Int wpClampPct( Int pct )
 {
-	if( pct < 0 ) pct = 0;
-	if( pct > 100 ) pct = 100;
-	if( TheAudio )
-		TheAudio->setVolume( ((Real)pct) / 100.0f, (AudioAffect)AudioAffect_All );
+	return pct < 0 ? 0 : pct > 100 ? 100 : pct;
 }
 
-// GeneralsX @feature Codex 05/09/2026 Settings use system channels so mission
+// The live master level. First use seeds it from WP_VOLUME, which the boot
+// page forwards from its persisted slider; the audio exports update it after.
+static Int wpMasterPct()
+{
+	if( s_wpMasterPct < 0 )
+	{
+		const char *env = getenv( "WP_VOLUME" );
+		s_wpMasterPct = env && *env ? wpClampPct( atoi( env ) ) : 100;
+	}
+	return s_wpMasterPct;
+}
+
+static void wpApplyAudioLevels()
+{
+	if( !TheAudio ) return;
+	const Int master = wpMasterPct();
+	const Int levels[] = { s_wpMusicPct, s_wpEffectsPct, s_wpVoicePct };
+	const Int groups[] = { AudioAffect_Music, AudioAffect_Sound | AudioAffect_Sound3D, AudioAffect_Speech };
+	for( Int i = 0; i < 3; ++i )
+		TheAudio->setVolume( (Real)(master * levels[i]) / 10000.0f,
+			(AudioAffect)(groups[i] | AudioAffect_SystemSetting) );
+}
+
+#ifdef __EMSCRIPTEN__
+// Compatibility master-volume export; the settings surface uses wpSetAudioLevels.
+extern "C" EMSCRIPTEN_KEEPALIVE void wpSetMasterVolume( int pct )
+{
+	s_wpMasterPct = wpClampPct( pct );
+	wpApplyAudioLevels();
+}
+
+// WarPowers @feature 05/09/2026 Settings use system channels so mission
 // fades retain their independent script multipliers on every audio backend.
 extern "C" EMSCRIPTEN_KEEPALIVE void wpSetAudioLevels( int master, int music, int effects, int voice )
 {
-	if( !TheAudio ) return;
-	const int levels[] = { music, effects, voice };
-	const int groups[] = { AudioAffect_Music, AudioAffect_Sound | AudioAffect_Sound3D, AudioAffect_Speech };
-	master = master < 0 ? 0 : master > 100 ? 100 : master;
-	for( int i = 0; i < 3; ++i )
-	{
-		int level = levels[i] < 0 ? 0 : levels[i] > 100 ? 100 : levels[i];
-		TheAudio->setVolume( (Real)(master * level) / 10000.0f,
-			(AudioAffect)(groups[i] | AudioAffect_SystemSetting) );
-	}
+	s_wpMasterPct = wpClampPct( master );
+	s_wpMusicPct = wpClampPct( music );
+	s_wpEffectsPct = wpClampPct( effects );
+	s_wpVoicePct = wpClampPct( voice );
+	wpApplyAudioLevels();
 }
 
 // A web panel may release only the pause it acquired, preserving Escape/P.
@@ -702,10 +742,8 @@ static void wpStartMap( const char *mapPath )
 	if( !mapPath || !*mapPath ) return;
 	s_wpLastMapPath = mapPath;
 	s_wpWebOwnsPause = FALSE;
-	// WarPowers @debug IG_TRACE menu-start forensics
-	static const bool wpTrace = getenv("IG_TRACE") && *getenv("IG_TRACE") != '0';
-	if (wpTrace)
-		fprintf(stderr, "[WPSHELL] startMap '%s' diff=%d\n", mapPath, (int)s_wpDiffIdx);
+	// WarPowers @feature 24/08/2026 IG_TRACE menu-start forensics
+	WP_TRACE("[WPSHELL] startMap '%s' diff=%d\n", mapPath, (int)s_wpDiffIdx);
 	TheWritableGlobalData->m_pendingFile = mapPath;
 	TheWritableGlobalData->m_shellMapOn = FALSE;
 	TheWritableGlobalData->m_playIntro = FALSE;
@@ -739,8 +777,6 @@ static NameKeyType wpButtonEngageID = NAMEKEY_INVALID;
 static NameKeyType wpButtonOptionsID = NAMEKEY_INVALID;
 static NameKeyType wpButtonQuitID = NAMEKEY_INVALID;
 
-extern Bool g_wpMenuCurtain;  // WarPowers @feature menu curtain
-
 void WPMainMenuInit( WindowLayout *layout, void *userData )
 {
 	s_wpMainLayout = layout;
@@ -760,7 +796,7 @@ void WPMainMenuInit( WindowLayout *layout, void *userData )
 	wpButtonOptionsID = TheNameKeyGenerator->nameToKey( "MainMenu.wnd:ButtonOptions" );
 	wpButtonQuitID = TheNameKeyGenerator->nameToKey( "MainMenu.wnd:ButtonQuit" );
 
-	// GeneralsX @tweak Codex 05/09/2026 Settings exposes the staged build ID;
+	// WarPowers @feature 05/09/2026 Settings exposes the staged build ID;
 	// a compiler timestamp is redundant and does not identify the game pack.
 	GameWindow *version = TheWindowManager->winGetWindowFromId( nullptr,
 		TheNameKeyGenerator->nameToKey( "MainMenu.wnd:LabelVersion" ) );
@@ -919,7 +955,7 @@ static void wpSkirmishRefreshLabels( void )
 		preview->winSetEnabledImage( 0, TheMappedImageCollection->findImageByName(entry.preview) );
 	GameWindow *meridian = TheWindowManager->winGetWindowFromId( nullptr, wpDeployMeridianID );
 	GameWindow *jackal = TheWindowManager->winGetWindowFromId( nullptr, wpDeployJackalID );
-	// GeneralsX @tweak Codex 05/09/2026 All scenarios are open; show only the factions authored for this map.
+	// WarPowers @feature 05/09/2026 All scenarios are open; show only the factions authored for this map.
 	if( meridian )
 	{
 		meridian->winHide( entry.mer == nullptr );
@@ -1107,15 +1143,7 @@ void WPOptionsInit( WindowLayout *layout, void *userData )
 
 	GameWindow *slider = TheWindowManager->winGetWindowFromId( nullptr, wpVolumeSliderID );
 	if( slider )
-	{
-		Int pos = 80;
-		const char *env = getenv( "WP_VOLUME" );
-		if( env && *env )
-			pos = atoi( env );
-		if( pos < 0 ) pos = 0;
-		if( pos > 100 ) pos = 100;
-		GadgetSliderSetPosition( slider, pos );
-	}
+		GadgetSliderSetPosition( slider, wpMasterPct() );  // the live master, not a boot-time env value
 
 	layout->hide( FALSE );
 	layout->bringForward();
@@ -1140,11 +1168,9 @@ WindowMsgHandledType WPOptionsSystem( GameWindow *window, UnsignedInt msg,
 			GameWindow *control = (GameWindow *)mData1;
 			if( control && control->winGetWindowId() == wpVolumeSliderID )
 			{
-				Real volume = ((Real)(Int)mData2) / 100.0f;
-				if( volume < 0.0f ) volume = 0.0f;
-				if( volume > 1.0f ) volume = 1.0f;
-				if( TheAudio )
-					TheAudio->setVolume( volume, (AudioAffect)AudioAffect_All );
+				// Master only: the page's per-channel levels stay as they are.
+				s_wpMasterPct = wpClampPct( (Int)mData2 );
+				wpApplyAudioLevels();
 #ifdef __EMSCRIPTEN__
 				// Persist across sessions; the boot page seeds WP_VOLUME
 				// from this key.

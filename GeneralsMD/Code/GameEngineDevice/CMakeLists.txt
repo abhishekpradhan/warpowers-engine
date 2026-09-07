@@ -225,6 +225,15 @@ add_library(z_gameenginedevice STATIC)
 
 target_sources(z_gameenginedevice PRIVATE ${GAMEENGINEDEVICE_SRC})
 
+# WarPowers @refactor 07/09/2026 The WP_CLICKTEST hook in SDL3GameEngine.cpp is
+# compiled only with -DWP_HARNESS=ON; per-file so toggling the option does not
+# rebuild the whole device library. SDL3GameEngine.cpp is a non-Windows source.
+if(WP_HARNESS AND NOT WIN32)
+    set_source_files_properties(Source/SDL3GameEngine.cpp
+        PROPERTIES COMPILE_DEFINITIONS WP_HARNESS=1
+    )
+endif()
+
 target_include_directories(z_gameenginedevice PUBLIC
     Include
 )

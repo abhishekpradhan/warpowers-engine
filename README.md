@@ -1,18 +1,18 @@
 # War Powers engine
 
-The engine fork used by [War Powers](https://github.com/abhishekpradhan/warpowers), a browser RTS with its own freely licensed game dataset. This repository carries the GeneralsX engine lineage, the Emscripten target, and the integration needed to run the War Powers menus, controls and missions.
+The engine component of [War Powers](https://github.com/abhishekpradhan/warpowers), a free browser real-time strategy game with its own original dataset. This repository is a fork of [GeneralsX](https://github.com/fbraz3/GeneralsX), which builds on [TheSuperHackers' GeneralsGameCode](https://github.com/TheSuperHackers/GeneralsGameCode), which continues Electronic Arts' GPL release of the *Command & Conquer: Generals* and *Zero Hour* source. War Powers adds the browser target: the engine is compiled with [Emscripten](https://emscripten.org/) against SDL3 for windowing and input, [MiniAudio](https://miniaud.io/) for audio, and the vendored [d8web](https://github.com/abhishekpradhan/warpowers/tree/main/dvijoke/d8web) Direct3D 8 to WebGL2 renderer from the parent workspace (both the Emscripten target and d8web originate in [GeneralsXWeb](https://github.com/meerzulee/GeneralsXWeb)).
 
-**This is a development fork, currently private.** The upstream release links below describe other projects; they are not War Powers releases. Publication, deployment and upstream submissions remain separate owner decisions.
+The repository also keeps GeneralsX's native macOS and Linux builds working; they are the fastest way to debug engine behaviour outside a browser. No retail game files are needed for War Powers: the dataset lives in the parent repository, and this repository contains only engine code, its build system and the browser bridge.
 
 ## Build the browser game
 
-Use the complete War Powers workspace. The WebAssembly target expects `dvijoke/d8web` beside `engine/`; this repository alone does not contain the browser renderer, boot page or game dataset.
-
-Prerequisites: an activated Emscripten SDK with `emcc` and `emcmake` on `PATH`, CMake, Ninja and Python 3. Initial configuration downloads the dependencies declared in CMake.
+The browser build is driven from the parent workspace, which supplies the d8web renderer, the web shell and the game data. Prerequisites: an activated Emscripten SDK (`emcc` and `emcmake` on `PATH`; 6.0.8 is the tested version), CMake 3.25 or newer, Ninja and Python 3.10 or newer. The first configure downloads the dependencies declared under `cmake/`. The full quick start, including the browser requirements, is in the [parent README](https://github.com/abhishekpradhan/warpowers#play-it); in short:
 
 ```sh
-git clone --recursive https://github.com/abhishekpradhan/warpowers.git
-cd warpowers/engine
+git clone https://github.com/abhishekpradhan/warpowers.git
+cd warpowers
+git submodule update --init engine
+cd engine
 emcmake cmake --preset wasm
 cmake --build build/wasm --target GeneralsXZH.js
 cd ..
@@ -20,33 +20,97 @@ python3 tools/genwebstage.py
 python3 tools/serve.py
 ```
 
-Open [the local game](http://localhost:8322). The workspace server supplies WASM MIME and cache headers. Keep the same URL for browser records and checkpoints, and reuse an existing server on that port. Use `emcmake` when configuring: plain CMake can select the host compiler. The engine outputs are `build/wasm/GeneralsMD/GeneralsXZH.js` and `GeneralsXZH.wasm`. The workspace staging command combines them with the current dataset and web application.
+Open http://localhost:8322 in a desktop browser with WebGL2. The staging step combines `build/wasm/GeneralsMD/GeneralsXZH.js` and `GeneralsXZH.wasm` with the current dataset and web application; the local server adds the WebAssembly MIME type and cache headers. Configure with `emcmake`: plain CMake may pick the host compiler. Keep one server and URL across sessions, because browser records and checkpoints are stored per origin.
 
-The browser build uses SDL3 input, MiniAudio, and the D3D8-to-WebGL2 `d8web` renderer. DXVK's native compatibility headers are used during compilation, but DXVK's Vulkan libraries and MoltenVK do not run in the browser. Browser multiplayer and cross-platform deterministic replay compatibility are not established by a successful WebAssembly build.
+Two configure presets produce browser builds:
+
+| Preset | Build directory | Purpose |
+|---|---|---|
+| `wasm` | `build/wasm` | Production build. Contains no self-test, click-test or review-scene code (`WP_HARNESS=OFF`). |
+| `wasm-harness` | `build/wasm-harness` | Diagnostic build (`WP_HARNESS=ON`). Compiles `GeneralsMD/Code/GameEngine/Source/WarPowers/WPHarness.cpp` and the harness hooks in `GameEngine.cpp`, `SDL3GameEngine.cpp` and `WPShell.cpp`; the definition is applied per file, so the rest of the engine is identical. Required for `?autotest=` and `?review=` runs. Stage it into its own directory and serve that directory from the parent workspace: `python3 tools/genwebstage.py webstage-harness --build-dir engine/build/wasm-harness/GeneralsMD`, then `python3 tools/serve.py --directory webstage-harness`. |
+
+`cmake/wasm-deps.cmake` expects the renderer at `../dvijoke/d8web`, which the clone above provides (d8web is vendored in the parent repository, so the browser build needs no nested submodule; `references/fbraz3-dxvk` and `references/OpenSAGE.BlenderPlugin` are for native development and art regeneration). Point `WP_D8WEB_DIR` at another checkout when the layout differs: `emcmake cmake --preset wasm -DWP_D8WEB_DIR=/path/to/d8web`. The configure step fails with a clear message when the renderer is missing.
+
+The browser build uses DXVK's Direct3D 8 compatibility headers at compile time only; DXVK's Vulkan libraries and MoltenVK never run in the browser. A successful WebAssembly build does not by itself establish browser multiplayer or cross-platform replay compatibility. The [wasm/README.md](wasm/README.md) page describes the bridge, the compatibility shims and the unsupported WebRTC prototype kept under `wasm/experimental/`.
 
 ## Native development
 
-Native builds are useful for engine diagnostics and asset inspection. Start with the inherited [macOS build guide](docs/BUILD/MACOS.md) or [Linux build guide](docs/BUILD/LINUX.md) for toolchain setup. Some inherited installation and replay instructions assume separately owned retail game files; they do not describe the War Powers dataset.
+Native builds are useful for engine diagnostics, asset inspection and native debuggers. Start with the inherited [macOS build guide](docs/BUILD/MACOS.md) or [Linux build guide](docs/BUILD/LINUX.md) for toolchain setup (CMake, Ninja, plus Meson and a LunarG Vulkan SDK on macOS). Inherited installation and replay instructions assume retail game files; they do not describe the War Powers dataset, which the parent workspace copies into a runtime directory for native runs.
 
-For native macOS work against the DXVK checkout pinned by this repository, configure from the engine directory:
+The native macOS path renders through DXVK on MoltenVK. `cmake/dx8.cmake` offers two DXVK sources:
+
+- Default: a pinned commit (`DXVK_REMOTE_REF`) of fbraz3's DXVK fork, cloned into `build/<preset>/_deps/`.
+- `-DSAGE_DXVK_USE_LOCAL_FORK=ON`: the submodule at `references/fbraz3-dxvk`. The path keeps its upstream name so that merges stay simple, but the submodule tracks the War Powers DXVK fork ([warpowers-dxvk](https://github.com/abhishekpradhan/warpowers-dxvk), branch `main`), which carries the fbraz3 macOS history plus the fork's own fixes. Its [README](references/fbraz3-dxvk/README.md) describes the integration boundary.
 
 ```sh
 cmake --preset macos-vulkan -DSAGE_DXVK_USE_LOCAL_FORK=ON
 cmake --build build/macos-vulkan --target z_generals
 ```
 
-The local-fork option matters: without it, [cmake/dx8.cmake](cmake/dx8.cmake) fetches its configured upstream DXVK commit instead of consuming `references/fbraz3-dxvk`. Edit that source checkout, never generated files under `build/_deps/`. See the [DXVK fork README](references/fbraz3-dxvk/README.md) for its integration boundary.
+Edit DXVK in the submodule checkout, never under `build/_deps/`. The Linux presets download DXVK's prebuilt native tarball instead of building it.
 
 ## What belongs here
 
-Engine fixes, browser integration, input/rendering/audio behavior and War Powers engine callbacks belong in this fork. Unit rules, models, textures, maps, mission metadata, web UI and asset generators belong in the parent War Powers workspace. Keep shared platform fixes separate from pack-specific behavior so useful fixes can be reviewed for upstream contribution later.
+| This repository | Parent workspace | DXVK fork |
+|---|---|---|
+| Engine fixes; the browser bridge under `wasm/`; input, rendering, audio and simulation; save/load exports; the War Powers menu and mission callbacks (`WPShell.cpp`, `WarPowers/`); CMake and presets | Unit rules, models, textures, maps, missions, strings, the web application, asset generators, staging and hosting | DXVK changes for the native macOS path, followed by a submodule update here |
 
-[CONTRIBUTING.md](CONTRIBUTING.md) describes fork routing, validation and review. [AGENTS.md](AGENTS.md) contains implementation constraints. The [worklog](docs/WORKLOG/README.md) distinguishes current fork work from inherited upstream history. Existing [replay instructions](TESTING.md) and [runtime flags](docs/ETC/COMMAND_LINE_PARAMETERS.md) remain references, not evidence that this fork has passed every upstream test.
+Keep shared platform fixes separate from dataset-specific behaviour so that generic fixes can be offered upstream. [CONTRIBUTING.md](CONTRIBUTING.md) describes routing, style and validation; [AGENTS.md](AGENTS.md) collects the engine constraints inherited from GeneralsX. The [worklog](docs/WORKLOG/README.md) is an AI-generated development diary kept for history; contributors are not asked to extend it. Inherited [replay instructions](TESTING.md) and [runtime flags](docs/ETC/COMMAND_LINE_PARAMETERS.md) remain references for the native builds.
 
-## Lineage and attribution
+## Diagnostics
 
-This work builds on EA's released Generals / Zero Hour source, [GeneralsX](https://github.com/fbraz3/GeneralsX), [TheSuperHackers](https://github.com/TheSuperHackers/GeneralsGameCode), the [Fighter19/feliwir port](https://github.com/Fighter19/CnC_Generals_Zero_Hour), and [GeneralsXWeb](https://github.com/meerzulee/GeneralsXWeb). Their engine, platform and browser work is the foundation of this fork. Original copyright notices and history are retained.
+Diagnostic output goes through `Core/Libraries/Include/WPTrace.h`: `WP_TRACE(...)` prints to stderr only while the `IG_TRACE` environment variable is set to a non-empty value other than `0`. The browser shell sets it only with `?debug=1`; native runs export it in the shell. The `WP_*` switches below work the same way: environment variables for native builds, query parameters that the web shell copies into the Emscripten `ENV` at boot for browser builds. The harness column says whether the hook exists only in the `wasm-harness` build; the `#if WP_HARNESS` blocks in the four harness files are the authoritative list.
 
-For the upstream projects' own releases and documentation, see [GeneralsX releases](https://github.com/fbraz3/GeneralsX/releases), [TheSuperHackers releases](https://github.com/TheSuperHackers/GeneralsGameCode/releases), and the inherited [tutorial index](docs/HOWTO/README.md). Those projects do not supply or endorse War Powers releases.
+| Variable | Effect | Needs harness build |
+|---|---|---|
+| `IG_TRACE=1` | Enables `WP_TRACE` output everywhere (browser: `?debug=1`) | no |
+| `WP_AUTOTEST=<mode>` | Self-driving diagnostics (browser: `?autotest=<mode>`). Modes include `base` and `wedge` (construction), `build` and the unit lab, `economy`, `powers`, `strike`, `ghost`, `husk`, `cycle`, `win`, `defeat`, `mission` and `mission-defeat[-hq]` (result paths) and `retry` (repeated score-screen Retry lifecycle). They inject fixtures or force outcomes; they are not played matches. | yes |
+| `WP_AUTOTEST_UNIT=<template>` | Unit template fielded by the unit lab instead of the default tank | yes |
+| `WP_RETRY_RUNS`, `WP_RETRY_FRAMES` | Runs (1 to 30, default 3) and match length in frames (900 to 54000, default 5400) for `WP_AUTOTEST=retry` (browser: `?retryruns=`, `?retryframes=`) | yes |
+| `WP_CLICKTEST=1` or `ui` | Synthesised SDL mouse clicks pushed through the real input path; pair with `WP_AUTOTEST=build` | yes |
+| `WP_REVIEW_SCENE=1` or `stress` | Faction asset rows on the `WPTest`/`WPTestJ` Flats maps; `stress` adds up to 120 mixed units with attack-move orders (browser: `?review=1`) | yes |
+| `WP_SCENE_DUMP=<frame>` (`+<frame>` re-arms per match) | One-shot render-object census at that logic frame (browser: `?scenedump=`) | no |
+| `WP_AI_TRACE=1` | AI production and script-condition tracing (browser: `?aitrace=1`) | no |
+| `WP_DOZER_TRACE=1` | Builder task-gate forensics every 15 frames (browser: `?doztrace=1`) | no |
+| `WP_SURFACE_TRACE=1` | Surface ownership records in the d8web bridge (browser: `?surfacetrace=1` in diagnostic runs) | no |
+| `WP_FRAME_DUMP=<path.tga>` | Writes the back buffer to that file every 60th frame; works with an occluded native window | no |
+| `WP_PRESENT_SKIP=<N>` | Presents only every Nth frame so an occluded native window does not throttle the simulation | no |
+| `WP_BOOT_MAP=<Maps\X\X.map>` | Boots straight into a map and returns to the in-engine shell afterwards, unlike `-file`, which quits | no |
+| `WP_DIFFICULTY=0`, `1` or `2` | Difficulty for `-file` matches (headless AI testing) | no |
+| `WP_VOLUME=0..100` | Master volume; the browser shell forwards its settings slider | no |
 
-The inherited [LICENSE.md](LICENSE.md) contains GPL version 3 and EA's additional terms; it is unchanged. Component licenses remain with their respective code. This source release does not grant redistribution rights to EA game assets, and War Powers does not include or require them. EA does not endorse or support this fork.
+[CONTRIBUTING.md](CONTRIBUTING.md) explains what each diagnostic does and does not prove.
+
+## Upstream relationship
+
+A maintained checkout has `origin` (this repository) plus the fetch-only remotes `upstream` (fbraz3/GeneralsX), `superhackers` (TheSuperHackers/GeneralsGameCode) and `generalsxweb` (meerzulee/GeneralsXWeb) with their push URLs disabled. Upstream changes are merged in from those remotes; nothing is pushed to them from here.
+
+Fixes that are not specific to War Powers (input ordering, D3DX compatibility, text layout, determinism) are kept as focused commits with reproduction details so that they can be offered upstream as pull requests. Dataset-specific behaviour (War Powers menus, mission callbacks, the browser bridge) stays in this fork. Fork changes are annotated in code as `// WarPowers @fix|@feature|@refactor DD/MM/YYYY <why>`; the inherited `GeneralsX @...`, `GeneralsXWeb @...` and `Igroteka @...` annotations are kept as they are.
+
+## License
+
+GPL-3.0 with Electronic Arts' additional terms, unchanged from the source release: see [LICENSE.md](LICENSE.md). Files added by the fork carry `SPDX-License-Identifier: GPL-3.0-or-later` and are copyright "The War Powers authors". Third-party components keep their own licenses (for example d8web under MIT and DXVK under zlib); the parent workspace's [licensing guide](https://github.com/abhishekpradhan/warpowers/blob/main/LICENSING.md) records the notices that ship with the browser build. This source release does not grant redistribution rights to EA game assets; War Powers neither includes nor requires them. EA has not endorsed and does not support this fork.
+
+## Inherited GeneralsX material
+
+The sections below come from the upstream GeneralsX README and describe that project. Their release links, community ports and support channels are not War Powers releases or support channels; they are kept for attribution and orientation.
+
+### Upstream projects and releases
+
+- [GeneralsX](https://github.com/fbraz3/GeneralsX): the cross-platform (Linux and macOS) port this fork is based on; [releases](https://github.com/fbraz3/GeneralsX/releases), inherited [build guides](docs/BUILD/) and [tutorials](docs/HOWTO/README.md).
+- [TheSuperHackers/GeneralsGameCode](https://github.com/TheSuperHackers/GeneralsGameCode): the upstream foundation for stability, bug fixes and retail compatibility; [releases](https://github.com/TheSuperHackers/GeneralsGameCode/releases).
+- [Fighter19's fork](https://github.com/Fighter19/CnC_Generals_Zero_Hour), with major work by feliwir: the SDL3, DXVK, OpenAL, FFmpeg and filesystem groundwork GeneralsX builds on.
+- [GeneralsXWeb](https://github.com/meerzulee/GeneralsXWeb): the first browser/WebAssembly port of GeneralsX and the origin of the Emscripten target, the d8web renderer and the `wasm/` glue.
+
+### Project goals (GeneralsX)
+
+GeneralsX exists to turn upstream preservation and porting work into a practical and maintainable project for active Linux and macOS players: preserve retail gameplay behaviour while modernising the platform layer; keep a single codebase with Linux and macOS as the active targets, applying fixes to both Zero Hour and the Generals base game; replace the Windows-only DirectX 8 and Miles stack with portable open-source equivalents; and keep the upstream lineage clear by distinguishing foundational work from GeneralsX's integration, packaging and platform support. Improvements aligned with upstream stability belong in TheSuperHackers' repository; GeneralsX keeps the changes specific to cross-platform delivery and packaging.
+
+### Special thanks
+
+- [Westwood Studios](https://cnc-comm.com/westwood-studios) for creating the Command & Conquer series, and [EA Games](https://www.ea.com/) for Command & Conquer: Generals and the source release.
+- [TheSuperHackers / Xezon](https://github.com/TheSuperHackers/GeneralsGameCode) and contributors for the upstream stability, bug fixes and code modernisation that form the foundation of GeneralsX.
+- [Fighter19](https://github.com/Fighter19) for the cross-platform port that pioneered SDL3 windowing, DXVK graphics and MinGW build support on Linux, and [feliwir](https://github.com/feliwir) for the foundational cross-platform systems in that fork: OpenAL audio, FFmpeg video decoding, C++17 filesystem and FreeType/Fontconfig text rendering.
+- [fbraz3](https://github.com/fbraz3) and the GeneralsX contributors, and [Meerzulee](https://github.com/meerzulee) for GeneralsXWeb and d8web.
+
+All trademarks are the property of their respective owners.

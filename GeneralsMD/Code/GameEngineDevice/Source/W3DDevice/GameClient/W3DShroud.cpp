@@ -31,6 +31,7 @@
 #include "WW3D2/camera.h"
 #include "WWLib/simplevec.h"
 #include "WW3D2/dx8wrapper.h"
+#include "WPTrace.h"
 #include "Common/MapObject.h"
 #include "Common/PerfTimer.h"
 #include "W3DDevice/GameClient/HeightMap.h"
@@ -162,7 +163,7 @@ void W3DShroud::init(WorldHeightMap *pMap, Real worldCellSizeX, Real worldCellSi
 #endif
 		m_pSrcTexture = DX8Wrapper::_Create_DX8_Surface(srcWidth,srcHeight, WW3D_FORMAT_R5G6B5);
 
-	// WarPowers @bugfix Some Vulkan/Metal drivers refuse 16-bit offscreen plain
+	// WarPowers @fix 21/08/2026 Some Vulkan/Metal drivers refuse 16-bit offscreen plain
 	// surfaces; fall back to 32-bit, and if surface creation fails entirely,
 	// leave the shroud disabled (get/setShroudLevel already tolerate null).
 	if (m_pSrcTexture == nullptr)
@@ -745,13 +746,12 @@ void W3DShroud::interpolateFogLevels(RECT *rect)
 
 	UnsignedInt timeDiff=timeGetTime()-prevTime;
 
-#ifdef __EMSCRIPTEN__
+	// WarPowers @fix 07/09/2026 opt-in (IG_TRACE): first few interpolation ticks.
 	static int logCount = 0;
-	if (logCount < 5) {
+	if (logCount < 5 && wpTraceEnabled()) {
 		fprintf(stderr, "[SHROUD] interpolate tick: now=%u diff=%u\n", timeGetTime(), timeDiff);
 		logCount++;
 	}
-#endif
 
 	if (!timeDiff)
 		return;	//no time has elapsed

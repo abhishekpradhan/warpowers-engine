@@ -47,6 +47,7 @@
 #include <set>
 #include <string>	// This must go first in EVERY cpp file in the GameEngine
 
+#include "WPTrace.h"
 #include "GameClient/GameText.h"
 #include "Common/Language.h"
 #include "Common/Registry.h"
@@ -299,7 +300,8 @@ void GameTextManager::init()
 	Int format;
 
 	// GeneralsX @bugfix BenderAI 16/02/2026 - Debug CSF init
-	fprintf(stderr, "[CSF] init() - START\n");
+	// WarPowers @fix 07/09/2026 opt-in (IG_TRACE): the [CSF] progress lines printed on every boot.
+	WP_TRACE("[CSF] init() - START\n");
 
 	if ( m_initialized )
 	{
@@ -323,7 +325,7 @@ void GameTextManager::init()
 	}
 	else if ( getCSFInfo ( csfFile.str(), m_textCount, m_language ) )
 	{
-		fprintf(stderr, "[CSF] init() - getCSFInfo OK, textCount=%d\n", m_textCount);
+		WP_TRACE("[CSF] init() - getCSFInfo OK, textCount=%d\n", m_textCount);
 		format = CSF_FILE;
 	}
 	else
@@ -357,14 +359,14 @@ void GameTextManager::init()
 	}
 	else
 	{
-		fprintf(stderr, "[CSF] init() - Calling parseCSF()...\n");
+		WP_TRACE("[CSF] init() - Calling parseCSF()...\n");
 		if ( !parseCSF ( csfFile.str(), m_stringInfo, m_textCount, m_maxLabelLen ) )
 		{
 			fprintf(stderr, "[CSF] init() - parseCSF FAILED\n");
 			deinit();
 			return;
 		}
-		fprintf(stderr, "[CSF] init() - parseCSF SUCCESS\n");
+		WP_TRACE("[CSF] init() - parseCSF SUCCESS\n");
 	}
 
 	m_stringLUT = NEW StringLookUp[m_textCount];
@@ -965,7 +967,7 @@ Bool GameTextManager::parseCSF( const Char *filename, StringInfo *stringInfo, In
 	CSFHeader header;
 
 	// GeneralsX @bugfix BenderAI 16/02/2026 - Debug parseCSF
-	fprintf(stderr, "[CSF] parseCSF() - START filename='%s'\n", filename);
+	WP_TRACE("[CSF] parseCSF() - START filename='%s'\n", filename);
 
 	file = TheFileSystem->openFile(filename, File::READ | File::BINARY, File::BUFFERSIZE, instance);
 
@@ -975,7 +977,7 @@ Bool GameTextManager::parseCSF( const Char *filename, StringInfo *stringInfo, In
 		return FALSE;
 	}
 
-	fprintf(stderr, "[CSF] parseCSF() - File opened\n");
+	WP_TRACE("[CSF] parseCSF() - File opened\n");
 
 	if (  file->read ( &header, sizeof ( CSFHeader)) != sizeof ( CSFHeader) )
 	{
@@ -984,17 +986,17 @@ Bool GameTextManager::parseCSF( const Char *filename, StringInfo *stringInfo, In
 	}
 
 	// GeneralsX @bugfix BenderAI 17/02/2026 - Log header for debugging
-	fprintf(stderr, "[CSF] parseCSF() - Header: id=%#x version=%d num_labels=%d num_strings=%d skip=%d langid=%d\n",
+	WP_TRACE("[CSF] parseCSF() - Header: id=%#x version=%d num_labels=%d num_strings=%d skip=%d langid=%d\n",
 		header.id, header.version, header.num_labels, header.num_strings, header.skip, header.langid);
 
 	// GeneralsX @bugfix BenderAI 17/02/2026 - Skip extra bytes after header
 	// The 'skip' field indicates how many bytes to advance before reading first label
 	if (header.skip > 0) {
-		fprintf(stderr, "[CSF] parseCSF() - Skipping %d bytes as indicated by header.skip\n", header.skip);
+		WP_TRACE("[CSF] parseCSF() - Skipping %d bytes as indicated by header.skip\n", header.skip);
 		file->seek(header.skip, File::CURRENT);
 	}
 
-	fprintf(stderr, "[CSF] parseCSF() - Starting main loop (textCount=%d)...\n", textCount);
+	WP_TRACE("[CSF] parseCSF() - Starting main loop (textCount=%d)...\n", textCount);
 
 	while( file->read ( &id, sizeof (id)) == sizeof ( id) )
 	{
@@ -1108,16 +1110,16 @@ Bool GameTextManager::parseCSF( const Char *filename, StringInfo *stringInfo, In
 		
 		// GeneralsX @bugfix BenderAI 17/02/2026 Progress logging every 500 labels
 		if (listCount % 500 == 0) {
-			fprintf(stderr, "[CSF] parseCSF() - Progress: %d/%d labels processed\n", listCount, textCount);
+			WP_TRACE("[CSF] parseCSF() - Progress: %d/%d labels processed\n", listCount, textCount);
 		}
 	}
 
-	fprintf(stderr, "[CSF] parseCSF() - Main loop complete! Processed %d/%d labels\n", listCount, textCount);
+	WP_TRACE("[CSF] parseCSF() - Main loop complete! Processed %d/%d labels\n", listCount, textCount);
 	ok = TRUE;
 
 quit:
 
-	fprintf(stderr, "[CSF] parseCSF() - Reached quit label: ok=%s, listCount=%d/%d\n", 
+	WP_TRACE("[CSF] parseCSF() - Reached quit label: ok=%s, listCount=%d/%d\n", 
 		ok ? "TRUE" : "FALSE", listCount, textCount);
 
 	file->close();
@@ -1419,7 +1421,7 @@ UnicodeString GameTextManager::fetch( const Char *label, Bool *exists )
 			static std::set<std::string> reportedMissing;
 			if (reportedMissing.insert(label).second)
 			{
-				printf("[gametext] missing label: %s\n", label);
+				fprintf(stderr, "[gametext] missing label: %s\n", label);
 			}
 		}
 		missingString = UnicodeString::TheEmptyString;

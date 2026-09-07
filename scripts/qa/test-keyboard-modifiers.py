@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Compile the production keyboard methods against deterministic input fixtures.
 
 Run from any directory with Python 3 and a native C++17 compiler:

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (c) 2026 The War Powers authors
 // Deterministic font/surface fixture for test-sentence-hotkeys.py.
 // The runner inserts production layout, allocation and glyph-blitting methods.
 // GPU uploads and font rasterization are deliberately outside this fixture.

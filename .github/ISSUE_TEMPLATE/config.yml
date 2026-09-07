@@ -1,9 +1,11 @@
 blank_issues_enabled: true
 contact_links:
-- name: Feature Request
-  url: https://github.com/fbraz3/GeneralsX/discussions/categories/ideas
-  about: Share your ideas or request new features to enhance the game
-
-#- name: Community Outpost Discord Server
-#  url: https://discord.gg/WzxQDZersE
-#  about: For help with miscellaneous things, join our Discord community
+  - name: Game content, maps, art, missions and the web application
+    url: https://github.com/abhishekpradhan/warpowers/issues/new/choose
+    about: The parent War Powers repository owns the dataset and the browser shell. Report those problems there; engine problems belong here.
+  - name: Upstream GeneralsX engine
+    url: https://github.com/fbraz3/GeneralsX/issues
+    about: Native problems that reproduce on an unmodified GeneralsX build should also be reported upstream.
+  - name: Security vulnerabilities
+    url: https://github.com/abhishekpradhan/warpowers-engine/security/advisories/new
+    about: Report privately through GitHub's advisory form; see SECURITY.md.

@@ -30,6 +30,7 @@
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
+#include "WPTrace.h"
 
 #include <stdio.h>
 
@@ -116,7 +117,7 @@ void GameWindowManager::processDestroyList()
 		if( m_grabWindow == doDestroy )
 			m_grabWindow = nullptr;
 
-		// GeneralsX @feature Codex 05/09/2026 Capture the owner before text teardown in opt-in surface diagnostics.
+		// WarPowers @feature 05/09/2026 Capture the owner before text teardown in opt-in surface diagnostics.
 #ifdef __EMSCRIPTEN__
 		Igroteka_TraceSurfaceWindow(doDestroy->winGetInstanceData()->m_decoratedNameString.str());
 #endif
@@ -1036,15 +1037,11 @@ WinInputReturnCode GameWindowManager::winProcessMouseEvent( GameWindowMessage ms
 						window = nullptr;
 				}
 
-			// WarPowers @debug IG_TRACE window hit-test forensics (menu click routing)
-			{
-				static const bool wpTrace = getenv("IG_TRACE") && *getenv("IG_TRACE") != '0';
-				if (wpTrace && (msg == GWM_LEFT_DOWN || msg == GWM_LEFT_UP)) {
-					fprintf(stderr, "[WINHIT] gwm=%d pos=%d,%d win=%s\n", (int)msg,
-						mousePos->x, mousePos->y,
-						window ? window->winGetInstanceData()->m_decoratedNameString.str() : "(none)");
-				}
-			}
+			// WarPowers @feature 24/08/2026 IG_TRACE window hit-test forensics (menu click routing)
+			if (msg == GWM_LEFT_DOWN || msg == GWM_LEFT_UP)
+				WP_TRACE("[WINHIT] gwm=%d pos=%d,%d win=%s\n", (int)msg,
+					mousePos->x, mousePos->y,
+					window ? window->winGetInstanceData()->m_decoratedNameString.str() : "(none)");
 
 			if( window )
 			{
@@ -3552,7 +3549,7 @@ UnicodeString GameWindowManager::winTextLabelToText( AsciiString label )
 	if( label.isEmpty() )
 		return UnicodeString::TheEmptyString;
 
-	// GeneralsX(WarPowers): labels that look like string-manager keys ("WP:Cancel",
+	// WarPowers @feature 23/08/2026 labels that look like string-manager keys ("WP:Cancel",
 	// "GUI:Options") resolve through TheGameText — the original left this as a
 	// raw-copy stub, so WND TEXT fields rendered their key names verbatim
 	if( TheGameText && strchr( label.str(), ':' ) != nullptr )

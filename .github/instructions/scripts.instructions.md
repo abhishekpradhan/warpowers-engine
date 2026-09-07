@@ -41,7 +41,8 @@ scripts/
 
 - **`qa/`** - Quality assurance, testing, and validation
   - `qa/smoke/` - Smoke tests and basic validation
-  - **Examples**: `docker-smoke-test-zh.sh`, `run-bundled-game.sh`
+  - `qa/test-*.py` with `*-fixture.cpp` - War Powers fixture regressions that compile production methods without an engine build (run by `.github/workflows/qa.yml`)
+  - **Examples**: `docker-smoke-test-zh.sh`, `run-bundled-game.sh`, `test-keyboard-modifiers.py`
 
 - **`legacy/`** - Deprecated or old scripts
   - `legacy/compat/` - Backward-compatibility shims and old implementations

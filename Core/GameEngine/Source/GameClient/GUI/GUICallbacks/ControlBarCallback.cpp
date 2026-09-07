@@ -62,7 +62,7 @@ WindowLayout *popupCommunicatorLayout = nullptr;
 //-------------------------------------------------------------------------------------------------
 /** Input procedure for the left HUD */
 //-------------------------------------------------------------------------------------------------
-// WarPowers @fix: the HUD strip must never leak clicks into the world.
+// WarPowers @fix 24/08/2026 the HUD strip must never leak clicks into the world.
 // When the hit chain all returns MSG_IGNORED (disabled build button, the
 // gap between buttons, a bare panel), winProcessMouseEvent treats the
 // event as unused and the game translators turn it into a rally-point /

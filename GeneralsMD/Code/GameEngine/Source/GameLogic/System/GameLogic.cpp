@@ -28,6 +28,8 @@
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
+#include "GameClient/WPShell.h"
+#include "WPTrace.h"
 
 #ifndef _WIN32
 #include <fenv.h>
@@ -435,7 +437,7 @@ void GameLogic::init()
 	ThePartitionManager->init();
 	// [WPSHELL] "cp *" lines = startNewGame/init checkpoint breadcrumbs
 	// (IG_TRACE) for bisecting map-load hangs.
-	{ static const bool wpT = getenv("IG_TRACE") && *getenv("IG_TRACE") != '0'; if (wpT) { fprintf(stderr, "[WPSHELL] cp partition-init\n"); fflush(stderr); } }
+	WP_TRACE("[WPSHELL] cp partition-init\n");
 	ThePartitionManager->setName("ThePartitionManager");
 
 
@@ -1504,18 +1506,15 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 
 	// load a map
 	TheTerrainLogic->loadMap( TheGlobalData->m_mapName, false );
-	// WarPowers @debug IG_TRACE menu-start forensics
+	// WarPowers @feature 24/08/2026 IG_TRACE menu-start forensics
+	if (wpTraceEnabled())
 	{
-		static const bool wpTrace = getenv("IG_TRACE") && *getenv("IG_TRACE") != '0';
-		if (wpTrace)
-		{
-			Region3D wpExtent;
-			wpExtent.lo.x = wpExtent.hi.x = 0.0f;
-			if (TheTerrainLogic)
-				TheTerrainLogic->getExtent(&wpExtent);
-			fprintf(stderr, "[WPSHELL] startNewGame loaded map '%s' extentW=%f\n",
-				TheGlobalData->m_mapName.str(), wpExtent.hi.x - wpExtent.lo.x);
-		}
+		Region3D wpExtent;
+		wpExtent.lo.x = wpExtent.hi.x = 0.0f;
+		if (TheTerrainLogic)
+			TheTerrainLogic->getExtent(&wpExtent);
+		fprintf(stderr, "[WPSHELL] startNewGame loaded map '%s' extentW=%f\n",
+			TheGlobalData->m_mapName.str(), wpExtent.hi.x - wpExtent.lo.x);
 	}
 	// anytime the world's size changes, must reset the partition mgr
 	//ThePartitionManager->init();
@@ -1709,7 +1708,7 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 		TheSidesList->addTeam(&d);
 	//}
 	TheSidesList->validateSides();
-	{ static const bool wpT = getenv("IG_TRACE") && *getenv("IG_TRACE") != '0'; if (wpT) { fprintf(stderr, "[WPSHELL] cp validateSides\n"); fflush(stderr); } }
+	WP_TRACE("[WPSHELL] cp validateSides\n");
 
 	// update the loadscreen
 	updateLoadProgress(LOAD_PROGRESS_POST_SIDE_LIST_INIT);
@@ -1723,7 +1722,7 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 
 	// Tell the script engine that a newe set of scripts is loaded.
 	TheScriptEngine->newMap();
-	{ static const bool wpT = getenv("IG_TRACE") && *getenv("IG_TRACE") != '0'; if (wpT) { fprintf(stderr, "[WPSHELL] cp scriptEngine-newMap\n"); fflush(stderr); } }
+	WP_TRACE("[WPSHELL] cp scriptEngine-newMap\n");
 
 	// update the loadscreen
 	updateLoadProgress(LOAD_PROGRESS_POST_SCRIPT_ENGINE_NEW_MAP);
@@ -1881,7 +1880,7 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 
 	// set the radar as on a new map
 	TheRadar->newMap( TheTerrainLogic );
-	{ static const bool wpT = getenv("IG_TRACE") && *getenv("IG_TRACE") != '0'; if (wpT) { fprintf(stderr, "[WPSHELL] cp radar-newMap\n"); fflush(stderr); } }
+	WP_TRACE("[WPSHELL] cp radar-newMap\n");
 
 	// TheSuperHackers @tweak Force on radar for all observers.
 	for (Int i = 0; i < MAX_PLAYER_COUNT; ++i)
@@ -1921,7 +1920,7 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 
 	// update the terrain logic now that all is loaded
 	TheTerrainLogic->newMap( loadingSaveGame );
-	{ static const bool wpT = getenv("IG_TRACE") && *getenv("IG_TRACE") != '0'; if (wpT) { fprintf(stderr, "[WPSHELL] cp terrainLogic-newMap\n"); fflush(stderr); } }
+	WP_TRACE("[WPSHELL] cp terrainLogic-newMap\n");
 
 	// update the loadscreen
 	updateLoadProgress(LOAD_PROGRESS_POST_TERRAIN_LOGIC_NEW_MAP);
@@ -1982,7 +1981,7 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 	// tell the AI about it
 	// Note that it is important that the pathfinder be called before the map objects are loaded.
 	TheAI->pathfinder()->newMap();
-	{ static const bool wpT = getenv("IG_TRACE") && *getenv("IG_TRACE") != '0'; if (wpT) { fprintf(stderr, "[WPSHELL] cp pathfinder-newMap\n"); fflush(stderr); } }
+	WP_TRACE("[WPSHELL] cp pathfinder-newMap\n");
 
 	// update the loadscreen
 	updateLoadProgress(LOAD_PROGRESS_POST_PATHFINDER_NEW_MAP);
@@ -2274,7 +2273,7 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 	updateLoadProgress(LOAD_PROGRESS_POST_PRELOAD_ASSETS);
 
 	// TheSuperHackers @info Initialize the camera height limits to default if the resolution was changed
-	{ static const bool wpT = getenv("IG_TRACE") && *getenv("IG_TRACE") != '0'; if (wpT) { fprintf(stderr, "[WPSHELL] cp camera-defaults\n"); fflush(stderr); } }
+	WP_TRACE("[WPSHELL] cp camera-defaults\n");
 	TheTacticalView->setCameraHeightAboveGroundLimitsToDefault();
 	TheTacticalView->setAngleToDefault();
 	TheTacticalView->setPitchToDefault();
@@ -2497,7 +2496,7 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 	else
 	{
 
-		// WarPowers @fix: the -file entry path bypasses the menu flow, so
+		// WarPowers @fix 22/08/2026 the -file entry path bypasses the menu flow, so
 		// nobody hides the shell; its full-screen MainMenu window then stays
 		// visible-status and blocks all in-game drawable picking (every
 		// click dies in W3DView::pickDrawable's window-under-cursor check).
@@ -2513,7 +2512,7 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 			}
 			TheShell->hide(TRUE);
 		}
-		// WarPowers @fix: with the shell screens popped, MainMenuInit never
+		// WarPowers @fix 22/08/2026 with the shell screens popped, MainMenuInit never
 		// runs, so nobody clears the render freeze that Intro::doPostIntro
 		// arms (m_breakTheMovie). Clear it here or the 3D scene is never
 		// rendered again (W3DDisplay::draw skips its whole render block),
@@ -2594,7 +2593,7 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 		}
 	}
 
-	{ static const bool wpT = getenv("IG_TRACE") && *getenv("IG_TRACE") != '0'; if (wpT) fprintf(stderr, "[WPSHELL] startNewGame checkpoint controlbar-branch\n"); }
+	WP_TRACE("[WPSHELL] startNewGame checkpoint controlbar-branch\n");
 	if(m_gameMode == GAME_SHELL)
 	{
 		HideControlBar();
@@ -2609,11 +2608,8 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 	HideControlBar();
 #endif
 	TheWritableGlobalData->m_loadScreenRender = FALSE;	///< mark to resume rendering as normal
-	{
-		extern Bool g_wpMenuCurtain;  // WarPowers @feature menu curtain
-		g_wpMenuCurtain = FALSE;      // next match is ready (covers Restart)
-	}
-	{ static const bool wpT = getenv("IG_TRACE") && *getenv("IG_TRACE") != '0'; if (wpT) fprintf(stderr, "[WPSHELL] startNewGame checkpoint loadScreenRender-cleared\n"); }
+	g_wpMenuCurtain = FALSE;  // next match is ready (covers Restart)
+	WP_TRACE("[WPSHELL] startNewGame checkpoint loadScreenRender-cleared\n");
 
 	// if we're in a gamespy game, mark us as playing
 	if (TheGameSpyBuddyMessageQueue && TheGameSpyGame && isInInternetGame())
@@ -2638,19 +2634,21 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
       drawable = drawable->getNextDrawable();
     }
 
-		// War Powers opening haulers are placed in the map, so they never
-		// pass through SupplyCenterProductionExitUpdate's harvesting kickoff.
-		// Give only those pack templates the same native behavior on a fresh
-		// map; a checkpoint restores its own cargo and AI orders unchanged.
-		for (Object *object = getFirstObject(); object; object = object->getNextObject())
+		// WarPowers @feature 07/09/2026 Map-placed haulers never pass through
+		// SupplyCenterProductionExitUpdate's harvesting kickoff. When the dataset
+		// opts in (GameData MapPlacedHarvestersAutoGather), every player-owned
+		// HARVESTER with a supply-truck AI starts gathering on a fresh map; a
+		// checkpoint restores its own cargo and AI orders unchanged.
+		if (TheGlobalData->m_mapPlacedHarvestersAutoGather)
 		{
-			const AsciiString& name = object->getTemplate()->getName();
-			if (name != "WP_Porter" && name != "WPJ_Scavenger") continue;
-			AIUpdateInterface *ai = object->getAIUpdateInterface();
-			if (ai && ai->getSupplyTruckAIInterface())
-				ai->getSupplyTruckAIInterface()->setForceWantingState(TRUE);
+			for (Object *object = getFirstObject(); object; object = object->getNextObject())
+			{
+				if (!object->isKindOf(KINDOF_HARVESTER) || object->isNeutralControlled()) continue;
+				AIUpdateInterface *ai = object->getAIUpdateInterface();
+				if (ai && ai->getSupplyTruckAIInterface())
+					ai->getSupplyTruckAIInterface()->setForceWantingState(TRUE);
+			}
 		}
-		extern void WPCreateReviewScene();
 		WPCreateReviewScene();
   }
 
@@ -4430,9 +4428,9 @@ void GameLogic::destroyObject( Object *obj )
 	if (!obj || obj->isDestroyed())
 		return;
 
-	// WarPowers @debug WP_AI_TRACE: catch whoever destroys a NAMED object
-	// (win/lose anchors) — the Phase 4 phantom-defeat forensics.
-	static const bool wp_aiTrc = getenv("WP_AI_TRACE") != nullptr;
+	// WarPowers @feature 26/08/2026 WP_AI_TRACE: catch whoever destroys a NAMED
+	// object (win/lose anchors) — the Phase 4 phantom-defeat forensics.
+	static const bool wp_aiTrc = wpEnvEnabled("WP_AI_TRACE");
 	if (wp_aiTrc && obj->getName().isNotEmpty())
 	{
 		fprintf(stderr, "[WPDESTROY] name='%s' tmpl=%s id=%u f=%u dead=%d\n",
@@ -4440,7 +4438,6 @@ void GameLogic::destroyObject( Object *obj )
 			obj->getTemplate() ? obj->getTemplate()->getName().str() : "?",
 			(unsigned)obj->getID(), TheGameLogic->getFrame(),
 			(int)obj->isEffectivelyDead());
-		extern void WPPrintBacktrace();
 		WPPrintBacktrace();
 	}
 
@@ -4782,14 +4779,9 @@ void GameLogic::sendObjectDestroyed( Object *obj )
 
 	// destroy the drawable
 	Drawable *draw = obj->getDrawable();
-	{
-		// WarPowers @debug IG_TRACE death-path breadcrumb
-		static int wpT = -1;
-		if (wpT < 0) { const char* e = getenv("IG_TRACE"); wpT = (e && *e && *e != '0') ? 1 : 0; }
-		if (wpT)
-			fprintf(stderr, "[WPDEATH] sendObjectDestroyed obj=%s id=%u draw=%p\n",
-				obj->getTemplate()->getName().str(), (unsigned)obj->getID(), (void*)draw);
-	}
+	// WarPowers @feature 23/08/2026 IG_TRACE death-path breadcrumb
+	WP_TRACE("[WPDEATH] sendObjectDestroyed obj=%s id=%u draw=%p\n",
+		obj->getTemplate()->getName().str(), (unsigned)obj->getID(), (void*)draw);
 	if(draw)
 	{
 		TheGameClient->destroyDrawable( draw );

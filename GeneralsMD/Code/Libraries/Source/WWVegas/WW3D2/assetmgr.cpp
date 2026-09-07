@@ -78,7 +78,7 @@
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #if !defined(__EMSCRIPTEN__) && !defined(_WIN32)
-#include <execinfo.h>  // WarPowers @debug degenerate-name backtrace
+#include <execinfo.h>  // WarPowers @feature 24/08/2026 degenerate-name backtrace
 #endif
 #include "assetmgr.h"
 #include <assert.h>
@@ -799,7 +799,7 @@ RenderObjClass * WW3DAssetManager::Create_Render_Obj(const char * name)
 	if (WW3D_Load_On_Demand && proto == nullptr) {	// If we didn't find one, try to load on demand
 		AssetStatusClass::Peek_Instance()->Report_Load_On_Demand_RObj(name);
 
-		// WarPowers @debug empty-name .w3d hunt: no missing-cache here — a
+		// WarPowers @feature 24/08/2026 empty-name .w3d hunt: no missing-cache here — a
 		// degenerate name re-hunts the filesystem on EVERY call. Count hits.
 		{
 			static unsigned wpHits = 0;
@@ -1005,7 +1005,7 @@ HAnimClass *	WW3DAssetManager::Get_HAnim(const char * name)
 			const char *animname = strchr( name, '.');
 			if (animname != nullptr) {
 				snprintf( filename, ARRAY_SIZE(filename), "%s.w3d", animname+1);
-				// WarPowers @debug empty-name .w3d hunt: an anim named "X." or
+				// WarPowers @feature 24/08/2026 empty-name .w3d hunt: an anim named "X." or
 				// "." derives an empty filename and hammers the filesystem
 				// every frame (wasm logs it as W3DFS_MISS '.w3d'/'..\.w3d').
 				{
@@ -1067,7 +1067,7 @@ HTreeClass *	WW3DAssetManager::Get_HTree(const char * name)
 		char filename[ MAX_PATH ];
 		snprintf( filename, ARRAY_SIZE(filename), "%s.w3d", name);
 
-		// WarPowers @debug empty-name .w3d hunt: unlike Get_HAnim, this path
+		// WarPowers @feature 24/08/2026 empty-name .w3d hunt: unlike Get_HAnim, this path
 		// has NO missing-cache — a degenerate name re-hunts the filesystem on
 		// every call (the per-frame wasm W3DFS_MISS spam).
 		{

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Compile the actual D3DXLoadSurfaceFromSurface function against guarded surfaces.
 
 Run with Python 3 and a native C++17 compiler (CXX selects it):
@@ -44,6 +45,7 @@ def run_fixture(directory, label, source, compiler, gli_root=None, baseline=Fals
     translation_unit, binary = directory / f"{label}.cpp", directory / label
     translation_unit.write_text(fixture.replace("// INSERT_PRODUCTION_FUNCTION", production_function(source)))
     flags = ["-std=c++17", "-fsanitize=address,undefined", "-fno-omit-frame-pointer", "-g"]
+    flags += ["-I", str(ROOT / "Core/Libraries/Include")]  # WPTrace.h for the production trace gate
     if gli_root:
         flags += ["-DTEST_GLI", "-DGLM_ENABLE_EXPERIMENTAL", "-I", str(gli_root)]
         if (gli_root / "external/glm/glm/glm.hpp").is_file():

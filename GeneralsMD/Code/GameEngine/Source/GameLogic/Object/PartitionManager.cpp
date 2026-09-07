@@ -1627,7 +1627,7 @@ ObjectShroudStatus PartitionData::getShroudedStatus(Int playerIndex)
 		return m_shroudedness[playerIndex];
 	}
 
-	// GeneralsX(WarPowers): a player has perfect knowledge of their own objects —
+	// WarPowers @fix 23/08/2026 a player has perfect knowledge of their own objects —
 	// never fog-classify them for their owner. Without this, an own construction
 	// site outside friendly vision freezes into a ghost snapshot: a label-less
 	// translucent husk that ignores every icon-UI fix because snapshots have no
@@ -2962,7 +2962,7 @@ void PartitionManager::unRegisterObject( Object* object )
 
 	// need to figure out if any players have a fogged memory of this object.
 	// if so, we can't remove it from the shroud system just yet.
-	// GeneralsX(WarPowers): under-construction sites leave no fog memory — a
+	// WarPowers @fix 23/08/2026 under-construction sites leave no fog memory — a
 	// translucent 1HP scaffold ghost reads as a rendering bug, not as intel
 	// (user repro: place next to an enemy, it gets shot before the dozer
 	// arrives, and the "ghost building" stood there forever).

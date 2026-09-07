@@ -1,3 +1,7 @@
+// Part of the GeneralsXWeb WebRTC LAN prototype, kept under wasm/experimental/
+// for reference: unsupported, not built or staged by War Powers. GPL-3.0 via
+// the repository LICENSE.md; provenance and usage in README.md next to this file.
+//
 // webrtc_udp.js — the JS half of the engine's UDP-over-WebRTC transport.
 //
 // The engine's UDP class (Core/GameEngine/Source/GameNetwork/udp.cpp) is shimmed
@@ -357,9 +361,14 @@
   // opens a lobby socket. CafeUdp still exists so the engine's UDP shim resolves.
   var udp = new CafeUdp();
   window.CafeUdp = udp;
-  if (window.CAFE_ENABLE) {
+  if (window.CAFE_ENABLE && !window.CAFE_URL) {
+    // No default signalling server: the host page must supply one in
+    // window.CAFE_URL (the original prototype pointed at a third party's
+    // server). See README.md in this directory.
+    udp.log("CAFE_ENABLE is set but window.CAFE_URL is empty; not connecting");
+  } else if (window.CAFE_ENABLE) {
     window.CAFE_UDP_READY = udp.connect(
-      window.CAFE_URL || "https://cafe-nw.mrz.sh",
+      window.CAFE_URL,
       window.CAFE_ROOM || "lan",
       window.CAFE_NAME || ("engine-" + Math.floor(Math.random() * 1e4))
     ).then(function () { udp.log("ready"); });

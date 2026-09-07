@@ -28,6 +28,7 @@
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
+#include "GameClient/WPShell.h"
 
 #include "Common/AudioAffect.h"
 #include "Common/AudioHandleSpecialValues.h"
@@ -204,11 +205,9 @@ void ScriptActions::doSetInfantryLightingOverride(Real setting)
 //-------------------------------------------------------------------------------------------------
 /** doVictory */
 //-------------------------------------------------------------------------------------------------
-extern void WPRecordMatchResult( Bool victory );  // WarPowers @feature score screen
-
 void ScriptActions::doVictory()
 {
-	WPRecordMatchResult( TRUE );  // WarPowers @feature score screen
+	WPRecordMatchResult( TRUE );  // WarPowers @feature 23/08/2026 score screen
 	closeWindows(FALSE);
 	TheGameLogic->closeWindows();
 	doDisableInput();
@@ -233,7 +232,7 @@ void ScriptActions::doVictory()
 //-------------------------------------------------------------------------------------------------
 void ScriptActions::doDefeat()
 {
-	WPRecordMatchResult( FALSE );  // WarPowers @feature score screen
+	WPRecordMatchResult( FALSE );  // WarPowers @feature 23/08/2026 score screen
 	closeWindows(FALSE);
 	TheGameLogic->closeWindows();
 	doDisableInput();
@@ -258,7 +257,7 @@ void ScriptActions::doDefeat()
 //-------------------------------------------------------------------------------------------------
 void ScriptActions::doLocalDefeat()
 {
-	WPRecordMatchResult( FALSE );  // WarPowers @feature score screen
+	WPRecordMatchResult( FALSE );  // WarPowers @feature 23/08/2026 score screen
 	TheScriptEngine->markMPLocalDefeatWindowShown();
 	closeWindows(FALSE);
 	TheGameLogic->closeWindows();
@@ -2597,9 +2596,8 @@ void ScriptActions::doPlayerKill(const AsciiString& playerName)
 //-------------------------------------------------------------------------------------------------
 void ScriptActions::doDisplayText(const AsciiString& displayText)
 {
-	// GeneralsX @feature Codex 05/09/2026 War Powers web mission text has an
+	// WarPowers @feature 05/09/2026 War Powers web mission text has an
 	// accessible overlay; preserve the engine message on native builds.
-	extern Bool WPDisplayMissionText( const AsciiString &key );
 	if( !WPDisplayMissionText(displayText) ) TheInGameUI->message(displayText);
 }
 

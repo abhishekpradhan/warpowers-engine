@@ -6,14 +6,14 @@ applyTo: 'scripts/build/macos/**,references/fbraz3-dxvk/**'
 
 - SDL3 for windowing/input.
 - DXVK + MoltenVK: DX8 → Vulkan → Metal chain.
-- OpenAL for audio (MiniAudio is WIP).
+- MiniAudio for audio (`macos-vulkan`); OpenAL through the legacy `macos-openal` preset.
 - Target: **ARM64 (Apple Silicon)**, macOS 15.0+.
 - Universal binary (arm64 + x86_64) planned.
 
 ## Key Considerations
 
 - DXVK is built via Meson as ExternalProject — must pass `-arch arm64` via `cmake/meson-arm64-native.ini` to avoid Rosetta2 confusion.
-- DXVK source of truth: fork branch `generalsx-macos-v2.6`; CMake tracks remote by default.
+- DXVK sources: the `references/fbraz3-dxvk` submodule tracks the War Powers DXVK fork (`warpowers-dxvk`, branch `main`); by default CMake clones the pinned upstream commit `DXVK_REMOTE_REF` instead.
 - Local fork mode: `-DSAGE_DXVK_USE_LOCAL_FORK=ON` (disables update/fetch, uses `references/fbraz3-dxvk`).
 - Vulkan SDK **must** be from LunarG — provides MoltenVK ICD JSON. Not from Homebrew.
 - Vulkan SDK path: `~/VulkanSDK/<version>/macOS/` — must contain `libvulkan.dylib` and `libMoltenVK.dylib`.

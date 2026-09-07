@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Check production sentence layout and glyph blitting with address/UB sanitizers.
 
 Run from any directory with Python 3 and a native C++17 compiler supporting

@@ -66,22 +66,8 @@
 
 #include <vector>
 
-// WarPowers: env/window-gated audio trace (IG_TRACE), same idiom as INI.cpp.
-#ifdef __EMSCRIPTEN__
-#include <emscripten/emscripten.h>
-static bool wpAudioTrace() {
-    static const bool on = EM_ASM_INT({
-        return (typeof window !== 'undefined' && window.IG_TRACE) ? 1 : 0;
-    }) != 0;
-    return on;
-}
-#else
-#include <cstdlib>
-static bool wpAudioTrace() {
-    static const bool on = std::getenv("IG_TRACE") != nullptr;
-    return on;
-}
-#endif
+// WarPowers @feature 23/08/2026 IG_TRACE-gated audio trace.
+#include "WPTrace.h"
 
 #ifdef RTS_HAS_FFMPEG
 #include "VideoDevice/FFmpeg/FFmpegFile.h"
@@ -251,7 +237,7 @@ void MiniAudioManager::update()
 
 	// WarPowers: trace heartbeat — engine clock advancing proves the live
 	// output device is pulling from THIS ma_engine instance.
-	if (wpAudioTrace()) {
+	if (wpTraceEnabled()) {
 		static int wp_hb = 0;
 		if ((++wp_hb % 150) == 0) {
 			fprintf(stderr, "[AUDIOHB] engineTime=%llu playing=%d device=%p started=%d\n",
@@ -364,7 +350,7 @@ void MiniAudioManager::playAudioEvent(AudioRequest *req)
 	AsciiString fileToPlay = event->getFilename();
 	DEBUG_LOG(("MINIAUDIO: playAudioEvent '%s' type=%d file='%s'\n",
 		event->getEventName().str(), info->m_soundType, fileToPlay.str()));
-	if (wpAudioTrace())
+	if (wpTraceEnabled())
 		fprintf(stderr, "[AUDIO] play '%s' type=%d file='%s'\n",
 			event->getEventName().str(), (int)info->m_soundType, fileToPlay.str());
 
@@ -450,7 +436,7 @@ void MiniAudioManager::playAudioEvent(AudioRequest *req)
 		releasePlayingAudio(audio);
 		return;
 	}
-	if (wpAudioTrace())
+	if (wpTraceEnabled())
 		fprintf(stderr, "[AUDIODEC] '%s' frames=%llu fmt=%d ch=%u rate=%u\n",
 			fileToPlay.str(), (unsigned long long)frameCount,
 			(int)decCfg.format, decCfg.channels, decCfg.sampleRate);
@@ -631,7 +617,7 @@ void MiniAudioManager::playAudioEvent(AudioRequest *req)
 	adjustPlayingVolume(audio);
 
 	result = ma_sound_start(sound);
-	if (wpAudioTrace())
+	if (wpTraceEnabled())
 		fprintf(stderr, "[AUDIO] start '%s' -> %d (vol=%.2f)\n",
 			event->getEventName().str(), (int)result, ma_sound_get_volume(sound));
 	if (result != MA_SUCCESS) {
@@ -986,7 +972,7 @@ void MiniAudioManager::openDevice(void)
 		return;
 	}
 
-	// WarPowers @feature WP_VOLUME=0..100 scales the master engine volume
+	// WarPowers @feature 23/08/2026 WP_VOLUME=0..100 scales the master engine volume
 	// (the web page persists the user's slider in localStorage and forwards
 	// it through ENV at boot)
 	{
@@ -996,7 +982,7 @@ void MiniAudioManager::openDevice(void)
 			if (v < 0.0f) v = 0.0f;
 			if (v > 1.0f) v = 1.0f;
 			ma_engine_set_volume(&m_engine, v);
-			if (wpAudioTrace())
+			if (wpTraceEnabled())
 				fprintf(stderr, "AUDIO: master volume from WP_VOLUME: %.2f\n", v);
 		}
 	}
@@ -1011,7 +997,7 @@ void MiniAudioManager::openDevice(void)
 	ma_sound_group_start(&m_soundGroup);
 	ma_sound_group_start(&m_sound3DGroup);
 	ma_sound_group_start(&m_speechGroup);
-	if (wpAudioTrace())
+	if (wpTraceEnabled())
 		fprintf(stderr, "[AUDIOGRP] groups playing: music=%d sound=%d s3d=%d speech=%d engineNode=%p\n",
 			(int)ma_sound_group_is_playing(&m_musicGroup),
 			(int)ma_sound_group_is_playing(&m_soundGroup),
