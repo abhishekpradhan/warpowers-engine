@@ -780,6 +780,17 @@ static NameKeyType wpButtonQuitID = NAMEKEY_INVALID;
 void WPMainMenuInit( WindowLayout *layout, void *userData )
 {
 	s_wpMainLayout = layout;
+	// WarPowers @fix 08/09/2026 apply the seeded master level once at startup so a native
+	// WP_VOLUME run is heard at that level before the slider is ever touched. The browser
+	// forwards 100 and sets its channel levels through the audio exports afterwards.
+	{
+		static Bool s_wpLevelsApplied = FALSE;
+		if( !s_wpLevelsApplied )
+		{
+			s_wpLevelsApplied = TRUE;
+			wpApplyAudioLevels();
+		}
+	}
 	// The menu is up — drop the exit curtain. Exception: with a match result
 	// pending, the score screen is about to push over this menu; keep the
 	// curtain up through the 1-3 frame menu flash so the player sees

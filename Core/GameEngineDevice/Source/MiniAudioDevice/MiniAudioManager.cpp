@@ -972,20 +972,9 @@ void MiniAudioManager::openDevice(void)
 		return;
 	}
 
-	// WarPowers @feature 23/08/2026 WP_VOLUME=0..100 scales the master engine volume
-	// (the web page persists the user's slider in localStorage and forwards
-	// it through ENV at boot)
-	{
-		const char* wpVol = getenv("WP_VOLUME");
-		if (wpVol && *wpVol) {
-			float v = (float)atoi(wpVol) / 100.0f;
-			if (v < 0.0f) v = 0.0f;
-			if (v > 1.0f) v = 1.0f;
-			ma_engine_set_volume(&m_engine, v);
-			if (wpTraceEnabled())
-				fprintf(stderr, "AUDIO: master volume from WP_VOLUME: %.2f\n", v);
-		}
-	}
+	// WarPowers @fix 08/09/2026 WP_VOLUME is no longer applied to the engine master here.
+	// It only seeds the in-game master slider (WPShell.cpp), which applies the level through
+	// the normal system-setting volumes; scaling it twice halved native runs with WP_VOLUME<100.
 
 	ma_sound_group_init(&m_engine, 0, NULL, &m_musicGroup);
 	ma_sound_group_init(&m_engine, 0, NULL, &m_soundGroup);
