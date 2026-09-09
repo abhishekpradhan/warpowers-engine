@@ -46,6 +46,11 @@ endif()
 add_compile_options("-sUSE_FREETYPE=1")
 add_link_options("-sUSE_FREETYPE=1")
 
+# ---- zlib via Emscripten port ----
+# One zlib for the engine and FreeType alike; see Core/Libraries/Source/Compression/CMakeLists.txt.
+add_compile_options("-sUSE_ZLIB=1")
+add_link_options("-sUSE_ZLIB=1")
+
 # ---- fontconfig stub ----
 add_library(fontconfig_stub STATIC ${CMAKE_SOURCE_DIR}/wasm/fontconfig_stub/fontconfig_stub.c)
 target_include_directories(fontconfig_stub PUBLIC ${CMAKE_SOURCE_DIR}/wasm/fontconfig_stub)

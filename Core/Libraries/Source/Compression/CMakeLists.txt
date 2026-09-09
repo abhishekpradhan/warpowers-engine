@@ -38,12 +38,20 @@ target_link_libraries(core_compression PUBLIC
     liblzhl
 )
 
-find_package(ZLIB)
-if (ZLIB_FOUND)
-    # Adds zlib from vcpkg
-    target_link_libraries(core_compression PUBLIC ZLIB::ZLIB)
+if (EMSCRIPTEN)
+    # WarPowers @fix 09/09/2026 The browser build always uses the Emscripten zlib
+    # port (-sUSE_ZLIB=1 in cmake/wasm-deps.cmake). find_package(ZLIB) only
+    # succeeds once the port exists in the sysroot cache, so a fresh machine
+    # would otherwise fetch and compile a second zlib that collides at link
+    # time with the copy the FreeType port pulls in (duplicate inflate_copyright).
 else()
-    # Adds zlib from github repository
-    include(${CMAKE_SOURCE_DIR}/cmake/zlib.cmake)
-    target_link_libraries(core_compression PUBLIC libzlib)
+    find_package(ZLIB)
+    if (ZLIB_FOUND)
+        # Adds zlib from vcpkg
+        target_link_libraries(core_compression PUBLIC ZLIB::ZLIB)
+    else()
+        # Adds zlib from github repository
+        include(${CMAKE_SOURCE_DIR}/cmake/zlib.cmake)
+        target_link_libraries(core_compression PUBLIC libzlib)
+    endif()
 endif()
