@@ -3085,7 +3085,7 @@ HRESULT W3DShaderManager::LoadAndCreateD3DShader(const char* strFilePath, const 
 			char debugMsg[512];
 			snprintf(debugMsg, sizeof(debugMsg), "ERROR: Could not normalize shader file path: '%s'\n", 
 				strFilePath ? strFilePath : "(null)");
-			OutputDebugString(debugMsg);
+			if (wpTraceEnabled()) OutputDebugString(debugMsg);  // WarPowers @fix 08/09/2026 expected when a dataset ships no shader files
 			return E_FAIL;
 		}
 
@@ -3101,7 +3101,7 @@ HRESULT W3DShaderManager::LoadAndCreateD3DShader(const char* strFilePath, const 
 			char debugMsg[512];
 			snprintf(debugMsg, sizeof(debugMsg), "ERROR: Could not find shader file: '%s' (normalized: '%s')\n", 
 				strFilePath ? strFilePath : "(null)", normalizedPath.str());
-			OutputDebugString(debugMsg);
+			if (wpTraceEnabled()) OutputDebugString(debugMsg);  // WarPowers @fix 08/09/2026 expected when a dataset ships no shader files
 			return E_FAIL;
 		}
 

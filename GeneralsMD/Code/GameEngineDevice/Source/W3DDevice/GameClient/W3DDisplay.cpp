@@ -584,7 +584,7 @@ static void SDL3_CenterWindowOnCurrentDisplay(SDL_Window* window, Int width, Int
 	if (y < usable.y) y = usable.y;
 
 	if (!SDL_SetWindowPosition(window, x, y)) {
-		fprintf(stderr, "WARNING: SDL_SetWindowPosition(%d,%d) failed: %s\n", x, y, SDL_GetError());
+		WP_TRACE("WARNING: SDL_SetWindowPosition(%d,%d) failed: %s\n", x, y, SDL_GetError());
 	}
 }
 
@@ -997,7 +997,7 @@ void W3DDisplay::init()
 #endif
 
 		// GeneralsX @bugfix felipebraz 16/02/2026 Add detailed WW3D init logging
-		fprintf(stderr, "DEBUG: About to call WW3D::Init() with ApplicationHWnd=%p\n", ApplicationHWnd);
+		WP_TRACE("DEBUG: About to call WW3D::Init() with ApplicationHWnd=%p\n", ApplicationHWnd);
 		WW3DErrorType ww3d_result = WW3D::Init( ApplicationHWnd );
 
 		// Decode error type
@@ -1010,7 +1010,7 @@ void W3DDisplay::init()
 			"WW3D_ERROR_INITIALIZATION_FAILED"
 		};
 		const char* error_name = (ww3d_result >= 0 && ww3d_result <= 5) ? error_names[ww3d_result] : "UNKNOWN";
-		fprintf(stderr, "DEBUG: WW3D::Init() returned: %d (%s)\n", ww3d_result, error_name);
+		WP_TRACE("DEBUG: WW3D::Init() returned: %d (%s)\n", ww3d_result, error_name);
 
 		if (ww3d_result != WW3D_ERROR_OK) {
 			fprintf(stderr, "ERROR: WW3D::Init() failed with %s - DirectX8/DXVK initialization error\n", error_name);
@@ -1021,7 +1021,7 @@ void W3DDisplay::init()
 		#ifndef _WIN32
 		extern SDL_Window* TheSDL3Window;
 		if (TheSDL3Window) {
-			fprintf(stderr, "DEBUG: Showing SDL3 window after WW3D init...\n");
+			WP_TRACE("DEBUG: Showing SDL3 window after WW3D init...\n");
 			SDL_ShowWindow(TheSDL3Window);
 		}
 		#endif
@@ -1033,7 +1033,7 @@ void W3DDisplay::init()
 		WW3D::Set_Screen_UV_Bias( TRUE );  ///< this makes text look good :)
 		WW3D::Set_Texture_Bitdepth(32);
 
-		fprintf(stderr, "[DEBUG-WIN] W3DDisplay::init() - TheGlobalData->m_windowed=%d\n", (int)TheGlobalData->m_windowed);
+		WP_TRACE("[DEBUG-WIN] W3DDisplay::init() - TheGlobalData->m_windowed=%d\n", (int)TheGlobalData->m_windowed);
 		setWindowed( TheGlobalData->m_windowed );
 
 		// create a 2D renderer helper

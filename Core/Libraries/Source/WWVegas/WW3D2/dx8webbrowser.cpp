@@ -31,6 +31,7 @@
 //******************************************************************************************
 
 #include "dx8webbrowser.h"
+#include "WPTrace.h"  // WarPowers: stub notice only with IG_TRACE
 #include "ww3d.h"
 #include "dx8wrapper.h"
 
@@ -278,7 +279,7 @@ bool DX8WebBrowser::Initialize(const char* badpageurl,
                                 const char* mousefilename,
                                 const char* mousebusyfilename)
 {
-	fprintf(stderr, "WARNING: DX8WebBrowser::Initialize() - Linux stub (browser not available)\n");
+	WP_TRACE("INFO: DX8WebBrowser::Initialize() - stub (no in-game browser on this platform)\n");
 	return false;  // Embedded browser not supported on Linux
 }
 

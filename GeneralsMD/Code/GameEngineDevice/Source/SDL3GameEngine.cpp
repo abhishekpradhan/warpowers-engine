@@ -628,7 +628,7 @@ AudioManager *SDL3GameEngine::createAudioManager(Bool dummy)
 	WP_TRACE("INFO: SDL3GameEngine::createAudioManager()\n");
 
 #ifdef SAGE_USE_MINIAUDIO
-	fprintf(stderr, "INFO: Creating MiniAudio audio backend\n");
+	WP_TRACE("INFO: Creating MiniAudio audio backend\n");
 	return new MiniAudioManager();
 #elif defined(SAGE_USE_OPENAL)
 	fprintf(stderr, "INFO: Creating OpenAL audio backend\n");

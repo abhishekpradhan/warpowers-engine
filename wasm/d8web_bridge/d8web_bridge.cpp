@@ -927,6 +927,6 @@ extern "C" void Igroteka_TraceSurfaceWindow(const char *name) {
 }
 // Entry point handed to DX8Wrapper on wasm in place of the dlopen'd symbol.
 extern "C" IDirect3D8* WINAPI Igroteka_Direct3DCreate8(UINT) {
-    std::fprintf(stderr, "[d8web-bridge] Igroteka_Direct3DCreate8: serving d8web WebGL2 backend\n");
+    WP_TRACE("[d8web-bridge] Igroteka_Direct3DCreate8: serving d8web WebGL2 backend\n");
     return new BridgeD3D8();
 }
