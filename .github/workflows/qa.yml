@@ -1,9 +1,8 @@
 # War Powers engine: fast regression checks that need no engine build.
 #
-# GitHub Actions is disabled at the repository level until the public release
-# (the inherited GeneralsX workflows were removed because they consumed hosted
-# runner minutes on every push). This workflow is inert until Actions is
-# switched on in the repository settings; until then run the same commands
+# The inherited GeneralsX workflows were removed because they consumed hosted
+# runner minutes on every push; this is the fork's only workflow. The same
+# commands
 # locally from the engine directory:
 #
 #   CXX=clang++ python3 scripts/qa/test-keyboard-modifiers.py
