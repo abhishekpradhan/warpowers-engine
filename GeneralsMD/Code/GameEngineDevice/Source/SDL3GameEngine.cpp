@@ -140,7 +140,7 @@ SDL3GameEngine::SDL3GameEngine()
 	  m_IsTextInputActive(false),
 	  m_TextInputFocusWindow(nullptr)
 {
-	fprintf(stderr, "DEBUG: SDL3GameEngine::SDL3GameEngine() created\n");
+	WP_TRACE("DEBUG: SDL3GameEngine::SDL3GameEngine() created\n");
 }
 
 /**

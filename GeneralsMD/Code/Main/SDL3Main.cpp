@@ -30,6 +30,7 @@
 
 // SYSTEM INCLUDES
 #include <SDL3/SDL.h>
+#include "WPTrace.h"  // WarPowers: boot chatter only with IG_TRACE
 #include <SDL3/SDL_vulkan.h>
 #include <cstdlib>
 #include <cctype>
@@ -140,7 +141,7 @@ static void FilterSoftwareVulkanICDs()
 		const char *base = strrchr(path, '/');
 		base = base ? base + 1 : path;
 		if (icd_is_software(base)) {
-			fprintf(stderr, "INFO: Vulkan ICD filter: skipping software ICD '%s'\n", base);
+			WP_TRACE("INFO: Vulkan ICD filter: skipping software ICD '%s'\n", base);
 			continue;
 		}
 		if (found_hw) {
@@ -153,10 +154,10 @@ static void FilterSoftwareVulkanICDs()
 
 	if (found_hw) {
 		setenv("VK_DRIVER_FILES", hw_icds, 1);
-		fprintf(stderr, "INFO: Vulkan ICD filter: VK_DRIVER_FILES=%s\n", hw_icds);
+		WP_TRACE("INFO: Vulkan ICD filter: VK_DRIVER_FILES=%s\n", hw_icds);
 	} else {
-		fprintf(stderr, "WARNING: Vulkan ICD filter: no hardware ICDs found, LLVMpipe exclusion skipped\n");
-		fprintf(stderr, "WARNING: If startup crashes in libvulkan_lvp.so, set VK_DRIVER_FILES manually\n");
+		WP_TRACE("WARNING: Vulkan ICD filter: no hardware ICDs found, LLVMpipe exclusion skipped\n");
+		WP_TRACE("WARNING: If startup crashes in libvulkan_lvp.so, set VK_DRIVER_FILES manually\n");
 	}
 }
 
@@ -203,7 +204,7 @@ static void FilterPipeWireOpenAL()
 		fprintf(stderr, "INFO: OpenAL: ALSOFT_DRIVERS=pulse,alsa,oss,jack,null,wave (pipewire excluded)\n");
 	}
 	#else
-	fprintf(stderr, "INFO: OpenAL: keeping default driver selection on non-Linux platform\n");
+	WP_TRACE("INFO: OpenAL: keeping default driver selection on non-Linux platform\n");
 	#endif
 }
 
@@ -217,7 +218,7 @@ static void FilterPipeWireOpenAL()
  */
 GameEngine *CreateGameEngine(void)
 {
-	fprintf(stderr, "INFO: CreateGameEngine() - Creating SDL3GameEngine for Linux\n");
+	WP_TRACE("INFO: CreateGameEngine() - Creating SDL3GameEngine for Linux\n");
 	SDL3GameEngine *engine = NEW SDL3GameEngine();
 	return engine;
 }
@@ -248,7 +249,11 @@ int main(int argc, char* argv[])
 	// git revision injected by CMake (reproducible, unlike __DATE__/__TIME__).
 #include "wp_build_id.h"  // generated each build (see wp_build_id.cmake)
 	fprintf(stderr, " build %s\n", WP_BUILD_ID);
+	#ifdef __EMSCRIPTEN__
+	fprintf(stderr, " SDL3 + d8web (WebGL2) build\n");
+	#else
 	fprintf(stderr, " SDL3 + DXVK Build\n");
+	#endif
 	fprintf(stderr, "=================================================\n\n");
 
 	try {
@@ -283,7 +288,7 @@ int main(int argc, char* argv[])
 		// Initialize SDL3 and Vulkan BEFORE creating GameEngine (fighter19 pattern)
 		// This prevents LLVM SIGSEGV crash during Vulkan driver enumeration
 		// Must be done here, not in SDL3GameEngine::init() which is too late
-		fprintf(stderr, "INFO: Initializing SDL3 video subsystem...\n");
+		WP_TRACE("INFO: Initializing SDL3 video subsystem...\n");
 		if (!SDL_InitSubSystem(SDL_INIT_VIDEO | SDL_INIT_AUDIO)) {
 			fprintf(stderr, "FATAL: Failed to initialize SDL3: %s\n", SDL_GetError());
 			return 1;
@@ -308,7 +313,7 @@ int main(int argc, char* argv[])
 #endif
 
 		// Create SDL3 window with Vulkan support
-		fprintf(stderr, "INFO: Creating SDL3 Vulkan window...\n");
+		WP_TRACE("INFO: Creating SDL3 Vulkan window...\n");
 #ifdef __EMSCRIPTEN__
 		// wasm: plain window over #canvas, no Vulkan. NOT resizable: with
 		// SDL_WINDOW_RESIZABLE, SDL3's emscripten backend syncs the canvas
@@ -353,7 +358,7 @@ int main(int argc, char* argv[])
 				if (!SDL_SetWindowPosition(TheSDL3Window, centered, centered)) {
 					// Wayland refuses programmatic positioning and lets the compositor place the window.
 					// Not fatal — the game is still usable, it just lands wherever the compositor decides.
-					fprintf(stderr, "WARNING: SDL_SetWindowPosition(primary display) failed: %s\n", SDL_GetError());
+					WP_TRACE("WARNING: SDL_SetWindowPosition(primary display) failed: %s\n", SDL_GetError());
 				}
 			} else {
 				fprintf(stderr, "WARNING: SDL_GetPrimaryDisplay failed: %s\n", SDL_GetError());
@@ -362,7 +367,7 @@ int main(int argc, char* argv[])
 
 		// Store window handle globally (cast SDL_Window* to HWND for compatibility)
 		ApplicationHWnd = (HWND)TheSDL3Window;
-		fprintf(stderr, "INFO: SDL3 window created successfully\n");
+		WP_TRACE("INFO: SDL3 window created successfully\n");
 		}
 
 		// Call cross-platform game entry point

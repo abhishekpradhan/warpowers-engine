@@ -27,6 +27,7 @@
 /////////////////////////////////////////////////////////////
 
 #include "Common/AudioAffect.h"
+#include "WPTrace.h"  // WarPowers: boot chatter only with IG_TRACE
 #include "Common/ArchiveFile.h"
 #include "Common/ArchiveFileSystem.h"
 #include "Common/file.h"
@@ -330,7 +331,7 @@ static Bool loadPrimaryGameAssets(TBigFileSystem* fileSystem, AsciiString* loade
 #endif
 	AsciiString sanitizedPrimaryEnvPath;
 	if (sanitizeConfiguredPath(primaryEnvValue, sanitizedPrimaryEnvPath)) {
-		fprintf(stderr, "[ASSET_ROOT] Trying env %s='%s'\n", primaryEnvName, sanitizedPrimaryEnvPath.str());
+		WP_TRACE("[ASSET_ROOT] Trying env %s='%s'\n", primaryEnvName, sanitizedPrimaryEnvPath.str());
 		if (tryLoadBigFiles(fileSystem, sanitizedPrimaryEnvPath, "env")) {
 			fprintf(stderr, "[ASSET_ROOT] Selected source=env path='%s'\n", sanitizedPrimaryEnvPath.str());
 			if (loadedDirectory != nullptr) {
@@ -338,7 +339,7 @@ static Bool loadPrimaryGameAssets(TBigFileSystem* fileSystem, AsciiString* loade
 			}
 			return TRUE;
 		}
-		fprintf(stderr, "[ASSET_ROOT] Env path '%s' did not provide BIG files\n", sanitizedPrimaryEnvPath.str());
+		WP_TRACE("[ASSET_ROOT] Env path '%s' did not provide BIG files\n", sanitizedPrimaryEnvPath.str());
 	}
 
 	// Backward compatibility with previous env naming.
