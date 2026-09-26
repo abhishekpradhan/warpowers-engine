@@ -497,6 +497,9 @@ public:
 	Bool m_dozerResumesAbandonedConstruction;	///< idle dozers resume nearby abandoned same-player sites on their own
 	Bool m_mapPlacedHarvestersAutoGather;			///< map-placed supply trucks start gathering when a fresh map begins
 	Bool m_commandButtonAvailabilityCues;			///< control-bar command portraits show a lock badge / brightened available state
+	// WarPowers @feature 26/09/2026 keyboard orders
+	AsciiString m_guardCommandButton;					///< command button the GUARD key binding presses (retail: none)
+	Bool m_preferSelectionQueuesWaypoints;		///< the prefer-selection modifier also queues waypoints (retail: No)
 	std::vector<AsciiString> m_musicRotation;	///< audio events cycled as background music in menus and matches (retail: none)
 
 	// network timing values.

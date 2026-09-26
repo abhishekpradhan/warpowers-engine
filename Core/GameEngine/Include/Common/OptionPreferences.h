@@ -84,6 +84,10 @@ public:
 	Bool getScreenEdgeScrollEnabledInWindowedApp() const;
 	Bool getScreenEdgeScrollEnabledInFullscreenApp() const;
 	ScreenEdgeScrollMode getScreenEdgeScrollMode() const;
+	// WarPowers @feature 26/09/2026 Camera preferences the browser shell writes to Options.ini
+	Bool getCameraRotationLocked() const;   ///< LockCameraRotation: ignore middle-drag and the rotate keys (default No)
+	Bool getWASDCameraKeys() const;         ///< CameraKeysWASD: W/A/S/D pan the camera like the arrow keys (default No)
+	Real getWheelZoomFactor() const;        ///< WheelZoomFactor: percent of the stock wheel zoom step (default 100)
 	Int getFirewallBehavior();
 	Short getFirewallPortAllocationDelta();
 	UnsignedShort getFirewallPortOverride();

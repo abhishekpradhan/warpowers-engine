@@ -496,6 +496,8 @@ GlobalData* GlobalData::m_theOriginal = nullptr;
 	{ "ShroudAlpha",		INI::parseUnsignedByte,				nullptr,	offsetof( GlobalData, m_shroudAlpha) },
 	// WarPowers @feature 07/09/2026 dataset switch (see GlobalData.h)
 	{ "CommandButtonAvailabilityCues",				INI::parseBool,					nullptr,	offsetof( GlobalData, m_commandButtonAvailabilityCues ) },
+	{ "GuardCommandButton",										INI::parseAsciiString,	nullptr,	offsetof( GlobalData, m_guardCommandButton ) },
+	{ "PreferSelectionQueuesWaypoints",			INI::parseBool,					nullptr,	offsetof( GlobalData, m_preferSelectionQueuesWaypoints ) },
 
 	{ "HotKeyTextColor",										INI::parseColorInt,					nullptr,	offsetof( GlobalData, m_hotKeyTextColor ) },
 
@@ -937,6 +939,8 @@ GlobalData::GlobalData()
 	m_fogAlpha = 127;
 	m_shroudAlpha = 0;
 	m_commandButtonAvailabilityCues = FALSE;  // WarPowers @feature 07/09/2026 retail default
+	m_guardCommandButton.clear();
+	m_preferSelectionQueuesWaypoints = FALSE;
 
 	m_powerBarBase = 7;
 	m_powerBarIntervals = 3;

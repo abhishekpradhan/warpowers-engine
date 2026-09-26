@@ -385,6 +385,36 @@ ScreenEdgeScrollMode OptionPreferences::getScreenEdgeScrollMode() const
 	return mode;
 }
 
+// WarPowers @feature 26/09/2026 Camera preferences (see OptionPreferences.h)
+Bool OptionPreferences::getCameraRotationLocked() const
+{
+	OptionPreferences::const_iterator it = find("LockCameraRotation");
+	if (it == end())
+		return FALSE;
+	return stricmp(it->second.str(), "yes") == 0;
+}
+
+Bool OptionPreferences::getWASDCameraKeys() const
+{
+	OptionPreferences::const_iterator it = find("CameraKeysWASD");
+	if (it == end())
+		return FALSE;
+	return stricmp(it->second.str(), "yes") == 0;
+}
+
+Real OptionPreferences::getWheelZoomFactor() const
+{
+	OptionPreferences::const_iterator it = find("WheelZoomFactor");
+	if (it == end())
+		return 1.0f;
+	Int percent = atoi(it->second.str());
+	if (percent < 10)
+		percent = 10;
+	if (percent > 1000)
+		percent = 1000;
+	return percent / 100.0f;
+}
+
 Bool OptionPreferences::usesSystemMapDir()
 {
 	OptionPreferences::const_iterator it = find("UseSystemMapDir");

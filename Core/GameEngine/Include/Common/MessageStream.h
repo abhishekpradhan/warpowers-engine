@@ -260,6 +260,7 @@ public:
 		MSG_META_TAKE_SCREENSHOT_PNG,							///< TheSuperHackers @feature Take lossless PNG screenshot
 		MSG_META_ALL_CHEER,													///< Yay! :)
 		MSG_META_TOGGLE_ATTACKMOVE,									///< enter attack-move mode
+		MSG_META_GUARD,															///< WarPowers @feature 26/09/2026 press the dataset's guard command button (GameData GuardCommandButton)
 
 		MSG_META_BEGIN_CAMERA_ROTATE_LEFT,
 		MSG_META_END_CAMERA_ROTATE_LEFT,

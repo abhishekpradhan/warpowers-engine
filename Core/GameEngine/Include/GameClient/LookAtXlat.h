@@ -55,6 +55,7 @@ public:
 	void setScreenEdgeScrollMode(ScreenEdgeScrollMode mode);
 
 	void resetModes(); //Used when disabling input, so when we reenable it we aren't stuck in a mode.
+	Bool isCameraRotationLocked() const { return m_cameraRotationLocked; } ///< WarPowers @feature 26/09/2026 Options.ini LockCameraRotation
 
 private:
 	enum
@@ -83,6 +84,11 @@ private:
 	ScrollType m_scrollType;
 	ScreenEdgeScrollMode m_screenEdgeScrollMode;
 	UnsignedInt m_lastMouseMoveTimeMsec;				// real-time in milliseconds when mouse last moved
+	// WarPowers @feature 26/09/2026 browser-shell camera preferences and the right-button click dead zone
+	Bool m_rmbPending;					// right button is down but the cursor has not left the click tolerance yet
+	Bool m_cameraRotationLocked;	// Options.ini LockCameraRotation: middle-drag and rotate keys are ignored
+	Bool m_wasdCameraKeys;				// Options.ini CameraKeysWASD: W/A/S/D scroll like the arrow keys
+	Real m_wheelZoomFactor;				// Options.ini WheelZoomFactor / 100
 
 	void setScrolling( ScrollType scrollType );
 	void stopScrolling();

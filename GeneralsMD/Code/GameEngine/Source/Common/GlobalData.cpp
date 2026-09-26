@@ -511,6 +511,8 @@ GlobalData* GlobalData::m_theOriginal = nullptr;
 	{ "DozerResumesAbandonedConstruction",		INI::parseBool,					nullptr,	offsetof( GlobalData, m_dozerResumesAbandonedConstruction ) },
 	{ "MapPlacedHarvestersAutoGather",				INI::parseBool,					nullptr,	offsetof( GlobalData, m_mapPlacedHarvestersAutoGather ) },
 	{ "CommandButtonAvailabilityCues",				INI::parseBool,					nullptr,	offsetof( GlobalData, m_commandButtonAvailabilityCues ) },
+	{ "GuardCommandButton",										INI::parseAsciiString,	nullptr,	offsetof( GlobalData, m_guardCommandButton ) },
+	{ "PreferSelectionQueuesWaypoints",			INI::parseBool,					nullptr,	offsetof( GlobalData, m_preferSelectionQueuesWaypoints ) },
 	{ "MusicRotation",												INI::parseAsciiStringVector,	nullptr,	offsetof( GlobalData, m_musicRotation ) },
 
 	{ "HotKeyTextColor",										INI::parseColorInt,					nullptr,	offsetof( GlobalData, m_hotKeyTextColor ) },
@@ -972,6 +974,8 @@ GlobalData::GlobalData()
 	m_dozerResumesAbandonedConstruction = FALSE;
 	m_mapPlacedHarvestersAutoGather = FALSE;
 	m_commandButtonAvailabilityCues = FALSE;
+	m_guardCommandButton.clear();
+	m_preferSelectionQueuesWaypoints = FALSE;
 	m_musicRotation.clear();
 
 	m_powerBarBase = 7;

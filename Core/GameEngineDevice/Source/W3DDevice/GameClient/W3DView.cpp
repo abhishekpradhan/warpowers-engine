@@ -2329,6 +2329,9 @@ void W3DView::setZoomToMax()
 void W3DView::setZoomToDefault()
 {
 	// default zoom has to be max, otherwise players will just zoom to max always
+	// WarPowers @fix 26/09/2026 the reset never touched the height, so Home left the zoom where it was
+	m_heightAboveGround = m_maxHeightAboveGround;
+	m_zoom = getMaxZoom(m_pos.x, m_pos.y);
 	stopDoingScriptedCamera();
 	m_CameraArrivedAtWaypointOnPathFlag = false;
 	m_cameraAreaConstraintsValid = false;

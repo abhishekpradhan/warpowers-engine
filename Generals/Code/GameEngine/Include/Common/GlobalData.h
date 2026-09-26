@@ -489,6 +489,9 @@ public:
 	// WarPowers @feature 07/09/2026 Dataset switch read by the shared Core control-bar gadget;
 	// retail data keeps the default. (The Zero Hour tree carries the full set of fork switches.)
 	Bool m_commandButtonAvailabilityCues;			///< control-bar command portraits show a lock badge / brightened available state
+	// WarPowers @feature 26/09/2026 keyboard orders
+	AsciiString m_guardCommandButton;					///< command button the GUARD key binding presses (retail: none)
+	Bool m_preferSelectionQueuesWaypoints;		///< the prefer-selection modifier also queues waypoints (retail: No)
 
 	// network timing values.
 	UnsignedInt m_networkFPSHistoryLength;			///< The number of fps history entries

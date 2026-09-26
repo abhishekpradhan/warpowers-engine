@@ -63,6 +63,7 @@
 #include "GameClient/GUICallbacks.h"
 #include "GameClient/Shell.h"
 #include "GameClient/ControlBar.h"
+#include "GameClient/LookAtXlat.h"
 #include "GameClient/SelectionInfo.h"
 #include "GameClient/SelectionXlat.h"
 
@@ -4313,7 +4314,24 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 			TheInGameUI->toggleAttackMoveToMode();
 			break;
 
+		// WarPowers @feature 26/09/2026 Keyboard guard: presses the dataset's guard command button
+		// (GameData GuardCommandButton) so the same targeting flow runs as a click on the bar.
+		case GameMessage::MSG_META_GUARD:
+		{
+			if( TheControlBar && TheInGameUI && !TheGlobalData->m_guardCommandButton.isEmpty()
+				&& TheInGameUI->areSelectedObjectsControllable() )
+			{
+				const CommandButton *guard = TheControlBar->findCommandButton( TheGlobalData->m_guardCommandButton );
+				if( guard )
+					TheInGameUI->setGUICommand( guard );
+			}
+			disp = DESTROY_MESSAGE;
+			break;
+		}
+
 		case GameMessage::MSG_META_BEGIN_CAMERA_ROTATE_LEFT:
+			if (TheLookAtTranslator && TheLookAtTranslator->isCameraRotationLocked()) // WarPowers @feature 26/09/2026
+				break;
 			DEBUG_ASSERTCRASH(!TheInGameUI->isCameraRotatingLeft(), ("Setting rotate camera left, but it's already set!"));
 			TheInGameUI->setCameraRotateLeft( true );
 			break;
@@ -4326,6 +4344,8 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 				TheTacticalView->rotateCamera(-1.0f / 8.0f, 500, 100, 400);
 			break;
 		case GameMessage::MSG_META_BEGIN_CAMERA_ROTATE_RIGHT:
+			if (TheLookAtTranslator && TheLookAtTranslator->isCameraRotationLocked()) // WarPowers @feature 26/09/2026
+				break;
 			DEBUG_ASSERTCRASH(!TheInGameUI->isCameraRotatingRight(), ("Setting rotate camera right, but it's already set!"));
 			TheInGameUI->setCameraRotateRight( true );
 			break;
@@ -4618,11 +4638,16 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 		//-----------------------------------------------------------------------------------------
 		case GameMessage::MSG_META_BEGIN_PREFER_SELECTION:
 			TheInGameUI->setPreferSelectionMode( true );
+			// WarPowers @feature 26/09/2026 GameData PreferSelectionQueuesWaypoints: the same modifier queues orders
+			if( TheGlobalData->m_preferSelectionQueuesWaypoints )
+				TheInGameUI->setWaypointMode( true );
 			break;
 
 		//-----------------------------------------------------------------------------------------
 		case GameMessage::MSG_META_END_PREFER_SELECTION:
 			TheInGameUI->setPreferSelectionMode( false );
+			if( TheGlobalData->m_preferSelectionQueuesWaypoints )
+				TheInGameUI->setWaypointMode( false );
 			break;
 
 		//-----------------------------------------------------------------------------------------

@@ -826,7 +826,12 @@ void SDL3Mouse::translateWheelEvent(const SDL_MouseWheelEvent& event, MouseIO *r
 	float wheelY = event.y;
 	if (event.direction == SDL_MOUSEWHEEL_FLIPPED)
 		wheelY = -wheelY;
-	result->wheelPos = (Int)(wheelY * MOUSE_WHEEL_DELTA);
+	// WarPowers @fix 26/09/2026 Trackpads deliver many fractional deltas well below one notch;
+	// truncating each event to whole 1/120ths dropped most of them. Carry the remainder over.
+	static float s_wheelRemainder = 0.0f;
+	const float scaled = wheelY * MOUSE_WHEEL_DELTA + s_wheelRemainder;
+	result->wheelPos = (Int)scaled;
+	s_wheelRemainder = scaled - (float)result->wheelPos;
 
 	result->leftState = MBS_None;
 	result->rightState = MBS_None;

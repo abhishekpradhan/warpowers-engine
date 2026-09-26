@@ -173,6 +173,9 @@ static const LookupListRec GameMessageMetaTypeNames[] =
 	{ "TAKE_SCREENSHOT",													GameMessage::MSG_META_TAKE_SCREENSHOT },
 	{ "TAKE_SCREENSHOT_PNG",											GameMessage::MSG_META_TAKE_SCREENSHOT_PNG },
 	{ "ALL_CHEER",																GameMessage::MSG_META_ALL_CHEER },
+	// WarPowers @feature 26/09/2026 keyboard attack-move (the same toggle the control-bar button posts) and guard
+	{ "TOGGLE_ATTACKMOVE",												GameMessage::MSG_META_TOGGLE_ATTACKMOVE },
+	{ "GUARD",																		GameMessage::MSG_META_GUARD },
 
 	{ "BEGIN_CAMERA_ROTATE_LEFT",									GameMessage::MSG_META_BEGIN_CAMERA_ROTATE_LEFT },
 	{ "END_CAMERA_ROTATE_LEFT",										GameMessage::MSG_META_END_CAMERA_ROTATE_LEFT },

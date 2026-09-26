@@ -114,8 +114,15 @@ void LookAtTranslator::stopScrolling()
 //-----------------------------------------------------------------------------
 Bool LookAtTranslator::canScrollAtScreenEdge() const
 {
+#ifdef __EMSCRIPTEN__
+	// WarPowers @tweak 26/09/2026 A browser page cannot capture the cursor. Scroll while the
+	// pointer is over the canvas (SDL reports enter/leave) and stop the moment it leaves.
+	if (!TheMouse->isCursorInside())
+		return false;
+#else
 	if (!TheMouse->isCursorCaptured())
 		return false;
+#endif
 
 	// TheSuperHackers-style fix (WarPowers): this windowed/fullscreen gate was
 	// #ifdef _WIN32, so non-Windows builds edge-scrolled in windowed mode even
@@ -146,7 +153,11 @@ LookAtTranslator::LookAtTranslator() :
 	m_middleButtonDownTimeMsec(0),
 	m_lastPlaneID(INVALID_DRAWABLE_ID),
 	m_lastMouseMoveTimeMsec(0),
-	m_scrollType(SCROLL_NONE)
+	m_scrollType(SCROLL_NONE),
+	m_rmbPending(false),
+	m_cameraRotationLocked(false),
+	m_wasdCameraKeys(false),
+	m_wheelZoomFactor(1.0f)
 {
 	m_anchor.x = m_anchor.y = 0;
 	m_currentPos.x = m_currentPos.y = 0;
@@ -154,6 +165,10 @@ LookAtTranslator::LookAtTranslator() :
 
 	OptionPreferences prefs;
 	m_screenEdgeScrollMode = prefs.getScreenEdgeScrollMode();
+	// WarPowers @feature 26/09/2026 camera preferences from Options.ini
+	m_cameraRotationLocked = prefs.getCameraRotationLocked();
+	m_wasdCameraKeys = prefs.getWASDCameraKeys();
+	m_wheelZoomFactor = prefs.getWheelZoomFactor();
 
 	DEBUG_ASSERTCRASH(!TheLookAtTranslator, ("Already have a LookAtTranslator - why do you need two?"));
 	TheLookAtTranslator = this;
@@ -220,6 +235,21 @@ GameMessageDisposition LookAtTranslator::translateGameMessage(const GameMessage 
 			if (TheShell && TheShell->isShellActive())
 				break;
 
+			// WarPowers @feature 26/09/2026 Optional WASD camera keys (Options.ini CameraKeysWASD). The
+			// letters pan like the arrows and go no further down the translator chain; the shell keeps
+			// every command binding off these keys while the option is on.
+			if (m_wasdCameraKeys)
+			{
+				switch (key)
+				{
+				case KEY_W: key = KEY_UP; disp = DESTROY_MESSAGE; break;
+				case KEY_S: key = KEY_DOWN; disp = DESTROY_MESSAGE; break;
+				case KEY_A: key = KEY_LEFT; disp = DESTROY_MESSAGE; break;
+				case KEY_D: key = KEY_RIGHT; disp = DESTROY_MESSAGE; break;
+				default: break;
+				}
+			}
+
 			switch (key)
 			{
 			case KEY_UP:
@@ -270,7 +300,34 @@ GameMessageDisposition LookAtTranslator::translateGameMessage(const GameMessage 
 
 			if (userWantsRMBScroll && !TheInGameUI->isSelecting() && !m_isScrolling)
 			{
-				setScrolling(SCROLL_RMB);
+				// WarPowers @tweak 26/09/2026 Pan only once the cursor leaves the click tolerance, so a
+				// right-click with a little hand motion stays a click (the order is issued on release)
+				// instead of nudging the camera and being dropped as a drag.
+				m_rmbPending = true;
+			}
+			break;
+		}
+
+		//-----------------------------------------------------------------------------
+		// WarPowers @tweak 26/09/2026 A drag message (button held, pointer moved) promotes the
+		// pending right button to a camera pan once the pointer is further from the press point
+		// than the click tolerance (Mouse.ini DragTolerance). The position message cannot be used
+		// for this: it carries the position from before the frame's events, so a click right after
+		// a fast mouse move would read as a long drag and fling the camera.
+		case GameMessage::MSG_RAW_MOUSE_RIGHT_DRAG:
+		{
+			if (m_rmbPending && !m_isScrolling && !TheInGameUI->isSelecting() && TheInGameUI->getInputEnabled())
+			{
+				const ICoord2D pos = msg->getArgument( 0 )->pixel;
+				const Int dx = pos.x - m_anchor.x;
+				const Int dy = pos.y - m_anchor.y;
+				const Int tolerance = (Int)TheMouse->m_dragTolerance;
+				if (dx * dx + dy * dy > tolerance * tolerance)
+				{
+					m_rmbPending = false;
+					m_currentPos = pos;
+					setScrolling(SCROLL_RMB);
+				}
 			}
 			break;
 		}
@@ -279,6 +336,7 @@ GameMessageDisposition LookAtTranslator::translateGameMessage(const GameMessage 
 		case GameMessage::MSG_RAW_MOUSE_RIGHT_BUTTON_UP:
 		{
 			m_lastMouseMoveTimeMsec = timeGetTime();
+			m_rmbPending = false;
 
 			if (m_scrollType == SCROLL_RMB)
 			{
@@ -294,7 +352,8 @@ GameMessageDisposition LookAtTranslator::translateGameMessage(const GameMessage 
 			m_lastMouseMoveTimeMsec = now;
 			m_middleButtonDownTimeMsec = now;
 
-			m_isRotating = true;
+			// WarPowers @feature 26/09/2026 the rotation lock keeps the middle click-to-reset, not the drag
+			m_isRotating = !m_cameraRotationLocked;
 			m_anchor = msg->getArgument( 0 )->pixel;
 			m_anchorAngle = TheTacticalView->getAngle();
 			m_originalAnchor = msg->getArgument( 0 )->pixel;
@@ -346,8 +405,10 @@ GameMessageDisposition LookAtTranslator::translateGameMessage(const GameMessage 
 				// We don't care how we're scrolling, just stop.
 				if (m_isScrolling)
 					stopScrolling();
+				m_rmbPending = false;
 				break;
 			}
+
 
 			if (canScrollAtScreenEdge())
 			{
@@ -423,7 +484,8 @@ GameMessageDisposition LookAtTranslator::translateGameMessage(const GameMessage 
 			m_lastMouseMoveTimeMsec = timeGetTime();
 
 			const Real spin = msg->getArgument( 1 )->real;
-			const Real zoom = -spin * View::ZoomHeightPerSecond;
+			// WarPowers @tweak 26/09/2026 Options.ini WheelZoomFactor scales the stock 10 units per notch
+			const Real zoom = -spin * View::ZoomHeightPerSecond * m_wheelZoomFactor;
 			TheTacticalView->userZoom(zoom);
 
 			break;
@@ -444,7 +506,15 @@ GameMessageDisposition LookAtTranslator::translateGameMessage(const GameMessage 
 		{
 			Coord2D offset = {0, 0};
 
-			if (m_isScrolling && !TheInGameUI->isScrolling())
+			// WarPowers @fix 26/09/2026 the pointer left the window (or capture ended): stop edge scrolling.
+			// The mouse-position handler cannot do it because no position event arrives after a leave.
+			if (m_isScrolling && m_scrollType == SCROLL_SCREENEDGE && !canScrollAtScreenEdge())
+			{
+				TheInGameUI->setScrollAmount(offset);
+				TheTacticalView->scrollBy(&offset);
+				stopScrolling();
+			}
+			else if (m_isScrolling && !TheInGameUI->isScrolling())
 			{
 				// If we've been forced to stop scrolling (script action?)
 				TheInGameUI->setScrollAmount(offset);
@@ -777,6 +847,7 @@ GameMessageDisposition LookAtTranslator::translateGameMessage(const GameMessage 
 void LookAtTranslator::resetModes()
 {
 	m_isScrolling = FALSE;
+	m_rmbPending = FALSE;
 	m_isRotating = FALSE;
 	m_isPitching = FALSE;
 	m_isPitchingToDefault = FALSE;
